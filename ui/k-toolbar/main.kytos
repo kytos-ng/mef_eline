@@ -6,17 +6,27 @@
                     title="Circuit Name:" tooltip="Circuit name"
                     placeholder="Circuit Name" icon="pencil"></k-input>
 
-           <k-input id="endpoint-a-input" :value.sync="endpoint_a"
+           <k-input-auto id="endpoint-a-input" :value.sync="endpoint_a"
                     title="Endpoint A:"
                     tooltip="Endpoint A (format: dpid:port_number)"
-                    placeholder="First endpoint" icon="arrow-right"></k-input>
+                    placeholder="First endpoint" icon="arrow-right"
+                    :candidates="dpids" 
+                    @focus="fetchDpids"
+					v-if="compexists"
+                    ></k-input-auto>
+            <k-input id="endpoint-a-input" :value.sync="endpoint_a"
+                    title="Endpoint A:"
+                    tooltip="Endpoint A (format: dpid:port_number)"
+                    placeholder="First endpoint" icon="arrow-right"
+					v-else
+                    ></k-input> 
 
-           <k-input id="endpoint-a-input" :value.sync="tag_type_a"
+           <k-input id="endpoint-a-tag-type" :value.sync="tag_type_a"
                     title="Tag Type A:"
                     tooltip="Enter with a Tag Type"
                     placeholder="tag type" icon="arrow-right"></k-input>
 
-           <k-input id="endpoint-a-input" :value.sync="tag_value_a"
+           <k-input id="endpoint-a-tag-value" :value.sync="tag_value_a"
                     title="Tag Value A:"
                     tooltip="Enter with a Tag value"
                     placeholder="tag value" icon="arrow-right"></k-input>
@@ -24,14 +34,24 @@
            <k-input id="endpoint-z-input" :value.sync="endpoint_z"
                     title="Endpoint Z:"
                     tooltip="Endpoint Z (format: dpid:port_number)"
-                    placeholder="Last endpoint" icon="arrow-left"></k-input>
+                    placeholder="Last endpoint" icon="arrow-left"
+                    :candidates="dpids"
+                    @focus="fetchDpids"
+					v-if="compexists"></k-input >
+           
+           <k-input id="endpoint-z-input" :value.sync="endpoint_z"
+                    title="Endpoint Z:"
+                    tooltip="Endpoint Z (format: dpid:port_number)"
+                    placeholder="Last endpoint" icon="arrow-left"
+                    v-else
+                    ></k-input>
 
-           <k-input id="endpoint-a-input" :value.sync="tag_type_z"
+           <k-input id="endpoint-z-tag_type" :value.sync="tag_type_z"
                     title="Tag Type Z:"
                     tooltip="Enter with a Tag Type Z"
                     placeholder="tag type" icon="arrow-right"></k-input>
 
-           <k-input id="endpoint-a-input" :value.sync="tag_value_z"
+           <k-input id="endpoint-z-tag-value" :value.sync="tag_value_z"
                     title="Tag Value Z:"
                     tooltip="Enter with a Tag Value Z"
                     placeholder="tag value" icon="arrow-right"></k-input>
@@ -59,7 +79,9 @@ module.exports = {
         tag_value_a: "",
         endpoint_z: "",
         tag_type_z: "",
-        tag_value_z: ""
+        tag_value_z: "",
+        dpids: [""],
+        hasAutoComplete:false
     }
   },
   methods: {
@@ -119,7 +141,27 @@ module.exports = {
                     
         circuit_request.done(this.post_success)
         circuit_request.fail(this.post_error)
+    },
+    fetchDpids: function() {
+        var self = this // create a closure to access component in the callback below
+        dataUrl = "/api/kytos/topology/v3/interfaces"
+        // Autocomplete usage example.
+        fetch(dataUrl).then(response => response.json())
+                    .then(data => {
+                        dpids = []
+                        for ( const [key,value] of Object.entries( data.interfaces ) ) {
+                            dpids.push(key)
+                        }
+                        self.dpids = dpids
+                    })
     }
+  },
+  mounted() { // when the Vue app is booted up, this is run automatically.
+    this.fetchDpids();
+    compexists = this.$root.$options.components['k-input-auto'] != null;
+  },
+  created() {
+    compexists = this.$root.$options.components['k-input-auto'] != null;
   }
 }
 </script>

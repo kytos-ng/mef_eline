@@ -1,71 +1,112 @@
 <template>
-    <k-table v-if="this.rows.length" title="List of EVCs"
-        :headers="this.headers"
-        :rows="this.rows">
-    </k-table>
+    <div v-if="component_key > 0">
+      <div class="mef_container">
+        <k-table title="List of EVCs"
+            :headers="data_headers"
+            :rows="data_rows"
+            key="component_key">
+        </k-table>
+      </div>
+    </div>
     <div v-else>
       <p class='empty-con-list'>No EVCs Installed.<br>
       Close this info-panel and try again, please.</p>
     </div>
-
 </template>
+
 <script>
 module.exports = {
   data(){
     return {
-        headers: ['Name ', 'Endpoint A' , 'Tag A' , 'Endpoint Z' , 'Tag Z' , 'Enabled' , 'Active'],
-        rows: this.listEVCs()
+        component_key: 0,
+        data_headers: ['Name ', 'Endpoint A' , 'Tag A' , 'Endpoint Z' , 'Tag Z' , 'Enabled' , 'Active'],
+        data_rows: [],
     }
   },
   methods: {
-    listEVCs() {
+    forceRerender: function() {
+      // Verificar porque precisa de 2x clicks no botao
+      this.component_key += 1;
+    },
+    listEVCs: function() {
+      this.component_key = 0;
       var tableRows = [];
+      var _this = this;
 
-      $.ajax({
+      var request = $.ajax({
         url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/",
         type:"GET",
         data: JSON.stringify(),
         dataType: "json",
-        contentType: "application/json; charset=utf-8",
-        success: function(data, textStatus) {
+        contentType: "application/json; charset=utf-8"
+      });
+      request.done(function(data) {
           $.each(data, function(i , evc) {
-            var connection = {
-              "Name": evc.name,
-              "Endpoint A": evc.uni_a.interface_id,
-              "Tag A": evc.uni_a.tag.value,
-              "Endpoint Z": evc.uni_z.interface_id,
-              "Tag Z": evc.uni_z.tag.value,
-              "Enabled": evc.enabled,
-              "Active": evc.active
-            };
-
-            tableRows.push(connection);
+            if (evc) {
+              let _endpoint_a =  (evc.uni_a) ? evc.uni_a.interface_id : "";
+              let _tag_a = (evc.uni_a && evc.uni_a.tag) ? evc.uni_a.tag.value : "";  
+              let _endpoint_z =  (evc.uni_z) ? evc.uni_z.interface_id : "";
+              let _tag_z = (evc.uni_z && evc.uni_z.tag) ? evc.uni_z.tag.value : "";  
+              
+              let connection = {
+                "Name": evc.name,
+                "Endpoint A": _endpoint_a,
+                "Tag A": _tag_a,
+                "Endpoint Z": _endpoint_z,
+                "Tag Z": _tag_z,
+                "Enabled": evc.enabled,
+                "Active": evc.active
+              };
+              tableRows.push(connection);
+            }
           });
-        },
-        error: function(data) {
-          /* This info-panel will show a message that there are
-           * no EVCs installed - no need to show the response */
-        },
-      })
 
+          _this.data_rows = tableRows;
+          _this.forceRerender(); 
+      });
+
+      request.fail(function( jqXHR, textStatus ) {
+        alert( "Request failed: " + textStatus );
+      });
+      
       return tableRows;
-    }
+    },
   },
-  computed: { 
-    emptyTable: function() {
-      return this.listEVCs().length > 0
-    }
+  mounted() {
+    this.listEVCs();
+    // Make the panel fill the screen except the left menu width
+    this.$parent.$el.style.width = "calc(100% - 300px)";
   }
- }
+}
 </script>
 
-
 <style>
+  .empty-con-list {
+    margin-top: 10px;
+    color: #ccc;
+    font-size: 0.8rem;
+  }
 
-.empty-con-list {
-  margin-top: 10px;
-  color: #ccc;
-  font-size: 0.8rem;
+.mef_container table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.8em;
 }
-
+.mef_container tr:nth-child(even) {
+    background-color: #3f3f3f;
+}
+.mef_container tr:hover {
+  background-color: #4f4f4f;
+}
+.mef_container td {
+    border-left: 1px solid darkgray;
+    padding: 5px;
+}
+.mef_container th {
+  background-color: #372C5E;
+  color: white;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  text-align: left;
+}
 </style>
