@@ -328,8 +328,8 @@ components:
         interface_id:
           type: string
           minLength: 25
-          maxLength: 26
-          pattern: '^([0-9A-Fa-f]{2}[:-]){8}(\d{1,2})$'
+          maxLength: 30
+          pattern: '^([0-9A-Fa-f]{2}[:-]){8}(\d{1,5})$'
         tag:
           $ref: '#/components/schemas/Tag'
 

@@ -207,19 +207,13 @@ class Main(KytosNApp):
                         errors = result.errors[0]
                         if hasattr(errors,'schema_errors'):
                             schema_errors = errors.schema_errors[0]
-                            error_message = schema_errors.message
-                            error_validator = schema_errors.validator
-                            error_validator_value=schema_errors.validator_value
-                            error_path = list(schema_errors.path)
-                            error_schema = schema_errors.schema
-                            error_schema_path = list(schema_errors.schema_path)
                             error_response = {
-                                "error_message" : error_message,
-                                "error_validator" : error_validator,
-                                "error_validator_value" : error_validator_value,
-                                "error_path" : error_path,
-                                "error_schema" : error_schema,
-                                "error_schema_path" : error_schema_path
+                                "error_message" : schema_errors.message,
+                                "error_validator" : schema_errors.validator,
+                                "error_validator_value" : schema_errors.validator_value,
+                                "error_path" : list(schema_errors.path),
+                                "error_schema" : schema_errors.schema,
+                                "error_schema_path" : list(schema_errors.schema_path)
                             }
                             log.info('error response : %s', error_response)
                             raise BadRequest(error_response)
