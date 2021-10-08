@@ -54,20 +54,12 @@ class Main(KytosNApp):
         try:
             spec_error = validate_spec(spec_dict)
         except ValueError as err:
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": err})
-            ) from err
+            log.debug("validate spec_dict error: %s" % err)
+            raise BadRequest(err)
         else:
             if spec_error:
-                raise BadRequest(
-                    json.dumps(
-                        {
-                            "httpStatus": 400,
-                            "message": spec_error,
-                            "spec_url": spec_url,
-                        }
-                    )
-                ) from spec_error
+                log.debug("invalid spec error: %s" % spec_err)
+                raise BadRequest(spec_err)
         self.spec = create_spec(spec_dict)
 
         # object used to scheduler circuit events
@@ -202,34 +194,35 @@ class Main(KytosNApp):
         try:
             data = request.get_json()
         except BadRequest:
-            result = "The request body is not a well-formed JSON."
-            log.debug("create_circuit result %s %s", result, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
-        validator = RequestValidator(self.spec)
-        openapi_request = FlaskOpenAPIRequest(request)
-        result = validator.validate(openapi_request)
-        if result.errors:
-            errors = result.errors[0]
-            if hasattr(errors, "schema_errors"):
-                schema_errors = errors.schema_errors[0]
-                error_response = {
-                    "error_message": schema_errors.message,
-                    "error_validator": schema_errors.validator,
-                    "error_validator_value": schema_errors.validator_value,
-                    "error_path": list(schema_errors.path),
-                    "error_schema": schema_errors.schema,
-                    "error_schema_path": list(schema_errors.schema_path),
-                }
-                log.debug("error response: %s", error_response)
-            else:
-                error_response = (
-                    "The request body mimetype is not application/json."
-                )
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": error_response})
-            ) from BadRequest
+            result = 'The request body is not a well-formed JSON.'
+            log.debug('create_circuit result %s %s', result, 400)
+            raise BadRequest(result)
+        if data is None:
+            result = 'The request body mimetype is not application/json.'
+            log.debug('create_circuit result %s %s', result, 415)
+            raise UnsupportedMediaType(result)
+        else:
+            validator = RequestValidator(self.spec)
+            openapi_request = FlaskOpenAPIRequest(request)
+            result = validator.validate(openapi_request)
+            errors = result.errors
+            if errors:
+                errors = result.errors[0]
+                if hasattr(errors,'schema_errors'):
+                    schema_errors = errors.schema_errors[0]
+                    error_response = {
+                        "error_message": schema_errors.message,
+                        "error_validator": schema_errors.validator,
+                        "error_validator_value": schema_errors.validator_value,
+                        "error_path": list(schema_errors.path),
+                        "error_schema": schema_errors.schema,
+                        "error_schema_path": list(schema_errors.schema_path)
+                    }
+                    log.debug('error response: %s', error_response)
+                    raise BadRequest(error_response)
+                else:
+                    raise BadRequest('no schema errors, \
+                                    check url match in spec file')
         try:
             evc = self._evc_from_dict(data)
         except ValueError as exception:
