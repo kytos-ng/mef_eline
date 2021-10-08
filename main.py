@@ -14,20 +14,18 @@ from kytos.core.events import KytosEvent
 from kytos.core.helpers import listen_to
 from kytos.core.interface import TAG, UNI
 from kytos.core.link import Link
+from kytos.core.napps import NAppsManager
 from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
 from napps.kytos.mef_eline.storehouse import StoreHouse
 from napps.kytos.mef_eline.utils import emit_event
 
-""" Modules for OpenAPI Specification 3.0 """
-import os
 import json
 from openapi_core import create_spec
 from openapi_core.validation.request.validators import RequestValidator
 from openapi_core.contrib.requests import RequestsOpenAPIRequest
 from openapi_core.contrib.flask import FlaskOpenAPIRequest
-
 from openapi_spec_validator import validate_spec
 from openapi_spec_validator.readers import read_from_filename
 
@@ -46,6 +44,24 @@ class Main(KytosNApp):
 
         So, if you have any setup routine, insert it here.
         """
+        # Validate Spec
+        self.napps_manager = NAppsManager(self.controller)
+        enabled_path = str(self.napps_manager._enabled_path)
+        if enabled_path[:2] == "//":
+            enabled_path = enabled_path[1:]
+        yml_file = enabled_path+"/.installed/kytos/mef_eline/openapi.yml"
+        spec_dict, spec_url = read_from_filename(yml_file)
+        try:
+            spec_error = validate_spec(spec_dict)
+        except ValueError as err:
+            log.debug("validate spec_dict error: %s" % err)
+            raise BadRequest(err)
+        else:
+            if spec_error:
+                log.debug("invalid spec error: %s" % spec_err)
+                raise BadRequest(spec_err)
+        self.spec = create_spec(spec_dict)
+
         # object used to scheduler circuit events
         self.sched = Scheduler()
 
@@ -148,50 +164,31 @@ class Main(KytosNApp):
             result = 'The request body is not a well-formed JSON.'
             log.debug('create_circuit result %s %s', result, 400)
             raise BadRequest(result)
-
         if data is None:
             result = 'The request body mimetype is not application/json.'
             log.debug('create_circuit result %s %s', result, 415)
             raise UnsupportedMediaType(result)
         else:
-            log.info('############ validate spec: ################')
-            #home_dir = os.getcwd()
-            #yaml_file = "/home_dir/kytos/mef_eline/openapi.yml"
-            yaml_file = "/src/kytos-mef-eline/openapi.yml"
-            spec_dict, spec_url = read_from_filename(yaml_file)
-            # If no exception is raised by validate_spec(), the spec is valid.
-            try:
-                spec_error = validate_spec(spec_dict)
-            except ValueError as err:
-                log.info("validate spec_dict error: %s" % err)
-                raise BadRequest(err)
-            else:
-                if spec_error:
-                    log.info("invalid spec error: %s" % spec_err)
-                    raise BadRequest(spec_err)
+            validator = RequestValidator(self.spec)
+            openapi_request = FlaskOpenAPIRequest(request)
+            result = validator.validate(openapi_request)
+            errors = result.errors
+            if errors:
+                errors = result.errors[0]
+                if hasattr(errors,'schema_errors'):
+                    schema_errors = errors.schema_errors[0]
+                    error_response = {
+                        "error_message": schema_errors.message,
+                        "error_validator": schema_errors.validator,
+                        "error_validator_value": schema_errors.validator_value,
+                        "error_path": list(schema_errors.path),
+                        "error_schema": schema_errors.schema,
+                        "error_schema_path": list(schema_errors.schema_path)
+                    }
+                    log.debug('error response: %s', error_response)
+                    raise BadRequest(error_response)
                 else:
-                    spec = create_spec(spec_dict)
-                    validator = RequestValidator(spec)
-                    openapi_request = FlaskOpenAPIRequest(request)
-                    result = validator.validate(openapi_request)
-                    # get list of errors
-                    errors = result.errors
-                    if errors:
-                        errors = result.errors[0]
-                        if hasattr(errors,'schema_errors'):
-                            schema_errors = errors.schema_errors[0]
-                            error_response = {
-                                "error_message" : schema_errors.message,
-                                "error_validator" : schema_errors.validator,
-                                "error_validator_value" : schema_errors.validator_value,
-                                "error_path" : list(schema_errors.path),
-                                "error_schema" : schema_errors.schema,
-                                "error_schema_path" : list(schema_errors.schema_path)
-                            }
-                            log.info('error response : %s', error_response)
-                            raise BadRequest(error_response)
-                        else:
-                            raise BadRequest('no schema errors, \
+                    raise BadRequest('no schema errors, \
                                     check url match in spec file')
         try:
             evc = self._evc_from_dict(data)
