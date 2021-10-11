@@ -31,13 +31,13 @@
                     tooltip="Enter with a Tag value"
                     placeholder="tag value" icon="arrow-right"></k-input>
 
-           <k-input id="endpoint-z-input" :value.sync="endpoint_z"
+           <k-input-auto id="endpoint-z-input" :value.sync="endpoint_z"
                     title="Endpoint Z:"
                     tooltip="Endpoint Z (format: dpid:port_number)"
                     placeholder="Last endpoint" icon="arrow-left"
                     :candidates="dpids"
                     @focus="fetchDpids"
-					v-if="compexists"></k-input >
+					v-if="compexists"></k-input-auto>
            
            <k-input id="endpoint-z-input" :value.sync="endpoint_z"
                     title="Endpoint Z:"
@@ -93,7 +93,7 @@ module.exports = {
             title: "View Connections",
             subtitle: "by kytos/mef_eline"
         }
-        this.$kytos.$emit("showInfoPanel", listConnections)
+        this.$kytos.$emit("showInfoPanel", listConnections);
     },
     post_success(data) {
         let notification = {
