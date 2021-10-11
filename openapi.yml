@@ -4,8 +4,7 @@ info:
   title: Kytos Circuit Provisioning
   description: Kytos NApp for provisioning of SDN circuits.
 servers:
-  - url: http://0.0.0.0:8181/api/kytos/mef_eline
-    description: Local server (uses test data)
+  - url: /api/kytos/mef_eline
 paths:
   /v2/evc/:
     get:
