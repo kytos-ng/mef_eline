@@ -1,3 +1,4 @@
 apscheduler
-openapi-core
-requests
+openapi-core==0.14.2
+pip==21.2.4
+requests==2.23.0
