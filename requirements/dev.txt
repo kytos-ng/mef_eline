@@ -7,19 +7,19 @@
 -e git+https://github.com/kytos/kytos.git#egg=kytos
 -e .
 -e git+https://github.com/kytos/python-openflow.git#egg=python-openflow
-astroid==2.3.3            # via pylint
+astroid==2.3.0            # via pylint
 click==7.1.1              # via pip-tools
 coverage==5.0.4
 docopt==0.6.2             # via yala
 first==2.0.1              # via pip-tools
 isort==4.3.4              # via pylint, yala
-lazy-object-proxy==1.4.3  # via astroid
+lazy-object-proxy==1.6.0  # via astroid
 mccabe==0.6.1             # via pylint
 pip-tools==4.5.1
 pycodestyle==2.5.0        # via yala
 pydocstyle==5.1.1         # via yala
 pylint==2.4.4             # via yala
-pytest==5.4.1             # via pytest
+pytest==6.2.5             # via pytest
 six==1.15.0               # via astroid, pip-tools, pydocstyle, tox
 snowballstemmer==2.0.0    # via pydocstyle
 typed-ast==1.4.1          # via astroid
