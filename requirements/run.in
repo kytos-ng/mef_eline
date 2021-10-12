@@ -1,4 +1,4 @@
 apscheduler
-openapi-core==0.14.2
+openapi-core
 requests
 glom
