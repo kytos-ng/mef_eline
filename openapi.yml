@@ -230,6 +230,8 @@ components:
       properties:
         name:
           type: string
+        frequency:
+          type: string
         uni_a:
           $ref: '#/components/schemas/Endpoint'
         uni_z:
@@ -251,12 +253,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Path'
+        primary_path:
+          type: array
+          items:
+            $ref: '#/components/schemas/Path'
+        dynamic_backup_path:
+          type: boolean
         circuit_scheduler:
           type: array
           items:
             $ref: '#/components/schemas/CircuitSchedule'
-        dynamic_backup_path:
-          type: boolean
+        priority:
+          type: integer
+          format: int64
         enabled:
           type: boolean
 
