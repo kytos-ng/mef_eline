@@ -15,6 +15,7 @@ first==2.0.1              # via pip-tools
 isort==4.3.4              # via pylint, yala
 lazy-object-proxy==1.4.3  # via astroid
 mccabe==0.6.1             # via pylint
+openapi-core==0.14.2
 pip-tools==4.5.1
 pycodestyle==2.5.0        # via yala
 pydocstyle==5.1.1         # via yala
