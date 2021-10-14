@@ -54,6 +54,17 @@ class Path(list, GenericEntity):
             link.make_tag_available(link.get_metadata('s_vlan'))
             link.remove_metadata('s_vlan')
 
+    def is_valid(self, switch_a, switch_z):
+        """Check if this is a valid path."""
+        previous = switch_a
+        for link in self:
+            if link.endpoint_a.switch != previous:
+                return False
+            previous = link.endpoint_b.switch
+        if previous == switch_z:
+            return True
+        return False
+
     @property
     def status(self):
         """Check for the  status of a path.
