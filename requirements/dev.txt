@@ -6,7 +6,7 @@
 #
 -e git+https://github.com/kytos/kytos.git#egg=kytos
     # via -r requirements/dev.in
--e file:///home/ubuntu/kytos/mef_eline
+-e .
     # via -r requirements/dev.in
 -e git+https://github.com/kytos/python-openflow.git#egg=python-openflow
     # via
