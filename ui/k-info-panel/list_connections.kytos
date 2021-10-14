@@ -1,11 +1,34 @@
 <template>
     <div v-if="component_key > 0">
       <div class="mef_container">
-        <k-table title="List of EVCs"
-            :headers="data_headers"
-            :rows="data_rows"
-            key="component_key">
-        </k-table>
+        <div class="mef-table no-compact">
+          <div class="mef-table-divisor">
+            <table class="table mef-table-list-circuit">
+              <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col" class="header" v-for="(header, index) in data_headers">
+                  {{ header }}
+                </th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr v-for="(row, rindex) in data_rows" @click="rowClicked(row['id'])">
+                <th scope="row" style="width: 45px">{{ rindex }}</th>
+                <template v-for="(column, cindex) in row"> 
+                  <td v-if="cindex != 'id'">
+                    <span v-if="cindex == 'Enabled' || cindex == 'Active'">
+                      <i class="material-icons" style="color:#c00000" v-if="column">close</i>
+                      <i class="material-icons" style="color:green" v-else>done</i>
+                    </span>
+                    <span v-else>{{ column }}</span>
+                  </td>
+                </template>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
     <div v-else>
@@ -20,12 +43,24 @@ module.exports = {
     return {
         component_key: 0,
         data_headers: ['Name ', 'Endpoint A' , 'Tag A' , 'Endpoint Z' , 'Tag Z' , 'Enabled' , 'Active'],
-        data_rows: [],
+        data_rows: []
     }
   },
   methods: {
+    rowClicked: function(id) {
+      this.open_circuit(id);
+    },
+    open_circuit: function(id) {
+      var content = {
+        "component": 'kytos-mef_eline-k-info-panel-show_circuit',
+        "content": {'id':id},
+        "icon": "gear",
+        "title": "Circuit Details",
+        "subtitle": "by kytos/mef_eline"
+      }
+      this.$kytos.$emit("showInfoPanel", content);
+    },
     forceRerender: function() {
-      // Verificar porque precisa de 2x clicks no botao
       this.component_key += 1;
     },
     listEVCs: function() {
@@ -49,6 +84,7 @@ module.exports = {
               let _tag_z = (evc.uni_z && evc.uni_z.tag) ? evc.uni_z.tag.value : "";  
               
               let connection = {
+                "id": evc.id,
                 "Name": evc.name,
                 "Endpoint A": _endpoint_a,
                 "Tag A": _tag_a,
@@ -81,32 +117,56 @@ module.exports = {
 </script>
 
 <style>
-  .empty-con-list {
-    margin-top: 10px;
-    color: #ccc;
-    font-size: 0.8rem;
-  }
+/* Import icons */
+@import "https://fonts.googleapis.com/icon?family=Material+Icons";
 
-.mef_container table {
-  border-collapse: collapse;
+.empty-con-list {
+  margin-top: 10px;
+  color: #ccc;
+  font-size: 0.8rem;
+}
+
+.mef-table {
+  color: #ccc;
+  max-height: 250px;
+  text-align: center;
+  margin: 0 auto;
+  display: block;
+  padding: 0.5em 0 1em 0.3em;
+  font-size: .8em;
+  height: 190px;
+}
+.mef-table table {
+  display: table;
   width: 100%;
-  font-size: 0.8em;
 }
-.mef_container tr:nth-child(even) {
-    background-color: #3f3f3f;
+.mef-table thead {
+  font-weight: bold;
+  background: #554077;
 }
-.mef_container tr:hover {
-  background-color: #4f4f4f;
+.mef-table th {
+    padding: 10px 0;
 }
-.mef_container td {
-    border-left: 1px solid darkgray;
-    padding: 5px;
+.mef-table tr {
+    color: lightgray;
 }
-.mef_container th {
-  background-color: #372C5E;
-  color: white;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  text-align: left;
+.mef-table tbody tr:nth-child(even) {
+  background: #414141;
+}
+.mef-table .header {
+  cursor: pointer;
+}
+.mef-table-divisor {
+  height: 190px;
+}
+
+.mef-table-list-circuit tbody tr:hover {
+    color: #eee;
+    background-color: #666;
+}
+
+.order-dir {
+  display: inline-block;
+  width: 12px;
 }
 </style>

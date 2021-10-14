@@ -19,7 +19,7 @@ def test_required():
         "bandwidth": json_data["bandwidth"],
         "dynamic_backup_path": True
     }
-    request_data=json.dumps(payload)
+    request_data = json.dumps(payload)
     response = requests.post(url=url, data=request_data, headers=headers)
     json_response = response.json()
     assert response.status_code == 400
@@ -44,11 +44,12 @@ def test_additionalProperties():
         "dynamic_backup_path": True,
         "active": True
     }
-    request_data=json.dumps(payload)
+    request_data = json.dumps(payload)
     response = requests.post(url=url, data=request_data, headers=headers)
     json_response = response.json()
     assert response.status_code == 400
-    assert 'additionalProperties' in json_response['description']['error_validator']
+    assert 'additionalProperties' in \
+        json_response['description']['error_validator']
 
 
 def test_pattern():
@@ -69,7 +70,7 @@ def test_pattern():
         "bandwidth": json_data["bandwidth"],
         "dynamic_backup_path": True
     }
-    request_data=json.dumps(payload)
+    request_data = json.dumps(payload)
     response = requests.post(url=url, data=request_data, headers=headers)
     json_response = response.json()
     assert response.status_code == 400
@@ -99,10 +100,8 @@ def test_type():
         "bandwidth": json_data["bandwidth"],
         "dynamic_backup_path": True
     }
-    request_data=json.dumps(payload)
+    request_data = json.dumps(payload)
     response = requests.post(url=url, data=request_data, headers=headers)
     json_response = response.json()
     assert response.status_code == 400
     assert 'type' in json_response['description']['error_validator']
-
-

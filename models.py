@@ -46,13 +46,13 @@ class Path(list, GenericEntity):
         for link in self:
             tag = link.get_next_available_tag()
             link.use_tag(tag)
-            link.add_metadata('s_vlan', tag)
+            link.add_metadata("s_vlan", tag)
 
     def make_vlans_available(self):
         """Make the VLANs used in a path available when undeployed."""
         for link in self:
-            link.make_tag_available(link.get_metadata('s_vlan'))
-            link.remove_metadata('s_vlan')
+            link.make_tag_available(link.get_metadata("s_vlan"))
+            link.remove_metadata("s_vlan")
 
     @property
     def status(self):
@@ -63,22 +63,25 @@ class Path(list, GenericEntity):
         if not self:
             return EntityStatus.DISABLED
 
-        endpoint = '%s/%s' % (settings.TOPOLOGY_URL, 'links')
+        endpoint = f"{0}/{1}".format(settings.TOPOLOGY_URL, "links")
         api_reply = requests.get(endpoint)
-        if api_reply.status_code != getattr(requests.codes, 'ok'):
-            log.error('Failed to get links at %s. Returned %s',
-                      endpoint, api_reply.status_code)
+        if api_reply.status_code != getattr(requests.codes, "ok"):
+            log.error(
+                "Failed to get links at %s. Returned %s",
+                endpoint,
+                api_reply.status_code,
+            )
             return None
-        links = api_reply.json()['links']
+        links = api_reply.json()["links"]
         return_status = EntityStatus.UP
         for path_link in self:
             try:
                 link = links[path_link.id]
             except KeyError:
                 return EntityStatus.DISABLED
-            if link['enabled'] is False:
+            if link["enabled"] is False:
                 return EntityStatus.DISABLED
-            if link['active'] is False:
+            if link["active"] is False:
                 return_status = EntityStatus.DOWN
         return return_status
 
@@ -101,16 +104,20 @@ class DynamicPathManager:
     def get_paths(circuit):
         """Get a valid path for the circuit from the Pathfinder."""
         endpoint = settings.PATHFINDER_URL
-        request_data = {"source": circuit.uni_a.interface.id,
-                        "destination": circuit.uni_z.interface.id}
+        request_data = {
+            "source": circuit.uni_a.interface.id,
+            "destination": circuit.uni_z.interface.id,
+        }
         api_reply = requests.post(endpoint, json=request_data)
-
-        if api_reply.status_code != getattr(requests.codes, 'ok'):
-            log.error("Failed to get paths at %s. Returned %s",
-                      endpoint, api_reply.status_code)
+        if api_reply.status_code != getattr(requests.codes, "ok"):
+            log.error(
+                "Failed to get paths at %s. Returned %s",
+                endpoint,
+                api_reply.status_code,
+            )
             return None
         reply_data = api_reply.json()
-        return reply_data.get('paths')
+        return reply_data.get("paths")
 
     @staticmethod
     def _clear_path(path):
@@ -122,24 +129,22 @@ class DynamicPathManager:
         """Return the best path available for a circuit, if exists."""
         paths = cls.get_paths(circuit)
         if paths:
-            return cls.create_path(cls.get_paths(circuit)[0]['hops'])
+            return cls.create_path(cls.get_paths(circuit)[0]["hops"])
         return None
 
     @classmethod
     def get_best_paths(cls, circuit):
         """Return the best paths available for a circuit, if they exist."""
         for path in cls.get_paths(circuit):
-            yield cls.create_path(path['hops'])
+            yield cls.create_path(path["hops"])
 
     @classmethod
     def create_path(cls, path):
         """Return the path containing only the interfaces."""
         new_path = Path()
         clean_path = cls._clear_path(path)
-
         if len(clean_path) % 2:
             return None
-
         for link in zip(clean_path[1:-1:2], clean_path[2::2]):
             interface_a = cls.controller.get_interface_by_id(link[0])
             interface_b = cls.controller.get_interface_by_id(link[1])
@@ -154,10 +159,13 @@ class EVCBase(GenericEntity):
     """Class to represent a circuit."""
 
     read_only_attributes = [
-        'creation_time', 'active', 'current_path',
-        '_id', 'archived'
+        "creation_time",
+        "active",
+        "current_path",
+        "_id",
+        "archived",
     ]
-    required_attributes = ['name', 'uni_a', 'uni_z']
+    required_attributes = ["name", "uni_a", "uni_z"]
 
     def __init__(self, controller, **kwargs):
         """Create an EVC instance with the provided parameters.
@@ -202,27 +210,27 @@ class EVCBase(GenericEntity):
         super().__init__()
 
         # required attributes
-        self._id = kwargs.get('id', uuid4().hex)[:14]
-        self.uni_a = kwargs.get('uni_a')
-        self.uni_z = kwargs.get('uni_z')
-        self.name = kwargs.get('name')
+        self._id = kwargs.get("id", uuid4().hex)[:14]
+        self.uni_a = kwargs.get("uni_a")
+        self.uni_z = kwargs.get("uni_z")
+        self.name = kwargs.get("name")
 
         # optional attributes
-        self.start_date = get_time(kwargs.get('start_date')) or now()
-        self.end_date = get_time(kwargs.get('end_date')) or None
-        self.queue_id = kwargs.get('queue_id', None)
+        self.start_date = get_time(kwargs.get("start_date")) or now()
+        self.end_date = get_time(kwargs.get("end_date")) or None
+        self.queue_id = kwargs.get("queue_id", None)
 
-        self.bandwidth = kwargs.get('bandwidth', 0)
-        self.primary_links = Path(kwargs.get('primary_links', []))
-        self.backup_links = Path(kwargs.get('backup_links', []))
-        self.current_path = Path(kwargs.get('current_path', []))
-        self.primary_path = Path(kwargs.get('primary_path', []))
-        self.backup_path = Path(kwargs.get('backup_path', []))
-        self.dynamic_backup_path = kwargs.get('dynamic_backup_path', False)
-        self.creation_time = get_time(kwargs.get('creation_time')) or now()
-        self.owner = kwargs.get('owner', None)
-        self.priority = kwargs.get('priority', -1)
-        self.circuit_scheduler = kwargs.get('circuit_scheduler', [])
+        self.bandwidth = kwargs.get("bandwidth", 0)
+        self.primary_links = Path(kwargs.get("primary_links", []))
+        self.backup_links = Path(kwargs.get("backup_links", []))
+        self.current_path = Path(kwargs.get("current_path", []))
+        self.primary_path = Path(kwargs.get("primary_path", []))
+        self.backup_path = Path(kwargs.get("backup_path", []))
+        self.dynamic_backup_path = kwargs.get("dynamic_backup_path", False)
+        self.creation_time = get_time(kwargs.get("creation_time")) or now()
+        self.owner = kwargs.get("owner", None)
+        self.priority = kwargs.get("priority", -1)
+        self.circuit_scheduler = kwargs.get("circuit_scheduler", [])
 
         self.current_links_cache = set()
         self.primary_links_cache = set()
@@ -230,31 +238,31 @@ class EVCBase(GenericEntity):
 
         self.lock = Lock()
 
-        self.archived = kwargs.get('archived', False)
+        self.archived = kwargs.get("archived", False)
 
         self._storehouse = StoreHouse(controller)
         self._controller = controller
 
-        if kwargs.get('active', False):
+        if kwargs.get("active", False):
             self.activate()
         else:
             self.deactivate()
 
-        if kwargs.get('enabled', False):
+        if kwargs.get("enabled", False):
             self.enable()
         else:
             self.disable()
 
         # datetime of user request for a EVC (or datetime when object was
         # created)
-        self.request_time = kwargs.get('request_time', now())
+        self.request_time = kwargs.get("request_time", now())
         # dict with the user original request (input)
         self._requested = kwargs
 
     def sync(self):
         """Sync this EVC in the storehouse."""
         self._storehouse.save_evc(self)
-        log.info(f'EVC {self.id} was synced to the storehouse.')
+        log.info(f"EVC {self.id} was synced to the storehouse.")
 
     def update(self, **kwargs):
         """Update evc attributes.
@@ -272,9 +280,9 @@ class EVCBase(GenericEntity):
         enable, redeploy = (None, None)
         for attribute, value in kwargs.items():
             if attribute in self.read_only_attributes:
-                raise ValueError(f'{attribute} can\'t be updated.')
+                raise ValueError(f"{attribute} can't be updated.")
             if hasattr(self, attribute):
-                if attribute in ('enable', 'enabled'):
+                if attribute in ("enable", "enabled"):
                     if value:
                         self.enable()
                     else:
@@ -282,7 +290,7 @@ class EVCBase(GenericEntity):
                     enable = value
                 else:
                     setattr(self, attribute, value)
-                    if 'path' in attribute or 'priority' in attribute:
+                    if "path" in attribute or "priority" in attribute:
                         redeploy = value
             else:
                 raise ValueError(f'The attribute "{attribute}" is invalid.')
@@ -306,16 +314,16 @@ class EVCBase(GenericEntity):
         for attribute in self.required_attributes:
 
             if attribute not in kwargs:
-                raise ValueError(f'{attribute} is required.')
+                raise ValueError(f"{attribute} is required.")
 
-            if 'uni' in attribute:
+            if "uni" in attribute:
                 uni = kwargs.get(attribute)
                 if not isinstance(uni, UNI):
-                    raise ValueError(f'{attribute} is an invalid UNI.')
+                    raise ValueError(f"{attribute} is an invalid UNI.")
 
                 if not uni.is_valid():
                     tag = uni.user_tag.value
-                    message = f'VLAN tag {tag} is not available in {attribute}'
+                    message = f"VLAN tag {tag} is not available in {attribute}"
                     raise ValueError(message)
 
     def __eq__(self, other):
@@ -323,7 +331,7 @@ class EVCBase(GenericEntity):
         if not isinstance(other, EVC):
             return False
 
-        attrs_to_compare = ['name', 'uni_a', 'uni_z', 'owner', 'bandwidth']
+        attrs_to_compare = ["name", "uni_a", "uni_z", "owner", "bandwidth"]
         for attribute in attrs_to_compare:
             if getattr(other, attribute) != getattr(self, attribute):
                 return False
@@ -331,16 +339,21 @@ class EVCBase(GenericEntity):
 
     def shares_uni(self, other):
         """Check if two EVCs share an UNI."""
-        if other.uni_a in (self.uni_a, self.uni_z) or \
-           other.uni_z in (self.uni_a, self.uni_z):
+        if other.uni_a in (self.uni_a, self.uni_z) or other.uni_z in (
+            self.uni_a,
+            self.uni_z,
+        ):
             return True
         return False
 
     def as_dict(self):
         """Return a dictionary representing an EVC object."""
-        evc_dict = {"id": self.id, "name": self.name,
-                    "uni_a": self.uni_a.as_dict(),
-                    "uni_z": self.uni_z.as_dict()}
+        evc_dict = {
+            "id": self.id,
+            "name": self.name,
+            "uni_a": self.uni_a.as_dict(),
+            "uni_z": self.uni_z.as_dict(),
+        }
 
         time_fmt = "%Y-%m-%dT%H:%M:%S"
 
@@ -352,14 +365,14 @@ class EVCBase(GenericEntity):
         if isinstance(self.end_date, datetime):
             evc_dict["end_date"] = self.end_date.strftime(time_fmt)
 
-        evc_dict['queue_id'] = self.queue_id
-        evc_dict['bandwidth'] = self.bandwidth
-        evc_dict['primary_links'] = self.primary_links.as_dict()
-        evc_dict['backup_links'] = self.backup_links.as_dict()
-        evc_dict['current_path'] = self.current_path.as_dict()
-        evc_dict['primary_path'] = self.primary_path.as_dict()
-        evc_dict['backup_path'] = self.backup_path.as_dict()
-        evc_dict['dynamic_backup_path'] = self.dynamic_backup_path
+        evc_dict["queue_id"] = self.queue_id
+        evc_dict["bandwidth"] = self.bandwidth
+        evc_dict["primary_links"] = self.primary_links.as_dict()
+        evc_dict["backup_links"] = self.backup_links.as_dict()
+        evc_dict["current_path"] = self.current_path.as_dict()
+        evc_dict["primary_path"] = self.primary_path.as_dict()
+        evc_dict["backup_path"] = self.backup_path.as_dict()
+        evc_dict["dynamic_backup_path"] = self.dynamic_backup_path
 
         # if self._requested:
         #     request_dict = self._requested.copy()
@@ -373,16 +386,17 @@ class EVCBase(GenericEntity):
             evc_dict["request_time"] = self.request_time.strftime(time_fmt)
 
         time = self.creation_time.strftime(time_fmt)
-        evc_dict['creation_time'] = time
+        evc_dict["creation_time"] = time
 
-        evc_dict['owner'] = self.owner
-        evc_dict['circuit_scheduler'] = [sc.as_dict()
-                                         for sc in self.circuit_scheduler]
+        evc_dict["owner"] = self.owner
+        evc_dict["circuit_scheduler"] = [
+            sc.as_dict() for sc in self.circuit_scheduler
+        ]
 
-        evc_dict['active'] = self.is_active()
-        evc_dict['enabled'] = self.is_enabled()
-        evc_dict['archived'] = self.archived
-        evc_dict['priority'] = self.priority
+        evc_dict["active"] = self.is_active()
+        evc_dict["enabled"] = self.is_enabled()
+        evc_dict["archived"] = self.archived
+        evc_dict["priority"] = self.priority
 
         return evc_dict
 
@@ -440,10 +454,12 @@ class EVCDeploy(EVCBase):
 
     def is_using_dynamic_path(self):
         """Verify if the current deployed path is a dynamic path."""
-        if self.current_path and \
-           not self.is_using_primary_path() and \
-           not self.is_using_backup_path() and \
-           self.current_path.status == EntityStatus.UP:
+        if (
+            self.current_path
+            and not self.is_using_primary_path()
+            and not self.is_using_backup_path()
+            and self.current_path.status == EntityStatus.UP
+        ):
             return True
         return False
 
@@ -468,8 +484,10 @@ class EVCDeploy(EVCBase):
         if success:
             return True
 
-        if self.dynamic_backup_path or \
-           self.uni_a.interface.switch == self.uni_z.interface.switch:
+        if (
+            self.dynamic_backup_path
+            or self.uni_a.interface.switch == self.uni_z.interface.switch
+        ):
             return self.deploy_to_path()
 
         return False
@@ -503,7 +521,7 @@ class EVCDeploy(EVCBase):
             success = self.deploy_to_backup_path()
 
         if success:
-            emit_event(self._controller, 'deployed', evc_id=self.id)
+            emit_event(self._controller, "deployed", evc_id=self.id)
         return success
 
     @staticmethod
@@ -520,15 +538,15 @@ class EVCDeploy(EVCBase):
                 return link.status
         return EntityStatus.UP
 
-#    def discover_new_path(self):
-#        # TODO: discover a new path to satisfy this circuit and deploy
+    #    def discover_new_path(self):
+    #        # TODO: discover a new path to satisfy this circuit and deploy
 
     def remove(self):
         """Remove EVC path and disable it."""
         self.remove_current_flows()
         self.disable()
         self.sync()
-        emit_event(self._controller, 'undeployed', evc_id=self.id)
+        emit_event(self._controller, "undeployed", evc_id=self.id)
 
     def remove_current_flows(self, current_path=None):
         """Remove all flows from current path."""
@@ -542,11 +560,13 @@ class EVCDeploy(EVCBase):
             switches.add(link.endpoint_a.switch)
             switches.add(link.endpoint_b.switch)
 
-        match = {'cookie': self.get_cookie(),
-                 'cookie_mask': 18446744073709551615}
+        match = {
+            "cookie": self.get_cookie(),
+            "cookie_mask": 18446744073709551615,
+        }
 
         for switch in switches:
-            self._send_flow_mods(switch, [match], 'delete')
+            self._send_flow_mods(switch, [match], "delete")
 
         current_path.make_vlans_available()
         self.current_path = Path([])
@@ -567,11 +587,11 @@ class EVCDeploy(EVCBase):
             return False
 
         if not self.is_enabled():
-            log.debug(f'{self} is disabled.')
+            log.debug(f"{self} is disabled.")
             return False
 
         if not self.is_active():
-            log.debug(f'{self} will be deployed.')
+            log.debug(f"{self} will be deployed.")
             return True
 
         return False
@@ -618,11 +638,12 @@ class EVCDeploy(EVCBase):
                 use_path = Path()
                 self._install_direct_uni_flows()
             else:
-                log.warn(f"{self} was not deployed. "
-                         "No available path was found.")
+                log.warn(
+                    f"{self} was not deployed. " "No available path was found."
+                )
                 return False
         except FlowModException:
-            log.error(f'Error deploying EVC {self} when calling flow_manager.')
+            log.error(f"Error deploying EVC {self} when calling flow_manager.")
             self.remove_current_flows(use_path)
             return False
         self.activate()
@@ -640,81 +661,102 @@ class EVCDeploy(EVCBase):
         vlan_a = self.uni_a.user_tag.value if self.uni_a.user_tag else None
         vlan_z = self.uni_z.user_tag.value if self.uni_z.user_tag else None
 
-        flow_mod_az = self._prepare_flow_mod(self.uni_a.interface,
-                                             self.uni_z.interface,
-                                             self.queue_id)
-        flow_mod_za = self._prepare_flow_mod(self.uni_z.interface,
-                                             self.uni_a.interface,
-                                             self.queue_id)
+        flow_mod_az = self._prepare_flow_mod(
+            self.uni_a.interface, self.uni_z.interface, self.queue_id
+        )
+        flow_mod_za = self._prepare_flow_mod(
+            self.uni_z.interface, self.uni_a.interface, self.queue_id
+        )
 
         if vlan_a and vlan_z:
-            flow_mod_az['match']['dl_vlan'] = vlan_a
-            flow_mod_za['match']['dl_vlan'] = vlan_z
-            flow_mod_az['actions'].insert(0, {'action_type': 'set_vlan',
-                                              'vlan_id': vlan_z})
-            flow_mod_za['actions'].insert(0, {'action_type': 'set_vlan',
-                                              'vlan_id': vlan_a})
+            flow_mod_az["match"]["dl_vlan"] = vlan_a
+            flow_mod_za["match"]["dl_vlan"] = vlan_z
+            flow_mod_az["actions"].insert(
+                0, {"action_type": "set_vlan", "vlan_id": vlan_z}
+            )
+            flow_mod_za["actions"].insert(
+                0, {"action_type": "set_vlan", "vlan_id": vlan_a}
+            )
         elif vlan_a:
-            flow_mod_az['match']['dl_vlan'] = vlan_a
-            flow_mod_az['actions'].insert(0, {'action_type': 'pop_vlan'})
-            flow_mod_za['actions'].insert(0, {'action_type': 'set_vlan',
-                                              'vlan_id': vlan_a})
+            flow_mod_az["match"]["dl_vlan"] = vlan_a
+            flow_mod_az["actions"].insert(0, {"action_type": "pop_vlan"})
+            flow_mod_za["actions"].insert(
+                0, {"action_type": "set_vlan", "vlan_id": vlan_a}
+            )
         elif vlan_z:
-            flow_mod_za['match']['dl_vlan'] = vlan_z
-            flow_mod_za['actions'].insert(0, {'action_type': 'pop_vlan'})
-            flow_mod_az['actions'].insert(0, {'action_type': 'set_vlan',
-                                              'vlan_id': vlan_z})
-        self._send_flow_mods(self.uni_a.interface.switch,
-                             [flow_mod_az, flow_mod_za])
+            flow_mod_za["match"]["dl_vlan"] = vlan_z
+            flow_mod_za["actions"].insert(0, {"action_type": "pop_vlan"})
+            flow_mod_az["actions"].insert(
+                0, {"action_type": "set_vlan", "vlan_id": vlan_z}
+            )
+        self._send_flow_mods(
+            self.uni_a.interface.switch, [flow_mod_az, flow_mod_za]
+        )
 
     def _install_nni_flows(self, path=None):
         """Install NNI flows."""
         for incoming, outcoming in self.links_zipped(path):
-            in_vlan = incoming.get_metadata('s_vlan').value
-            out_vlan = outcoming.get_metadata('s_vlan').value
+            in_vlan = incoming.get_metadata("s_vlan").value
+            out_vlan = outcoming.get_metadata("s_vlan").value
 
             flows = []
             # Flow for one direction
-            flows.append(self._prepare_nni_flow(incoming.endpoint_b,
-                                                outcoming.endpoint_a,
-                                                in_vlan, out_vlan,
-                                                queue_id=self.queue_id))
+            flows.append(
+                self._prepare_nni_flow(
+                    incoming.endpoint_b,
+                    outcoming.endpoint_a,
+                    in_vlan,
+                    out_vlan,
+                    queue_id=self.queue_id,
+                )
+            )
 
             # Flow for the other direction
-            flows.append(self._prepare_nni_flow(outcoming.endpoint_a,
-                                                incoming.endpoint_b,
-                                                out_vlan, in_vlan,
-                                                queue_id=self.queue_id))
+            flows.append(
+                self._prepare_nni_flow(
+                    outcoming.endpoint_a,
+                    incoming.endpoint_b,
+                    out_vlan,
+                    in_vlan,
+                    queue_id=self.queue_id,
+                )
+            )
             self._send_flow_mods(incoming.endpoint_b.switch, flows)
 
     def _install_uni_flows(self, path=None):
         """Install UNI flows."""
         if not path:
-            log.info('install uni flows without path.')
+            log.info("install uni flows without path.")
             return
 
         # Determine VLANs
         in_vlan_a = self.uni_a.user_tag.value if self.uni_a.user_tag else None
-        out_vlan_a = path[0].get_metadata('s_vlan').value
+        out_vlan_a = path[0].get_metadata("s_vlan").value
 
         in_vlan_z = self.uni_z.user_tag.value if self.uni_z.user_tag else None
-        out_vlan_z = path[-1].get_metadata('s_vlan').value
+        out_vlan_z = path[-1].get_metadata("s_vlan").value
 
         # Flows for the first UNI
         flows_a = []
 
         # Flow for one direction, pushing the service tag
-        push_flow = self._prepare_push_flow(self.uni_a.interface,
-                                            path[0].endpoint_a,
-                                            in_vlan_a, out_vlan_a,
-                                            queue_id=self.queue_id)
+        push_flow = self._prepare_push_flow(
+            self.uni_a.interface,
+            path[0].endpoint_a,
+            in_vlan_a,
+            out_vlan_a,
+            queue_id=self.queue_id,
+        )
         flows_a.append(push_flow)
 
         # Flow for the other direction, popping the service tag
-        pop_flow = self._prepare_pop_flow(path[0].endpoint_a,
-                                          self.uni_a.interface,
-                                          in_vlan_a, out_vlan_a,
-                                          queue_id=self.queue_id)
+        pop_flow = self._prepare_pop_flow(
+            path[0].endpoint_a,
+            self.uni_a.interface,
+            in_vlan_a,
+            out_vlan_a,
+            queue_id=self.queue_id,
+        )
         flows_a.append(pop_flow)
 
         self._send_flow_mods(self.uni_a.interface.switch, flows_a)
@@ -723,23 +765,29 @@ class EVCDeploy(EVCBase):
         flows_z = []
 
         # Flow for one direction, pushing the service tag
-        push_flow = self._prepare_push_flow(self.uni_z.interface,
-                                            path[-1].endpoint_b,
-                                            in_vlan_z, out_vlan_z,
-                                            queue_id=self.queue_id)
+        push_flow = self._prepare_push_flow(
+            self.uni_z.interface,
+            path[-1].endpoint_b,
+            in_vlan_z,
+            out_vlan_z,
+            queue_id=self.queue_id,
+        )
         flows_z.append(push_flow)
 
         # Flow for the other direction, popping the service tag
-        pop_flow = self._prepare_pop_flow(path[-1].endpoint_b,
-                                          self.uni_z.interface,
-                                          in_vlan_z, out_vlan_z,
-                                          queue_id=self.queue_id)
+        pop_flow = self._prepare_pop_flow(
+            path[-1].endpoint_b,
+            self.uni_z.interface,
+            in_vlan_z,
+            out_vlan_z,
+            queue_id=self.queue_id,
+        )
         flows_z.append(pop_flow)
 
         self._send_flow_mods(self.uni_z.interface.switch, flows_z)
 
     @staticmethod
-    def _send_flow_mods(switch, flow_mods, command='flows'):
+    def _send_flow_mods(switch, flow_mods, command="flows"):
         """Send a flow_mod list to a specific switch.
 
         Args:
@@ -748,7 +796,7 @@ class EVCDeploy(EVCBase):
             command(str): By default is 'flows'. To remove a flow is 'remove'.
 
         """
-        endpoint = f'{settings.MANAGER_URL}/{command}/{switch.id}'
+        endpoint = f"{settings.MANAGER_URL}/{command}/{switch.id}"
 
         data = {"flows": flow_mods}
         response = requests.post(endpoint, json=data)
@@ -761,30 +809,33 @@ class EVCDeploy(EVCBase):
 
     def _prepare_flow_mod(self, in_interface, out_interface, queue_id=None):
         """Prepare a common flow mod."""
-        default_actions = [{"action_type": "output",
-                            "port": out_interface.port_number}]
+        default_actions = [
+            {"action_type": "output", "port": out_interface.port_number}
+        ]
         if queue_id:
             default_actions.append(
                 {"action_type": "set_queue", "queue_id": queue_id}
             )
 
-        flow_mod = {"match": {"in_port": in_interface.port_number},
-                    "cookie": self.get_cookie(),
-                    "actions": default_actions}
+        flow_mod = {
+            "match": {"in_port": in_interface.port_number},
+            "cookie": self.get_cookie(),
+            "actions": default_actions,
+        }
         if self.priority > -1:
-            flow_mod['priority'] = self.priority
+            flow_mod["priority"] = self.priority
 
         return flow_mod
 
     def _prepare_nni_flow(self, *args, queue_id=None):
         """Create NNI flows."""
         in_interface, out_interface, in_vlan, out_vlan = args
-        flow_mod = self._prepare_flow_mod(in_interface, out_interface,
-                                          queue_id)
-        flow_mod['match']['dl_vlan'] = in_vlan
+        flow_mod = self._prepare_flow_mod(
+            in_interface, out_interface, queue_id
+        )
+        flow_mod["match"]["dl_vlan"] = in_vlan
 
-        new_action = {"action_type": "set_vlan",
-                      "vlan_id": out_vlan}
+        new_action = {"action_type": "set_vlan", "vlan_id": out_vlan}
         flow_mod["actions"].insert(0, new_action)
 
         return flow_mod
@@ -805,8 +856,9 @@ class EVCDeploy(EVCBase):
         # assign all arguments
         in_interface, out_interface, in_vlan, out_vlan = args
 
-        flow_mod = self._prepare_flow_mod(in_interface, out_interface,
-                                          queue_id)
+        flow_mod = self._prepare_flow_mod(
+            in_interface, out_interface, queue_id
+        )
 
         # the service tag must be always pushed
         new_action = {"action_type": "set_vlan", "vlan_id": out_vlan}
@@ -817,23 +869,25 @@ class EVCDeploy(EVCBase):
 
         if in_vlan:
             # if in_vlan is set, it must be included in the match
-            flow_mod['match']['dl_vlan'] = in_vlan
+            flow_mod["match"]["dl_vlan"] = in_vlan
             new_action = {"action_type": "pop_vlan"}
             flow_mod["actions"].insert(0, new_action)
         return flow_mod
 
-    def _prepare_pop_flow(self, in_interface, out_interface, in_vlan,
-                          out_vlan, queue_id=None):
+    def _prepare_pop_flow(
+        self, in_interface, out_interface, in_vlan, out_vlan, queue_id=None
+    ):
         # pylint: disable=too-many-arguments
         """Prepare pop flow."""
-        flow_mod = self._prepare_flow_mod(in_interface, out_interface,
-                                          queue_id)
-        flow_mod['match']['dl_vlan'] = out_vlan
+        flow_mod = self._prepare_flow_mod(
+            in_interface, out_interface, queue_id
+        )
+        flow_mod["match"]["dl_vlan"] = out_vlan
         if in_vlan:
-            new_action = {'action_type': 'set_vlan', 'vlan_id': in_vlan}
-            flow_mod['actions'].insert(0, new_action)
-            new_action = {'action_type': 'push_vlan', 'tag_type': 'c'}
-            flow_mod['actions'].insert(0, new_action)
+            new_action = {"action_type": "set_vlan", "vlan_id": in_vlan}
+            flow_mod["actions"].insert(0, new_action)
+            new_action = {"action_type": "push_vlan", "tag_type": "c"}
+            flow_mod["actions"].insert(0, new_action)
         new_action = {"action_type": "pop_vlan"}
         flow_mod["actions"].insert(0, new_action)
         return flow_mod
@@ -856,17 +910,19 @@ class LinkProtection(EVCDeploy):
 
     def is_using_dynamic_path(self):
         """Verify if the current deployed path is dynamic."""
-        if self.current_path and \
-           not self.is_using_primary_path() and \
-           not self.is_using_backup_path() and \
-           self.current_path.status is EntityStatus.UP:
+        if (
+            self.current_path
+            and not self.is_using_primary_path()
+            and not self.is_using_backup_path()
+            and self.current_path.status is EntityStatus.UP
+        ):
             return True
         return False
 
     def deploy_to(self, path_name=None, path=None):
         """Create a deploy to path."""
         if self.current_path == path:
-            log.debug(f'{path_name} is equal to current_path.')
+            log.debug(f"{path_name} is equal to current_path.")
             return True
 
         if path.status is EntityStatus.UP:
@@ -933,7 +989,7 @@ class LinkProtection(EVCDeploy):
             self.deactivate()
             self.current_path = Path([])
             self.sync()
-            log.debug(f'Failed to re-deploy {self} after link down.')
+            log.debug(f"Failed to re-deploy {self} after link down.")
 
         return success
 

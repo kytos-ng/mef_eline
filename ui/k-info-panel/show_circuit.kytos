@@ -1,0 +1,246 @@
+<template>
+
+    <div class="mef_circuit_container">
+      <div class="mef-back-button">
+        <k-button tooltip="List installed EVCs" title="< Back to list" :on_click="showInfoPanel">
+        </k-button>
+      </div>
+      <div class="mef-table no-compact">
+        <div class="mef-circuit-table">
+         <table class="table">
+            <template v-for="(column, cindex) in basics"> 
+              <tr><th>{{cindex}}</th><td>{{column}}</td></tr>
+            </template>
+          </table>
+        </div>
+        <div class="mef-circuit-table" id="mef-flags">
+         <table class="table">
+            <template v-for="(column, cindex) in flags"> 
+              <tr><th>{{cindex}}</th>
+              <td>
+                <i class="material-icons" style="color:#c00000" v-if="column">close</i>
+                <i class="material-icons" style="color:green" v-else>done</i>
+              </td></tr>
+            </template>
+          </table>
+        </div>
+        <div class="mef-circuit-table">
+         <table class="table">
+            <template v-for="(column, cindex) in others"> 
+              <tr><th>{{cindex}}</th><td>{{column}}</td></tr>
+            </template>
+          </table>
+        </div>
+        <div class="mef-circuit-table">
+         <table class="table">
+            <template v-for="(column, cindex) in dates"> 
+              <tr><th>{{cindex}}</th><td>{{column}}</td></tr>
+            </template>
+          </table>
+        </div>
+
+        <div class="mef-circuit-table" id="mef-unis">
+         <table class="table">
+            <tbody>
+              <tr>
+                <th>UNI A</th>
+                <th>UNI Z</th>
+              </tr>
+              <template v-if="circuit['uni_a'] && circuit['uni_a']['interface_id']">
+                <tr>
+                  <td>{{circuit['uni_a']['interface_id']}}</td>
+                  <td>{{circuit['uni_z']['interface_id']}}</td>
+                </tr>
+              </template>
+              <template v-if="circuit['uni_a'] && circuit['uni_a']['tag']">
+                <tr>
+                  <td>Tag {{circuit['uni_a']['tag']['tag_type']}} {{circuit['uni_a']['tag']['value']}}</td>
+                  <td>Tag {{circuit['uni_z']['tag']['tag_type']}} {{circuit['uni_z']['tag']['value']}}</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <template v-for="(path, pindex) in paths">
+          <div class="mef-circuit-table" id="mef-table-curr-path">
+          <table class="table">
+              <tbody>
+                <tr>
+                  <th>{{pindex}}</th>
+                  <td>
+                      <table v-for="(column, cindex) in path">
+                        <tr><th>Endpoint A</th><th>Endpoint B</th></tr>
+                        <tr><td>{{column['endpoint_a']['name']}}</td><td>{{column['endpoint_b']['name']}}</td></tr>
+                        <tr><td>{{column['endpoint_a']['id']}}</td><td>{{column['endpoint_b']['id']}}</td></tr>
+                        <tr><td>{{column['endpoint_a']['mac']}}</td><td>{{column['endpoint_b']['mac']}}</td></tr>
+                      </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+      <div class="mef-back-button">
+        <k-button tooltip="List installed EVCs" title="< Back to list" :on_click="showInfoPanel">
+        </k-button>
+      </div>
+    </div>
+</template>
+<script>
+module.exports = {
+  props: {
+    content: {
+      type: Object,
+      required: true,
+    },
+  },
+  data(){
+    return {
+        component_key: 0,
+        circuit: {},
+        basics: {},
+        flags: {},
+        others: {},
+        dates: {},
+        paths: {},
+        links: {},
+        circuit_scheduler: {}
+    }
+  },
+  methods: {
+    showInfoPanel() {
+      let listConnections = {
+          component: 'kytos-mef_eline-k-info-panel-list_connections',
+          content: {},
+          icon: "desktop",
+          title: "View Connections",
+          subtitle: "by kytos/mef_eline"
+      }
+      this.$kytos.$emit("showInfoPanel", listConnections);
+    },
+    forceRerender: function() {
+      this.component_key += 1;
+    },
+    getEVC: function(id) {
+      this.component_key = 0;
+      var _this = this;
+
+      var request = $.ajax({
+        url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + id,
+        type:"GET",
+        data: JSON.stringify(),
+        dataType: "json",
+        contentType: "application/json; charset=utf-8"
+      });
+      
+      request.done(function(data) {
+          _this.circuit = data;
+
+          _this.basics = {'ID': data['id'],
+                       'Name': data['name']
+                      };
+          _this.flags = {'Enabled': data['enabled'],
+                        'Active': data['active'],
+                        'Archived': data['archived'],
+                        'Dynamic backup path': data['dynamic_backup_path'],
+                      };
+          _this.others = {'Owner': data['owner'],
+                       'Priority': data['priority'],
+                       'Bandwidth': data['bandwidth'],
+                       'Queue': data['queue_id']
+                      };
+          _this.dates = {
+                       'Request time': data['request_time'],
+                       'Creation time': data['creation_time'],
+                       'Start date': data['start_date'],
+                       'End date': data['end_date']
+                      };
+          _this.paths = {"Current path": data['current_path'],
+                      "Primary path": data['primary_path'],
+                      "Backup path": data['backup_path']
+                      };
+
+          _this.links = {"Primary links": data['primary_links'],
+                         "Backup links": data['backup_links']
+                        };
+          
+          _this.circuit_scheduler = data['circuit_scheduler'];
+
+          _this.forceRerender();
+      });
+      request.fail(function( jqXHR, textStatus ) {
+        alert( "Request failed: " + textStatus );
+      });
+    },
+  },
+  mounted() {
+    if(this.content && this.content.id) {
+      this.getEVC(this.content.id);
+      // Make the panel fill the screen except the left menu width
+      this.$parent.$el.style.width = "calc(100% - 300px)";
+    }
+  }
+}
+</script>
+<style>
+/* Import icons */
+@import "https://fonts.googleapis.com/icon?family=Material+Icons";
+
+  .empty-con-list {
+    margin-top: 10px;
+    color: #ccc;
+    font-size: 0.8rem;
+  }
+  .mef_circuit_container table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9em;
+  }
+  .mef_circuit_container tr:nth-child(even) {
+      background-color: #3f3f3f;
+  }
+  .mef_circuit_container td {
+      border-left: 1px solid darkgray;
+      padding: 5px;
+  }
+  .mef_circuit_container th {
+    background-color: #372C5E;
+    color: white;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    text-align: left;
+  }
+  .mef-circuit-table {
+      width: 250px;
+      float: left;
+      margin-left: 20px;
+      margin-bottom: 20px;
+  }
+  .mef-circuit-table th {
+    width: 75px;
+  }
+  .mef-back-button {
+    clear: both;
+  }
+  #mef-flags {
+    clear:both;
+
+  }
+  #mef-flags th {
+    width: 125px;
+  }
+  #mef-flags i {
+    /* icon size */
+    font-size: 1.1em;
+  }
+  #mef-unis {
+    clear:both;
+    width:520px;
+  }
+  #mef-table-curr-path {
+  clear:both; 
+  width:520px;
+  }
+</style>
