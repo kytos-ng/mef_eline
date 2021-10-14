@@ -32,7 +32,7 @@ class EVCBase(GenericEntity):
         'primary_path', 'backup_path', 'dynamic_backup_path', 'queue_id',
         'priority'
     ]
-    required_attributes = ['name', 'uni_a', 'uni_z']
+    required_attributes = ["name", "uni_a", "uni_z"]
 
     def __init__(self, controller, **kwargs):
         """Create an EVC instance with the provided parameters.
