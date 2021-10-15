@@ -1,3 +1,4 @@
+# pylint: disable=consider-using-with
 """Module to handle the storehouse."""
 import threading
 
