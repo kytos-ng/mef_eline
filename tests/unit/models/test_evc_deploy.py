@@ -1,4 +1,3 @@
-# pylint: disable=duplicate-code
 """Method to thest EVCDeploy class."""
 import sys
 from unittest import TestCase
