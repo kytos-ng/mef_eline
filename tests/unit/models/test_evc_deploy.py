@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 """Method to thest EVCDeploy class."""
 import sys
 from unittest import TestCase
@@ -388,7 +389,6 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                                switch_id="switch_uni_a", is_valid=True)
         uni_z = get_uni_mocked(interface_port=3, tag_value=83,
                                switch_id="switch_uni_z", is_valid=True)
-        # pylint: disable=duplicate-code
         primary_links = [
             get_link_mocked(endpoint_a_port=9, endpoint_b_port=10,
                             metadata={"s_vlan": 5}),
@@ -404,7 +404,6 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "primary_links": primary_links,
             "queue_id": 5
         }
-        # pylint: enable=duplicate-code
 
         # Setup path to deploy
         path = Path()
@@ -502,7 +501,6 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         uni_z = get_uni_mocked(interface_port=3, tag_value=83,
                                switch_id="switch_uni_z", is_valid=True)
 
-        # pylint: disable=duplicate-code
         primary_links = [
             get_link_mocked(endpoint_a_port=9, endpoint_b_port=10,
                             metadata={"s_vlan": 5}),
@@ -518,7 +516,6 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "primary_links": primary_links,
             "queue_id": 5
         }
-        # pylint: enable=duplicate-code
         # Setup path to deploy
         path = Path()
         path.append(primary_links[0])
