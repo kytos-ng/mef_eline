@@ -11,6 +11,7 @@ astroid==2.3.3            # via pylint
 click==7.1.1              # via pip-tools
 coverage==5.0.4
 docopt==0.6.2             # via yala
+eventlet==0.32.0
 first==2.0.1              # via pip-tools
 isort==4.3.4              # via pylint, yala
 lazy-object-proxy==1.4.3  # via astroid
