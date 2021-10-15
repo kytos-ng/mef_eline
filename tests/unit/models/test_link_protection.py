@@ -1,17 +1,19 @@
 """Module to test the LinkProtection class."""
 import sys
+
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 from unittest.mock import Mock
 
+from napps.kytos.mef_eline.models import EVC, Path  # NOQA pycodestyle
+from napps.kytos.mef_eline.tests.helpers import MockResponse, get_link_mocked,\
+    get_uni_mocked, get_controller_mock  # NOQA pycodestyle
+
+
 from kytos.core.common import EntityStatus
 
-# pylint: disable=wrong-import-position
 sys.path.insert(0, '/var/lib/kytos/napps/..')
-# pylint: enable=wrong-import-position
-from napps.kytos.mef_eline.models import EVC, Path  # NOQA pycodestyle
-from tests.helpers import MockResponse, get_link_mocked,\
-    get_uni_mocked, get_controller_mock  # NOQA pycodestyle
+
 
 DEPLOY_TO_PRIMARY_PATH = \
     'napps.kytos.mef_eline.models.LinkProtection.deploy_to_primary_path'
