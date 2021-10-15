@@ -4,7 +4,6 @@
 NApp to provision circuits from user request.
 """
 from threading import Lock
-
 from flask import jsonify, request
 from openapi_core import create_spec
 from openapi_core.contrib.flask import FlaskOpenAPIRequest
@@ -14,7 +13,6 @@ from openapi_spec_validator.readers import read_from_filename
 from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
                                  MethodNotAllowed, NotFound,
                                  UnsupportedMediaType)
-
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
 from kytos.core.helpers import listen_to
