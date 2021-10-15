@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 """Module to test the LinkProtection class."""
 import sys
 
@@ -46,7 +47,6 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
     def test_is_using_primary_path(self):
         """Test test is using primary path."""
-        # pylint: disable=duplicate-code
         primary_path = [
                 get_link_mocked(endpoint_a_port=9, endpoint_b_port=10,
                                 metadata={"s_vlan": 5}),
@@ -61,7 +61,6 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path
         }
-        # pylint: enable=duplicate-code
         evc = EVC(**attributes)
         self.assertFalse(evc.is_using_primary_path())
         evc.current_path = evc.primary_path
