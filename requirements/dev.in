@@ -1,3 +1,5 @@
 -e git+https://github.com/kytos/python-openflow.git#egg=python-openflow
 -e git+https://github.com/kytos/kytos.git#egg=kytos
 -e .[dev]
+eventlet==0.32.0
+openapi-core==0.14.2
