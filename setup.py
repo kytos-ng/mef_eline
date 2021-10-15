@@ -8,6 +8,7 @@ import shutil
 import sys
 from abc import abstractmethod
 from pathlib import Path
+from string import Template
 from subprocess import CalledProcessError, call, check_call
 
 from setuptools import Command, setup
@@ -69,7 +70,9 @@ class TestCommand(Command):
 
     def get_args(self):
         """Return args to be used in test command."""
-        return f"--size {0} --type {1}".format(self.size, self.type)
+        tmpl = Template("--size ${size} --type ${type}")
+        data = {"size": self.size, "type": self.type}
+        return tmpl.substitute(data)
 
     def initialize_options(self):
         """Set default size and type args."""
@@ -112,8 +115,12 @@ class Test(TestCommand):
         markers = self.size
         if markers == "small":
             markers = "not medium and not large"
-        size_args = "" if self.size == "all" else f"-m '{0}'".format(markers)
-        return f'--addopts="tests/{0} {1}"'.format(self.type, size_args)
+        size_args = ""
+        if self.size != "all":
+            size_args = Template("-m '${markers}'")
+        add_opts = Template('--addopts="tests/${type} ${args}"')
+        data = {"type": self.type, "args": size_args}
+        return add_opts.substitute(data)
 
     def run(self):
         """Run tests."""
@@ -133,13 +140,18 @@ class TestCoverage(Test):
 
     def run(self):
         """Run tests quietly and display coverage report."""
-        cmd = f"coverage3 run setup.py pytest {0}".format(self.get_args())
-        cmd += "&& coverage3 report"
+        # cmd = 'coverage3 run setup.py pytest %s' % self.get_args()
+        tmpl = Template(
+            "coverage3 run setup.py pytest ${arg1} && coverage3 report"
+        )
+        cmd = tmpl.substitute(arg1=self.get_args())
         try:
             check_call(cmd, shell=True)
         except CalledProcessError as exc:
             print(exc)
-            print("Coverage tests failed. Fix the errors above and try again.")
+            print(
+                "Coverage tests failed. Fix the errors abov e and try again."
+            )
             sys.exit(-1)
 
 
