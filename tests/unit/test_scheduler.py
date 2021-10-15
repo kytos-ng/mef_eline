@@ -8,7 +8,7 @@ from pytz import utc
 
 from napps.kytos.mef_eline.models import EVC
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
-from tests.helpers import get_controller_mock
+from napps.kytos.mef_eline.tests.helpers import get_controller_mock
 
 
 class TestCircuitSchedule(TestCase):

@@ -7,7 +7,10 @@ from kytos.core.events import KytosEvent
 from kytos.core.interface import UNI, Interface
 from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC
-from tests.helpers import get_controller_mock, get_uni_mocked
+from napps.kytos.mef_eline.tests.helpers import (
+    get_controller_mock,
+    get_uni_mocked,
+)
 
 
 # pylint: disable=too-many-public-methods, too-many-lines

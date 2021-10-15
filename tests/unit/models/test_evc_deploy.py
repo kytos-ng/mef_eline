@@ -13,7 +13,7 @@ sys.path.insert(0, '/var/lib/kytos/napps/..')
 from napps.kytos.mef_eline.models import EVC, Path  # NOQA
 from napps.kytos.mef_eline.settings import MANAGER_URL  # NOQA
 from napps.kytos.mef_eline.exceptions import FlowModException  # NOQA
-from tests.helpers import get_link_mocked,\
+from napps.kytos.mef_eline.tests.helpers import get_link_mocked,\
     get_uni_mocked, get_controller_mock  # NOQA
 
 

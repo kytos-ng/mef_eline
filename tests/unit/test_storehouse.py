@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import patch, Mock
 
 from napps.kytos.mef_eline.storehouse import StoreHouse
-from tests.helpers import get_controller_mock
+from napps.kytos.mef_eline.tests.helpers import get_controller_mock
 
 
 class TestStoreHouse(TestCase):

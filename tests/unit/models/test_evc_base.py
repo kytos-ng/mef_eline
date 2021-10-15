@@ -9,7 +9,7 @@ sys.path.insert(0, '/var/lib/kytos/napps/..')
 from napps.kytos.mef_eline.models import EVC  # NOQA  pycodestyle
 from napps.kytos.mef_eline.scheduler import \
     CircuitSchedule   # NOQA  pycodestyle
-from tests.helpers import get_uni_mocked, \
+from napps.kytos.mef_eline.tests.helpers import get_uni_mocked, \
     get_controller_mock  # NOQA  pycodestyle
 
 
