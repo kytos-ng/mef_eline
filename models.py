@@ -4,6 +4,10 @@ from threading import Lock
 from uuid import uuid4
 
 import requests
+from napps.kytos.mef_eline import settings
+from napps.kytos.mef_eline.exceptions import FlowModException
+from napps.kytos.mef_eline.storehouse import StoreHouse
+from napps.kytos.mef_eline.utils import emit_event
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
@@ -11,10 +15,6 @@ from kytos.core.exceptions import KytosNoTagAvailableError
 from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI
 from kytos.core.link import Link
-from napps.kytos.mef_eline import settings
-from napps.kytos.mef_eline.exceptions import FlowModException
-from napps.kytos.mef_eline.storehouse import StoreHouse
-from napps.kytos.mef_eline.utils import emit_event
 
 
 class Path(list, GenericEntity):

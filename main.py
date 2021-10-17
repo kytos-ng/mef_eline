@@ -5,7 +5,13 @@ NApp to provision circuits from user request.
 """
 import json
 from threading import Lock
+
 from flask import jsonify, request
+from napps.kytos.mef_eline import settings
+from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
+from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
+from napps.kytos.mef_eline.storehouse import StoreHouse
+from napps.kytos.mef_eline.utils import emit_event
 from openapi_core import create_spec
 from openapi_core.contrib.flask import FlaskOpenAPIRequest
 from openapi_core.validation.request.validators import RequestValidator
@@ -14,17 +20,13 @@ from openapi_spec_validator.readers import read_from_filename
 from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
                                  MethodNotAllowed, NotFound,
                                  UnsupportedMediaType)
+
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
 from kytos.core.helpers import listen_to
 from kytos.core.interface import TAG, UNI
 from kytos.core.link import Link
 from kytos.core.napps import NAppsManager
-from napps.kytos.mef_eline import settings
-from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
-from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
-from napps.kytos.mef_eline.storehouse import StoreHouse
-from napps.kytos.mef_eline.utils import emit_event
 
 
 class Main(KytosNApp):
