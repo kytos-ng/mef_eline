@@ -4,7 +4,6 @@ from unittest import TestCase
 from unittest.mock import patch, Mock
 
 from kytos.core.common import EntityStatus
-from kytos.core.switch import Switch
 
 # pylint: disable=wrong-import-position
 sys.path.insert(0, '/var/lib/kytos/napps/..')
@@ -179,12 +178,12 @@ class TestPath(TestCase):
 
     def test_is_valid(self):
         """Test is_valid method."""
-        switch1 = Switch('00:00:00:00:00:00:00:01')
-        switch2 = Switch('00:00:00:00:00:00:00:02')
-        switch3 = Switch('00:00:00:00:00:00:00:03')
-        switch4 = Switch('00:00:00:00:00:00:00:04')
-        switch5 = Switch('00:00:00:00:00:00:00:05')
-        switch6 = Switch('00:00:00:00:00:00:00:06')
+        switch1 = '00:00:00:00:00:00:00:01'
+        switch2 = '00:00:00:00:00:00:00:02'
+        switch3 = '00:00:00:00:00:00:00:03'
+        switch4 = '00:00:00:00:00:00:00:04'
+        switch5 = '00:00:00:00:00:00:00:05'
+        switch6 = '00:00:00:00:00:00:00:06'
 
         links1 = [
             get_link_mocked(switch_a=switch1, switch_b=switch2),

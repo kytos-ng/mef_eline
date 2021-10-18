@@ -287,22 +287,28 @@ class EVCBase(GenericEntity):
 
         """
         enable, redeploy = (None, None)
+        uni_a = kwargs.get('uni_a') or self.uni_a
+        uni_z = kwargs.get('uni_z') or self.uni_z
         for attribute, value in kwargs.items():
             if attribute in self.read_only_attributes:
                 raise ValueError(f'{attribute} can\'t be updated.')
-            if hasattr(self, attribute):
-                if attribute in ('enable', 'enabled'):
-                    if value:
-                        self.enable()
-                    else:
-                        self.disable()
-                    enable = value
-                else:
-                    setattr(self, attribute, value)
-                    if attribute in self.attributes_requiring_redeploy:
-                        redeploy = value
-            else:
+            if not hasattr(self, attribute):
                 raise ValueError(f'The attribute "{attribute}" is invalid.')
+            if attribute in ('primary_path', 'backup_path'):
+                if not value.is_valid(uni_a.interface.switch,
+                                      uni_z.interface.switch):
+                    raise ValueError(f'{attribute} is not a valid path.')
+        for attribute, value in kwargs.items():
+            if attribute in ('enable', 'enabled'):
+                if value:
+                    self.enable()
+                else:
+                    self.disable()
+                enable = value
+            else:
+                setattr(self, attribute, value)
+                if attribute in self.attributes_requiring_redeploy:
+                    redeploy = value
         self.sync()
         return enable, redeploy
 

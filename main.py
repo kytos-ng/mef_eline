@@ -162,6 +162,15 @@ class Main(KytosNApp):
             log.debug('create_circuit result %s %s', exception, 400)
             raise BadRequest(str(exception))
 
+        if evc.primary_path:
+            if not evc.primary_path.is_valid(evc.uni_a.interface.switch,
+                                             evc.uni_z.interface.switch):
+                raise BadRequest('primary_path is not valid')
+        if evc.backup_path:
+            if not evc.backup_path.is_valid(evc.uni_a.interface.switch,
+                                            evc.uni_z.interface.switch):
+                raise BadRequest('backup_path is not valid')
+
         # verify duplicated evc
         if self._is_duplicated_evc(evc):
             result = "The EVC already exists."

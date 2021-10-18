@@ -1251,6 +1251,7 @@ class TestMain(TestCase):
     @patch('napps.kytos.mef_eline.storehouse.StoreHouse.save_evc')
     @patch('napps.kytos.mef_eline.models.EVC._validate')
     @patch('kytos.core.Controller.get_interface_by_id')
+    @patch('napps.kytos.mef_eline.models.Path.is_valid')
     @patch('napps.kytos.mef_eline.models.EVCDeploy.deploy')
     @patch('napps.kytos.mef_eline.main.Main._uni_from_dict')
     @patch('napps.kytos.mef_eline.main.EVC.as_dict')
@@ -1422,6 +1423,81 @@ class TestMain(TestCase):
                              content_type='application/json')
         current_data = json.loads(response.data)
         expected_data = 'The request body is not a well-formed JSON.'
+        self.assertEqual(current_data['description'], expected_data)
+        self.assertEqual(400, response.status_code)
+
+    @patch('napps.kytos.mef_eline.models.EVC.deploy')
+    @patch('napps.kytos.mef_eline.scheduler.Scheduler.add')
+    @patch('napps.kytos.mef_eline.main.Main._uni_from_dict')
+    @patch('napps.kytos.mef_eline.main.Main._link_from_dict')
+    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.save_evc')
+    @patch('napps.kytos.mef_eline.models.EVC._validate')
+    @patch('napps.kytos.mef_eline.main.EVC.as_dict')
+    @patch('napps.kytos.mef_eline.models.Path.is_valid')
+    def test_update_circuit_invalid_path(self, *args):
+        """Test update a circuit circuit."""
+        # pylint: disable=too-many-locals
+        (is_valid_mock, evc_as_dict_mock, validate_mock, save_evc_mock,
+         link_from_dict_mock, uni_from_dict_mock, sched_add_mock,
+         evc_deploy_mock) = args
+
+        is_valid_mock.return_value = False
+        validate_mock.return_value = True
+        save_evc_mock.return_value = True
+        sched_add_mock.return_value = True
+        evc_deploy_mock.return_value = True
+        link_from_dict_mock.return_value = 1
+        uni1 = create_autospec(UNI)
+        uni2 = create_autospec(UNI)
+        uni1.interface = create_autospec(Interface)
+        uni2.interface = create_autospec(Interface)
+        uni1.interface.switch = '00:00:00:00:00:00:00:01'
+        uni2.interface.switch = '00:00:00:00:00:00:00:02'
+        uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
+
+        api = self.get_app_test_client(self.napp)
+        payload1 = {
+            "name": "my evc1",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+                "tag": {
+                    "tag_type": 1,
+                    "value": 80
+                }
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:02:2",
+                "tag": {
+                    "tag_type": 1,
+                    "value": 1
+                }
+            },
+            "dynamic_backup_path": True
+        }
+
+        payload2 = {
+            "primary_path": [
+                    {
+                        "endpoint_a": {"id": "00:00:00:00:00:00:00:01:1"},
+                        "endpoint_b": {"id": "00:00:00:00:00:00:00:02:2"}
+                    }
+                ]
+        }
+
+        evc_as_dict_mock.return_value = payload1
+        response = api.post(f'{self.server_name_url}/v2/evc/',
+                            data=json.dumps(payload1),
+                            content_type='application/json')
+        self.assertEqual(201, response.status_code)
+
+        evc_as_dict_mock.return_value = payload2
+        current_data = json.loads(response.data)
+        circuit_id = current_data['circuit_id']
+        response = api.patch(f'{self.server_name_url}/v2/evc/{circuit_id}',
+                             data=json.dumps(payload2),
+                             content_type='application/json')
+        current_data = json.loads(response.data)
+        expected_data = 'primary_path is not a valid path.'
         self.assertEqual(current_data['description'], expected_data)
         self.assertEqual(400, response.status_code)
 
