@@ -3,28 +3,47 @@
       <div class="mef_container">
         <div class="mef-table no-compact">
           <div class="mef-table-divisor">
-            <table class="table mef-table-list-circuit">
+            <table id="mef-table-list-circuit" class="table mef-table-list-circuit">
               <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col" class="header" v-for="(header, index) in data_headers">
-                  {{ header }}
-                </th>
-              </tr>
+                <tr>
+                  <template v-for="(header, index) in data_headers">
+                    <th scope="col" v-if="header == 'id'">#</th>
+                    <th scope="col" class="header" @click="defineSort(index)" v-else>
+                      {{ header }}
+                      <span class="order-dir" v-if="currentSort === index">
+                        {{ spanDir(index) }}
+                      </span>
+                    </th>
+                  </template>
+                </tr>
+                <tr class="header-filter">
+                  <template v-for="(header, index) in data_header_id">
+                    <th scope="col" v-if="header == 'mef_dpid_id'"></th>
+                    <th scope="col" v-else>
+                      <input :id="header + '_search'" :id="'{header}_search'"
+                        tooltip="DPID" @keyup="filterCircuitList"
+                        v-if="!(['mef_lst_enabled', 'mef_lst_active'].includes(header))">
+                      </input>
+                    </th>
+                  </template>
+                </tr>
               </thead>
               <tbody>
-              <tr v-for="(row, rindex) in data_rows" @click="rowClicked(row['id'])">
-                <th scope="row" style="width: 45px">{{ rindex }}</th>
-                <template v-for="(column, cindex) in row"> 
-                  <td v-if="cindex != 'id'">
-                    <span v-if="cindex == 'Enabled' || cindex == 'Active'">
-                      <i class="material-icons" style="color:#c00000" v-if="column">close</i>
-                      <i class="material-icons" style="color:green" v-else>done</i>
-                    </span>
-                    <span v-else>{{ column }}</span>
-                  </td>
-                </template>
-              </tr>
+                <tr v-for="(row, rindex) in rowsOfPage"
+                  @click="rowClicked(row['id'])">
+                  <th scope="row" style="width: 45px">{{ rindex + 1 }}</th>
+                  <template v-for="(column, cindex) in row"> 
+                    <td v-if="cindex != 'id'">
+                      <template v-if="cindex == 'Enabled' || cindex == 'Active'">
+                        <i class="material-icons" style="color:green" 
+                          v-if="column">done</i>
+                        <i class="material-icons" style="color:#c00000" 
+                          v-else>close</i>
+                      </template>
+                      <template v-else>{{ column }}</template>
+                    </td>
+                  </template>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -42,11 +61,43 @@ module.exports = {
   data(){
     return {
         component_key: 0,
-        data_headers: ['Name ', 'Endpoint A' , 'Tag A' , 'Endpoint Z' , 'Tag Z' , 'Enabled' , 'Active'],
-        data_rows: []
+         data_header_id:  ['mef_dpid_id', 'mef_lst_name', 'mef_lst_end_a', 'mef_lst_tag_a',
+                          'mef_lst_end_z', 'mef_lst_tag_z', 'mef_lst_enabled',
+                          'mef_lst_active'],                         
+        data_headers: ['id', 'Name', 'Endpoint A', 'Tag A', 'Endpoint Z', 'Tag Z',
+                       'Enabled', 'Active'],
+        data_rows: [],
+        currentSort: 0,
+        currentSortDir: []
     }
   },
   methods: {
+    defineSort: function(newSort) {
+      /**
+      * Identify the direction of the sort for
+      * the selected column as sort base
+      */
+      if(newSort === this.currentSort) {
+        let sortDir = (this.currentSortDir[newSort] === 'asc') ? 'desc' : 'asc'
+        this.$set(this.currentSortDir, newSort, sortDir);
+        /**
+        * It is necessary to use a different syntax to replace arrays values
+        * by index because Vue cannot detect when directly set an item with
+        * the index like it is usually done. In this case should've been:
+        * this.currentSortDir[newSort] = sortDir;
+        */
+      }
+      this.currentSort = newSort;
+    },
+    spanDir(index) {
+      /**
+      * Defines a span marker only for the selected
+      * column to indicate its sort direction
+      */
+      if (this.currentSortDir[index] === 'desc')
+        return '▾';
+      return '▴';
+    },
     rowClicked: function(id) {
       this.open_circuit(id);
     },
@@ -59,6 +110,62 @@ module.exports = {
         "subtitle": "by kytos/mef_eline"
       }
       this.$kytos.$emit("showInfoPanel", content);
+    },
+    filterCircuitList: function(event) {
+      /**
+      * Filter circuit list.
+      * It is triggered by keyup in every filter.
+      */
+      this.clearListFilter();
+
+      // check data headers to filter
+      // ignore the id column (x=1)
+      for(let x = 0; x < this.data_header_id.length; x++) {
+        let s_id = this.data_header_id[x] + "_search";
+        
+        let component = document.getElementById(s_id);
+        if(!component)
+          continue;
+
+        let filter = component.value.toUpperCase();
+        if(filter.length == 0)
+          continue;
+
+        // Declare variables
+        let table, tr, td, txtValue;
+        let index = x;
+
+        table = document.getElementById("mef-table-list-circuit");
+        // hide table to prepare to render the cells
+        table.style.display = "none";
+        body = table.getElementsByTagName("tbody");
+        tr = body[0].getElementsByTagName("tr");
+
+        // Loop through all table rows, and hide those who don't match the search query
+        for (let i = 0; i < tr.length; i++) {
+          // first cell in tbody is a th tag, not a td tag
+          td = tr[i].getElementsByTagName("td")[index-1];
+          
+          if (td) {
+            txtValue = td.textContent || td.innerText;
+            if (txtValue.toUpperCase().indexOf(filter) < 0)
+              tr[i].style.display = "none";
+          }
+        }
+        // show table
+        table.style.display = "";
+      }
+    },
+    clearListFilter: function() {
+      /**
+      * Clear circuit list column filters.
+      */
+      let table = document.getElementById("mef-table-list-circuit");
+      let body = table.getElementsByTagName("tbody")[0];
+      let tr = body.getElementsByTagName("tr");
+      for (let i = 0; i < tr.length; i++) {
+        tr[i].style.display = "";
+      }
     },
     forceRerender: function() {
       this.component_key += 1;
@@ -108,10 +215,32 @@ module.exports = {
       return tableRows;
     },
   },
+  computed: {
+    rowsOfPage: function() {
+      /**
+       * Orders by ascendant or descendant of a
+       * selected column
+       */
+      return this.data_rows.sort((a, b) => {
+        let modifier = 1,
+            key_a = Object.keys(a),
+            key_b = Object.keys(b);
+        if(this.currentSortDir[this.currentSort] === 'desc')
+          modifier = -1;
+        if(a[key_a[this.currentSort]] < b[key_b[this.currentSort]])
+          return -1 * modifier;
+        if(a[key_a[this.currentSort]] > b[key_b[this.currentSort]])
+          return modifier;
+        return 0;
+      });
+    },
+  },
   mounted() {
     this.listEVCs();
     // Make the panel fill the screen except the left menu width
     this.$parent.$el.style.width = "calc(100% - 300px)";
+    // Initialize list sort direction
+    this.currentSortDir = Array(this.data_headers.length).fill('asc');
   }
 }
 </script>
@@ -145,24 +274,41 @@ module.exports = {
   background: #554077;
 }
 .mef-table th {
-    padding: 10px 0;
+  padding: 0.6em 0 0.6em  0;
 }
 .mef-table tr {
-    color: lightgray;
+  color: lightgray;
 }
-.mef-table tbody tr:nth-child(even) {
-  background: #414141;
+.mef-table td {
+  vertical-align: middle;
 }
 .mef-table .header {
   cursor: pointer;
 }
+.mef-table .header-filter th {
+  padding: 0 0 0.5em 0;
+  background: #554077;
+}
+.mef-table .header-filter input {
+  background: lightgray;
+  border: 1px solid gray;
+  border-radius: 3px;
+  font-size: 0.9em;
+  margin: 0 0.2em 0 0.2em;
+}
+.mef-table tbody tr:nth-child(even) {
+  background: #414141;
+}
+.mef-table tbody tr:hover {
+    color: #eee;
+    background-color: #666;
+}
 .mef-table-divisor {
   height: 190px;
 }
-
-.mef-table-list-circuit tbody tr:hover {
-    color: #eee;
-    background-color: #666;
+#mef_lst_tag_a_search,
+#mef_lst_tag_z_search {
+  width: 4em;
 }
 
 .order-dir {
