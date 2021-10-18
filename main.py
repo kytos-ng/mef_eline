@@ -3,7 +3,6 @@
 
 NApp to provision circuits from user request.
 """
-import json
 from threading import Lock
 
 from flask import jsonify, request
@@ -53,20 +52,11 @@ class Main(KytosNApp):
         try:
             spec_error = validate_spec(spec_dict)
         except ValueError as err:
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": err})
-            ) from err
+            raise BadRequest(err) from err
         else:
             if spec_error:
-                raise BadRequest(
-                    json.dumps(
-                        {
-                            "httpStatus": 400,
-                            "message": spec_error,
-                            "spec_url": spec_url,
-                        }
-                    )
-                ) from spec_error
+                log.debug("spec_url %s", spec_url)
+                raise BadRequest(spec_error) from spec_error
         self.spec = create_spec(spec_dict)
 
         # object used to scheduler circuit events
@@ -139,9 +129,7 @@ class Main(KytosNApp):
         except KeyError:
             result = f"circuit_id {circuit_id} not found"
             log.debug("get_circuit result %s %s", result, 404)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from KeyError
+            raise BadRequest(result) from KeyError
         status = 200
         log.debug("get_circuit result %s %s", result, status)
         return jsonify(result), status
@@ -178,9 +166,7 @@ class Main(KytosNApp):
         except BadRequest:
             result = "The request body is not a well-formed JSON."
             log.debug("create_circuit result %s %s", result, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
+            raise BadRequest(result) from BadRequest
         validator = RequestValidator(self.spec)
         openapi_request = FlaskOpenAPIRequest(request)
         result = validator.validate(openapi_request)
@@ -201,16 +187,12 @@ class Main(KytosNApp):
                 error_response = (
                     "The request body mimetype is not application/json."
                 )
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": error_response})
-            ) from BadRequest
+            raise BadRequest(error_response) from BadRequest
         try:
             evc = self._evc_from_dict(data)
         except ValueError as exception:
             log.debug("create_circuit result %s %s", exception, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": str(exception)})
-            ) from BadRequest
+            raise BadRequest(str(exception)) from BadRequest
 
         # verify duplicated evc
         if self._is_duplicated_evc(evc):
@@ -225,9 +207,7 @@ class Main(KytosNApp):
         ):
             result = "The EVC must have a primary path or allow dynamic paths."
             log.debug("create_circuit result %s %s", result, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
+            raise BadRequest(result) from BadRequest
 
         # store circuit in dictionary
         self.circuits[evc.id] = evc
@@ -267,9 +247,7 @@ class Main(KytosNApp):
         except KeyError:
             result = f"circuit_id {circuit_id} not found"
             log.debug("update result %s %s", result, 404)
-            raise NotFound(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from NotFound
+            raise NotFound(result) from NotFound
 
         if evc.archived:
             result = "Can't update archived EVC"
@@ -281,15 +259,11 @@ class Main(KytosNApp):
         except BadRequest:
             result = "The request body is not a well-formed JSON."
             log.debug("update result %s %s", result, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
+            raise BadRequest(result) from BadRequest
         if data is None:
             result = "The request body mimetype is not application/json."
             log.debug("update result %s %s", result, 415)
-            raise UnsupportedMediaType(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from UnsupportedMediaType
+            raise UnsupportedMediaType(result) from UnsupportedMediaType
 
         try:
             enable, redeploy = evc.update(
@@ -298,9 +272,7 @@ class Main(KytosNApp):
         except ValueError as exception:
             log.error(exception)
             log.debug("update result %s %s", exception, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": str(exception)})
-            ) from BadRequest
+            raise BadRequest(str(exception)) from BadRequest
 
         if evc.is_active():
             if enable is False:  # disable if active
@@ -334,16 +306,12 @@ class Main(KytosNApp):
         except KeyError:
             result = f"circuit_id {circuit_id} not found"
             log.debug("delete_circuit result %s %s", result, 404)
-            raise NotFound(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from NotFound
+            raise NotFound(result) from NotFound
 
         if evc.archived:
             result = f"Circuit {circuit_id} already removed"
             log.debug("delete_circuit result %s %s", result, 404)
-            raise NotFound(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from NotFound
+            raise NotFound(result) from NotFound
 
         log.info("Removing %s", evc)
         evc.remove_current_flows()
@@ -368,9 +336,7 @@ class Main(KytosNApp):
             evc = self.circuits[circuit_id]
         except KeyError:
             result = f"circuit_id {circuit_id} not found"
-            raise NotFound(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from NotFound
+            raise NotFound(result) from NotFound
         if evc.is_enabled():
             with evc.lock:
                 evc.remove_current_flows()
@@ -440,24 +406,18 @@ class Main(KytosNApp):
         except TypeError:
             result = "The payload should have a dictionary."
             log.debug("create_schedule result %s %s", result, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
+            raise BadRequest(result) from BadRequest
         except KeyError:
             result = "Missing circuit_id."
             log.debug("create_schedule result %s %s", result, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
+            raise BadRequest(result) from BadRequest
 
         try:
             schedule_data = json_data["schedule"]
         except KeyError:
             result = "Missing schedule data."
             log.debug("create_schedule result %s %s", result, 400)
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
+            raise BadRequest(result) from BadRequest
 
         # Get EVC from circuits buffer
         circuits = self._get_circuits_buffer()
@@ -469,16 +429,12 @@ class Main(KytosNApp):
         if not evc:
             result = f"circuit_id {circuit_id} not found"
             log.debug("create_schedule result %s %s", result, 404)
-            raise NotFound(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from NotFound
+            raise NotFound(result) from NotFound
         # Can not modify circuits deleted and archived
         if evc.archived:
             result = f"Circuit {circuit_id} is archived. Update is forbidden."
             log.debug("create_schedule result %s %s", result, 403)
-            raise Forbidden(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from Forbidden
+            raise Forbidden(result) from Forbidden
 
         # new schedule from dict
         new_schedule = CircuitSchedule.from_dict(schedule_data)
@@ -525,15 +481,11 @@ class Main(KytosNApp):
         if not found_schedule:
             result = f"schedule_id {schedule_id} not found"
             log.debug("update_schedule result %s %s", result, 404)
-            raise NotFound(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from NotFound
+            raise NotFound(result) from NotFound
         if evc.archived:
             result = f"Circuit {evc.id} is archived. Update is forbidden."
             log.debug("update_schedule result %s %s", result, 403)
-            raise Forbidden(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from Forbidden
+            raise Forbidden(result) from Forbidden
 
         data = self._json_from_request("update_schedule")
 
@@ -732,9 +684,7 @@ class Main(KytosNApp):
                     data[attribute] = self._uni_from_dict(value)
                 except ValueError:
                     result = "Error creating UNI: Invalid value"
-                    raise BadRequest(
-                        json.dumps({"httpStatus": 400, "message": result})
-                    ) from BadRequest
+                    raise BadRequest(result) from BadRequest
 
             if attribute == "circuit_scheduler":
                 data[attribute] = []
@@ -779,9 +729,7 @@ class Main(KytosNApp):
                 "Error creating UNI:"
                 + f"Could not instantiate interface {interface_id}"
             )
-            raise ValueError(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from ValueError
+            raise ValueError(result) from ValueError
 
         tag_dict = uni_dict.get("tag", None)
         if tag_dict:
@@ -862,15 +810,11 @@ class Main(KytosNApp):
         except ValueError as exception:
             log.error(exception)
             log.debug(f"{caller} result {exception} 400")
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": str(exception)})
-            ) from BadRequest
+            raise BadRequest(str(exception)) from BadRequest
         except BadRequest:
             result = "The request is not a valid JSON."
             log.debug(f"{caller} result {result} 400")
-            raise BadRequest(
-                json.dumps({"httpStatus": 400, "message": result})
-            ) from BadRequest
+            raise BadRequest(result) from BadRequest
         if json_data is None:
             result = "Content-Type must be application/json"
             log.debug(f"{caller} result {result} 415")

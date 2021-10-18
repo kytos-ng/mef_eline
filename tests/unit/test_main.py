@@ -310,9 +310,7 @@ class TestMain(TestCase):
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/3"
         response = api.get(url)
-        expected_result = json.dumps(
-            {"httpStatus": 400, "message": "circuit_id 3 not found"}
-        )
+        expected_result = "circuit_id 3 not found"
         self.assertEqual(
             json.loads(response.data)["description"], expected_result
         )
@@ -437,9 +435,7 @@ class TestMain(TestCase):
         response = api.post(url)
         current_data = json.loads(response.data)
         expected_message = "The request body mimetype is not application/json."
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = expected_message
         self.assertEqual(400, response.status_code, response.data)
         self.assertEqual(current_data["description"], expected_data)
 
@@ -455,10 +451,7 @@ class TestMain(TestCase):
             content_type="application/json",
         )
         current_data = json.loads(response.data)
-        expected_message = "The request body is not a well-formed JSON."
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = 'The request body is not a well-formed JSON.'
 
         self.assertEqual(400, response.status_code, response.data)
         self.assertEqual(current_data["description"], expected_data)
@@ -489,10 +482,7 @@ class TestMain(TestCase):
             url, data=json.dumps(payload), content_type="application/json"
         )
         current_data = json.loads(response.data)
-        expected_message = "Error creating UNI: Invalid value"
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = "Error creating UNI: Invalid value"
         self.assertEqual(400, response.status_code, response.data)
         self.assertEqual(current_data["description"], expected_data)
 
@@ -588,11 +578,8 @@ class TestMain(TestCase):
             url, data=json.dumps(payload), content_type="application/json"
         )
         current_data = json.loads(response.data)
-        expected_message = "The EVC must have a primary path "
-        expected_message += "or allow dynamic paths."
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = "The EVC must have a primary path "
+        expected_data += "or allow dynamic paths."
         self.assertEqual(400, response.status_code, response.data)
         self.assertEqual(current_data["description"], expected_data)
 
@@ -958,9 +945,7 @@ class TestMain(TestCase):
         # Call URL
         response = api.get(url)
 
-        expected = json.dumps(
-            {"httpStatus": 400, "message": "circuit_id blah not found"}
-        )
+        expected = "circuit_id blah not found"
         # Assert response not found
         self.assertEqual(response.status_code, 400, response.data)
         self.assertEqual(expected, json.loads(response.data)["description"])
@@ -1338,10 +1323,7 @@ class TestMain(TestCase):
             content_type="application/json",
         )
         current_data = json.loads(response.data)
-        expected_message = "circuit_id 1234 not found"
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = "circuit_id 1234 not found"
         self.assertEqual(current_data["description"], expected_data)
         self.assertEqual(404, response.status_code)
 
@@ -1420,10 +1402,7 @@ class TestMain(TestCase):
             content_type="application/json",
         )
         current_data = json.loads(response.data)
-        expected_message = "The request body is not a well-formed JSON."
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = "The request body is not a well-formed JSON."
         self.assertEqual(current_data["description"], expected_data)
         self.assertEqual(400, response.status_code)
 
@@ -1488,10 +1467,7 @@ class TestMain(TestCase):
             f"{self.server_name_url}/v2/evc/{circuit_id}", data=payload2
         )
         current_data = json.loads(response.data)
-        expected_message = "The request body mimetype is not application/json."
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = "The request body mimetype is not application/json."
         self.assertEqual(current_data["description"], expected_data)
         self.assertEqual(415, response.status_code)
 
@@ -1500,10 +1476,7 @@ class TestMain(TestCase):
         api = self.get_app_test_client(self.napp)
         response = api.delete(f"{self.server_name_url}/v2/evc/123")
         current_data = json.loads(response.data)
-        expected_message = "circuit_id 123 not found"
-        expected_data = json.dumps(
-            {"httpStatus": 400, "message": expected_message}
-        )
+        expected_data = "circuit_id 123 not found"
         self.assertEqual(current_data["description"], expected_data)
         self.assertEqual(404, response.status_code)
 
