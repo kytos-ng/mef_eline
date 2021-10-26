@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, PropertyMock, call, create_autospec, patch
 
 from kytos.core.events import KytosEvent
 from kytos.core.interface import UNI, Interface
+from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC
 from tests.helpers import get_controller_mock, get_uni_mocked
 
@@ -1441,7 +1442,7 @@ class TestMain(TestCase):
          link_from_dict_mock, uni_from_dict_mock, sched_add_mock,
          evc_deploy_mock) = args
 
-        is_valid_mock.return_value = False
+        is_valid_mock.side_effect = InvalidPath('error')
         validate_mock.return_value = True
         save_evc_mock.return_value = True
         sched_add_mock.return_value = True
@@ -1497,9 +1498,9 @@ class TestMain(TestCase):
                              data=json.dumps(payload2),
                              content_type='application/json')
         current_data = json.loads(response.data)
-        expected_data = 'primary_path is not a valid path.'
-        self.assertEqual(current_data['description'], expected_data)
+        expected_data = 'primary_path is not a valid path: error'
         self.assertEqual(400, response.status_code)
+        self.assertEqual(current_data['description'], expected_data)
 
     @patch('napps.kytos.mef_eline.models.EVC.deploy')
     @patch('napps.kytos.mef_eline.scheduler.Scheduler.add')

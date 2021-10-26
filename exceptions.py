@@ -15,3 +15,7 @@ class ValidationException(EVCException):
 
 class FlowModException(MEFELineException):
     """Exception for FlowMod errors."""
+
+
+class InvalidPath(MEFELineException):
+    """Exception for invalid path."""

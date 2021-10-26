@@ -8,6 +8,7 @@ from kytos.core.common import EntityStatus
 # pylint: disable=wrong-import-position
 sys.path.insert(0, '/var/lib/kytos/napps/..')
 # pylint: enable=wrong-import-position
+from napps.kytos.mef_eline.exceptions import InvalidPath  # NOQA pycodestyle
 from napps.kytos.mef_eline.models import Path  # NOQA pycodestyle
 from tests.helpers import MockResponse, get_link_mocked  # NOQA pycodestyle
 
@@ -207,4 +208,9 @@ class TestPath(TestCase):
             with self.subTest(links=links, switch_a=switch_a,
                               switch_z=switch_z, expected=expected):
                 path = Path(links)
-                self.assertEqual(path.is_valid(switch_a, switch_z), expected)
+                if expected:
+                    self.assertEqual(path.is_valid(switch_a, switch_z),
+                                     expected)
+                else:
+                    with self.assertRaises(InvalidPath):
+                        path.is_valid(switch_a, switch_z)

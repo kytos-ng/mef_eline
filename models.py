@@ -13,7 +13,7 @@ from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI
 from kytos.core.link import Link
 from napps.kytos.mef_eline import settings
-from napps.kytos.mef_eline.exceptions import FlowModException
+from napps.kytos.mef_eline.exceptions import FlowModException, InvalidPath
 from napps.kytos.mef_eline.storehouse import StoreHouse
 from napps.kytos.mef_eline.utils import compare_endpoint_trace, emit_event
 
@@ -59,11 +59,12 @@ class Path(list, GenericEntity):
         previous = switch_a
         for link in self:
             if link.endpoint_a.switch != previous:
-                return False
+                raise InvalidPath(f'{link.endpoint_a} switch is different'
+                                  f' from previous.')
             previous = link.endpoint_b.switch
         if previous == switch_z:
             return True
-        return False
+        raise InvalidPath(f'Last endpoint is different from uni_z')
 
     @property
     def status(self):
@@ -295,9 +296,12 @@ class EVCBase(GenericEntity):
             if not hasattr(self, attribute):
                 raise ValueError(f'The attribute "{attribute}" is invalid.')
             if attribute in ('primary_path', 'backup_path'):
-                if not value.is_valid(uni_a.interface.switch,
-                                      uni_z.interface.switch):
-                    raise ValueError(f'{attribute} is not a valid path.')
+                try:
+                    value.is_valid(uni_a.interface.switch,
+                                   uni_z.interface.switch)
+                except InvalidPath as exception:
+                    raise ValueError(f'{attribute} is not a '
+                                     f'valid path: {exception}')
         for attribute, value in kwargs.items():
             if attribute in ('enable', 'enabled'):
                 if value:
