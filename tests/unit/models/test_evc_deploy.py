@@ -673,3 +673,83 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         switch_2 = evc.primary_links[0].endpoint_b.switch
         send_flow_mods_mocked.assert_any_call(switch_1, flows, 'delete')
         send_flow_mods_mocked.assert_any_call(switch_2, flows, 'delete')
+
+    def test_uni_in_path(self):
+        """Test uni_in_path method."""
+        uni_a = get_uni_mocked(interface_port=2, tag_value=82,
+                               is_valid=True)
+        uni_z = get_uni_mocked(interface_port=3, tag_value=83,
+                               is_valid=True)
+
+        switch1 = Mock(spec=Switch)
+        switch1.dpid = "00:00:00:00:00:00:00:01"
+        switch2 = Mock(spec=Switch)
+        switch2.dpid = "00:00:00:00:00:00:00:02"
+        switch3 = Mock(spec=Switch)
+        switch3.dpid = "00:00:00:00:00:00:00:03"
+        uni_a.interface.switch = switch1
+        uni_z.interface.switch = switch2
+
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "enabled": True,
+            "dynamic_backup_path": False
+        }
+
+        evc = EVC(**attributes)
+
+        path = Path(
+            [
+                get_link_mocked(switch_a=switch1,
+                                switch_b=switch3,
+                                endpoint_a_port=2),
+                get_link_mocked(switch_a=switch3,
+                                switch_b=switch2,
+                                endpoint_b_port=1)
+            ]
+        )
+
+        self.assertEqual(evc.uni_in_path(path), True)
+
+    def test_uni_not_in_path(self):
+        """Test uni_in_path method."""
+        uni_a = get_uni_mocked(interface_port=2, tag_value=82,
+                               is_valid=True)
+        uni_z = get_uni_mocked(interface_port=3, tag_value=83,
+                               is_valid=True)
+
+        switch1 = Mock(spec=Switch)
+        switch1.dpid = "00:00:00:00:00:00:00:01"
+        switch2 = Mock(spec=Switch)
+        switch2.dpid = "00:00:00:00:00:00:00:02"
+        switch3 = Mock(spec=Switch)
+        switch3.dpid = "00:00:00:00:00:00:00:03"
+        uni_a.interface.switch = switch1
+        uni_z.interface.switch = switch2
+
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "enabled": True,
+            "dynamic_backup_path": False
+        }
+
+        evc = EVC(**attributes)
+
+        path = Path(
+            [
+                get_link_mocked(switch_a=switch1,
+                                switch_b=switch3,
+                                endpoint_a_port=3),
+                get_link_mocked(switch_a=switch3,
+                                switch_b=switch2,
+                                endpoint_b_port=1)
+            ]
+        )
+
+        self.assertEqual(evc.uni_in_path(path), False)

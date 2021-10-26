@@ -606,6 +606,8 @@ class EVCDeploy(EVCBase):
             for use_path in self.discover_new_paths():
                 if use_path is None:
                     continue
+                if self.uni_in_path(use_path):
+                    continue
                 try:
                     use_path.choose_vlans()
                     break
@@ -634,6 +636,16 @@ class EVCDeploy(EVCBase):
         self.sync()
         log.info(f"{self} was deployed.")
         return True
+
+    def uni_in_path(self, path):
+        """Check if any of the UNI ports is in the path."""
+        for link in path:
+            if (self.uni_a.interface == link.endpoint_a or
+               self.uni_a.interface == link.endpoint_b or
+               self.uni_z.interface == link.endpoint_a or
+               self.uni_z.interface == link.endpoint_b):
+                return True
+        return False
 
     def _install_direct_uni_flows(self):
         """Install flows connecting two UNIs.
