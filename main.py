@@ -48,9 +48,6 @@ class Main(KytosNApp):
         # Every create/update/delete must be synced to storehouse.
         self.circuits = {}
 
-        # dictionary of EVCs by interface
-        self._circuits_by_interface = {}
-
         self._lock = Lock()
 
         self.execute_as_loop(settings.DEPLOY_EVCS_INTERVAL)
@@ -58,10 +55,22 @@ class Main(KytosNApp):
 
     def execute(self):
         """Execute once when the napp is running."""
-        for circuit in tuple(self.circuits.values()):
-            if circuit.is_enabled() and not circuit.is_active():
-                with circuit.lock:
-                    circuit.deploy()
+        if self._lock.locked():
+            return
+        log.info("Starting consistency routine")
+        with self._lock:
+            stored_circuits = self.storehouse.get_data().copy()
+            for circuit in tuple(self.circuits.values()):
+                stored_circuits.pop(circuit.id, None)
+                if circuit.is_enabled() and not circuit.is_active() and \
+                   not circuit.lock.locked():
+                    log.info(f"EVC enabled but inactive {circuit}")
+                    with circuit.lock:
+                        circuit.deploy()
+            for circuit_id in stored_circuits:
+                log.info(f"EVC found in storehouse but unloaded {circuit_id}")
+                self._load_evc(stored_circuits[circuit_id])
+        log.info("Finished consistency routine")
 
     def shutdown(self):
         """Execute when your napp is unloaded.
@@ -533,45 +542,6 @@ class Main(KytosNApp):
                     else:
                         emit_event(self.controller, 'error_redeploy_link_down',
                                    evc_id=evc.id)
-
-    def load_circuits_by_interface(self, circuits):
-        """Load circuits in storehouse for in-memory dictionary."""
-        for circuit_id, circuit in circuits.items():
-            if circuit['archived'] is True:
-                continue
-            intf_a = circuit['uni_a']['interface_id']
-            self.add_to_dict_of_sets(intf_a, circuit_id)
-            intf_z = circuit['uni_z']['interface_id']
-            self.add_to_dict_of_sets(intf_z, circuit_id)
-            for path in ('current_path', 'primary_path', 'backup_path'):
-                for link in circuit[path]:
-                    intf_a = link['endpoint_a']['id']
-                    self.add_to_dict_of_sets(intf_a, circuit_id)
-                    intf_b = link['endpoint_b']['id']
-                    self.add_to_dict_of_sets(intf_b, circuit_id)
-
-    def add_to_dict_of_sets(self, intf, circuit_id):
-        """Add a single item to the dictionary of circuits by interface."""
-        if intf not in self._circuits_by_interface:
-            self._circuits_by_interface[intf] = set()
-        self._circuits_by_interface[intf].add(circuit_id)
-
-    @listen_to('kytos/topology.port.created')
-    def load_evcs(self, event):
-        """Try to load the unloaded EVCs from storehouse."""
-        with self._lock:
-            log.debug("Event load_evcs %s", event)
-            circuits = self.storehouse.get_data()
-            if not self._circuits_by_interface:
-                self.load_circuits_by_interface(circuits)
-
-            interface_id = '{}:{}'.format(event.content['switch'],
-                                          event.content['port'])
-
-            for circuit_id in self._circuits_by_interface.get(interface_id,
-                                                              []):
-                if circuit_id in circuits and circuit_id not in self.circuits:
-                    self._load_evc(circuits[circuit_id])
 
     def load_all_evcs(self):
         """Try to load all EVCs on startup."""
