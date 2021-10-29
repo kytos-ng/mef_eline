@@ -235,6 +235,8 @@ class EVCBase(GenericEntity):
 
         self.archived = kwargs.get('archived', False)
 
+        self.metadata = kwargs.get('metadata', {})
+
         self._storehouse = StoreHouse(controller)
         self._controller = controller
 
@@ -363,6 +365,7 @@ class EVCBase(GenericEntity):
         evc_dict['primary_path'] = self.primary_path.as_dict()
         evc_dict['backup_path'] = self.backup_path.as_dict()
         evc_dict['dynamic_backup_path'] = self.dynamic_backup_path
+        evc_dict['metadata'] = self.metadata
 
         # if self._requested:
         #     request_dict = self._requested.copy()

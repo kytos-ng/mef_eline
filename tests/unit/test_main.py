@@ -60,6 +60,16 @@ class TestMain(TestCase):
             ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'PATCH'},
              '/api/kytos/mef_eline/v2/evc/<circuit_id>'),
 
+            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'HEAD', 'GET'},
+             '/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata'),
+
+            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'POST'},
+             '/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata'),
+
+            ({'circuit_id': '[circuit_id]', 'key': '[key]'},
+             {'OPTIONS', 'DELETE'},
+             '/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata/<key>'),
+
             ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'PATCH'},
              '/api/kytos/mef_eline/v2/evc/<circuit_id>/redeploy'),
 
@@ -1513,3 +1523,19 @@ class TestMain(TestCase):
         self.napp.circuits = dict(zip(['1', '2', '3'], evcs))
         self.napp.handle_link_down(event)
         evc_mock.handle_link_down.assert_has_calls([call(), call()])
+
+    def test_add_metadata(self):
+        """Test method to add metadata"""
+        evc_mock = create_autospec(EVC)
+        evc_mock.metadata = {}
+        evc_mock.id = 1234
+        self.napp.circuits = {'1234': evc_mock}
+
+        api = self.get_app_test_client(self.napp)
+        payload = {'metadata1': 1, 'metadata2': 2}
+        response = api.post(f'{self.server_name_url}/v2/evc/1234/metadata',
+                            data=json.dumps(payload),
+                            content_type='application/json')
+
+        self.assertEqual(response.status_code, 201)
+        evc_mock.extend_metadata.assert_called_with(payload)

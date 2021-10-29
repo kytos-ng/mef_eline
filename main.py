@@ -21,6 +21,7 @@ from napps.kytos.mef_eline.storehouse import StoreHouse
 from napps.kytos.mef_eline.utils import emit_event
 
 
+# pylint: disable=too-many-public-methods
 class Main(KytosNApp):
     """Main class of amlight/mef_eline NApp.
 
@@ -279,6 +280,56 @@ class Main(KytosNApp):
         log.debug('delete_circuit result %s %s', result, status)
         emit_event(self.controller, 'deleted', evc_id=evc.id)
         return jsonify(result), status
+
+    @rest('v2/evc/<circuit_id>/metadata', methods=['GET'])
+    def get_metadata(self, circuit_id):
+        """Get metadata from an EVC."""
+        try:
+            return jsonify({"metadata":
+                            self.circuits[circuit_id].metadata}), 200
+        except KeyError:
+            raise NotFound(f'circuit_id {circuit_id} not found.')
+
+    @rest('v2/evc/<circuit_id>/metadata', methods=['POST'])
+    def add_metadata(self, circuit_id):
+        """Add metadata to an EVC."""
+        try:
+            metadata = request.get_json()
+            content_type = request.content_type
+        except BadRequest:
+            result = 'The request body is not a well-formed JSON.'
+            raise BadRequest(result)
+        if content_type is None:
+            result = 'The request body is empty.'
+            raise BadRequest(result)
+        if metadata is None:
+            if content_type != 'application/json':
+                result = ('The content type must be application/json '
+                          f'(received {content_type}).')
+            else:
+                result = 'Metadata is empty.'
+            raise UnsupportedMediaType(result)
+
+        try:
+            evc = self.circuits[circuit_id]
+        except KeyError:
+            raise NotFound(f'circuit_id {circuit_id} not found.')
+
+        evc.extend_metadata(metadata)
+        evc.sync()
+        return jsonify("Operation successful"), 201
+
+    @rest('v2/evc/<circuit_id>/metadata/<key>', methods=['DELETE'])
+    def delete_switch_metadata(self, circuit_id, key):
+        """Delete metadata from an EVC."""
+        try:
+            evc = self.circuits[circuit_id]
+        except KeyError:
+            raise NotFound(f'circuit_id {circuit_id} not found.')
+
+        evc.remove_metadata(key)
+        evc.sync()
+        return jsonify("Operation successful"), 200
 
     @rest('/v2/evc/<circuit_id>/redeploy', methods=['PATCH'])
     def redeploy(self, circuit_id):
