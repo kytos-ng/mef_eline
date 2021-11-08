@@ -129,7 +129,66 @@ paths:
           description: Accepted
         '409':
           description: Circuit disabled
-
+  /v2/evc/{circuit_id}/metadata:
+    get:
+      summary: Get the metadata from en EVC
+      operationId: get_metadata
+      parameters:
+        - name: circuit_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: EVC not found
+    post:
+      summary: Add metadata to an EVC
+      operationId: add_metadata
+      parameters:
+        - name: circuit_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Metadata to in the form of key:value
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201': 
+          description: Successful
+        '400':
+          description: Request problem
+        '404':
+          description: EVC not found
+        '415':
+          description: Wrong type
+  /v2/evc/{circuit_id}/metadata/key:
+    delete:
+      summary: Remove a metadata
+      operationId: delete_metadata
+      parameters:
+        - name: circuit_id
+          in: path
+          required: true
+          schema:
+            type: string            
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful
+        '404':
+          description: EVC not found
   /v2/evc/schedule/:
     get:
       summary: List all schedules stored for all circuits .
