@@ -320,7 +320,7 @@ class Main(KytosNApp):
         return jsonify("Operation successful"), 201
 
     @rest('v2/evc/<circuit_id>/metadata/<key>', methods=['DELETE'])
-    def delete_switch_metadata(self, circuit_id, key):
+    def delete_metadata(self, circuit_id, key):
         """Delete metadata from an EVC."""
         try:
             evc = self.circuits[circuit_id]
