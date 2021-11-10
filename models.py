@@ -54,13 +54,20 @@ class Path(list, GenericEntity):
             link.make_tag_available(link.get_metadata('s_vlan'))
             link.remove_metadata('s_vlan')
 
-    def is_valid(self, switch_a, switch_z):
+    def is_valid(self, switch_a, switch_z, is_scheduled=False):
         """Check if this is a valid path."""
         previous = switch_a
         for link in self:
             if link.endpoint_a.switch != previous:
                 raise InvalidPath(f'{link.endpoint_a} switch is different'
                                   f' from previous.')
+            if is_scheduled is False and (
+                link.endpoint_a.link is None or
+                link.endpoint_a.link != link or
+                link.endpoint_b.link is None or
+                link.endpoint_b.link != link
+            ):
+                raise InvalidPath(f'Link {link} is not available.')
             previous = link.endpoint_b.switch
         if previous == switch_z:
             return True

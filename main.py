@@ -166,13 +166,15 @@ class Main(KytosNApp):
         if evc.primary_path:
             try:
                 evc.primary_path.is_valid(evc.uni_a.interface.switch,
-                                          evc.uni_z.interface.switch)
+                                          evc.uni_z.interface.switch,
+                                          bool(evc.circuit_scheduler))
             except InvalidPath as exception:
                 raise BadRequest(f'primary_path is not valid: {exception}')
         if evc.backup_path:
             try:
                 evc.backup_path.is_valid(evc.uni_a.interface.switch,
-                                         evc.uni_z.interface.switch)
+                                         evc.uni_z.interface.switch,
+                                         bool(evc.circuit_scheduler))
             except InvalidPath as exception:
                 raise BadRequest(f'backup_path is not valid: {exception}')
 
