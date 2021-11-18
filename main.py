@@ -55,15 +55,10 @@ class Main(KytosNApp):
         if enabled_path[:2] == "//":
             enabled_path = enabled_path[1:]
         yml_file = enabled_path + "/.installed/kytos/mef_eline/openapi.yml"
-        spec_dict, spec_url = read_from_filename(yml_file)
-        try:
-            spec_error = validate_spec(spec_dict)
-        except ValueError as err:
-            raise BadRequest(err) from err
-        else:
-            if spec_error:
-                log.debug("spec_url %s", spec_url)
-                raise BadRequest(spec_error) from spec_error
+        spec_dict, _ = read_from_filename(yml_file)
+
+        validate_spec(spec_dict)
+
         self.spec = create_spec(spec_dict)
 
         # object used to scheduler circuit events
