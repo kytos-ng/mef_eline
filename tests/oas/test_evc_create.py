@@ -7,7 +7,7 @@ import requests
 
 
 def test_required():
-    """ test should_fail_due_to_missing_name_attribute_on_payload """
+    """test should_fail_due_to_missing_name_attribute_on_payload"""
     actual_dir = os.getcwd()
     evc_params = actual_dir + "/tests/oas/evc_params.json"
     with open(evc_params, encoding="utf8") as json_file:
@@ -31,7 +31,7 @@ def test_required():
 
 
 def test_additional_properties():
-    """ test should_fail_due_to_additional_properties_on_payload """
+    """test should_fail_due_to_additional_properties_on_payload"""
     actual_dir = os.getcwd()
     evc_params = actual_dir + "/tests/oas/evc_params.json"
     with open(evc_params, encoding="utf8") as json_file:
@@ -57,7 +57,7 @@ def test_additional_properties():
 
 
 def test_pattern():
-    """ test should_fail_due_to_invalid_mac_address_on_payload """
+    """test should_fail_due_to_invalid_mac_address_on_payload"""
     actual_dir = os.getcwd()
     evc_params = actual_dir + "/tests/oas/evc_params.json"
     with open(evc_params, encoding="utf8") as json_file:
@@ -83,7 +83,7 @@ def test_pattern():
 
 
 def test_type():
-    """ test should_fail_due_to_invalid_mac_address_on_payload """
+    """test should_fail_due_to_invalid_mac_address_on_payload"""
     actual_dir = os.getcwd()
     evc_params = actual_dir + "/tests/oas/evc_params.json"
     with open(evc_params, encoding="utf8") as json_file:

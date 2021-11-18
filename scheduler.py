@@ -141,7 +141,8 @@ class Scheduler:
 
         elif circuit_scheduler.frequency:
             cron = CronTrigger.from_crontab(
-                circuit_scheduler.frequency, timezone=utc
+                circuit_scheduler.frequency,
+                timezone=utc
             )
             self.scheduler.add_job(job_call, cron, **data)
 

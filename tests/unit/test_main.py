@@ -51,49 +51,60 @@ class TestMain(TestCase):
     def test_verify_api_urls(self):
         """Verify all APIs registered."""
         expected_urls = [
-            ({}, {'POST', 'OPTIONS'},
-             '/api/kytos/mef_eline/v2/evc/'),
-
-            ({}, {'OPTIONS', 'HEAD', 'GET'},
-             '/api/kytos/mef_eline/v2/evc/'),
-
-            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'DELETE'},
-             '/api/kytos/mef_eline/v2/evc/<circuit_id>'),
-
-            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'HEAD', 'GET'},
-             '/api/kytos/mef_eline/v2/evc/<circuit_id>'),
-
-            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'PATCH'},
-             '/api/kytos/mef_eline/v2/evc/<circuit_id>'),
-
-            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'HEAD', 'GET'},
-             '/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata'),
-
-            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'POST'},
-             '/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata'),
-
-            ({'circuit_id': '[circuit_id]', 'key': '[key]'},
-             {'OPTIONS', 'DELETE'},
-             '/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata/<key>'),
-
-            ({'circuit_id': '[circuit_id]'}, {'OPTIONS', 'PATCH'},
-             '/api/kytos/mef_eline/v2/evc/<circuit_id>/redeploy'),
-
-            ({}, {'OPTIONS', 'GET', 'HEAD'},
-             '/api/kytos/mef_eline/v2/evc/schedule'),
-
-            ({}, {'POST', 'OPTIONS'},
-             '/api/kytos/mef_eline/v2/evc/schedule/'),
-
-            ({'schedule_id': '[schedule_id]'},
-             {'OPTIONS', 'DELETE'},
-             '/api/kytos/mef_eline/v2/evc/schedule/<schedule_id>'),
-
-            ({'schedule_id': '[schedule_id]'},
-             {'OPTIONS', 'PATCH'},
-             '/api/kytos/mef_eline/v2/evc/schedule/<schedule_id>')
-            ]
-
+            ({}, {"POST", "OPTIONS"}, "/api/kytos/mef_eline/v2/evc/"),
+            ({}, {"OPTIONS", "HEAD", "GET"}, "/api/kytos/mef_eline/v2/evc/"),
+            (
+                {"circuit_id": "[circuit_id]"},
+                {"OPTIONS", "DELETE"},
+                "/api/kytos/mef_eline/v2/evc/<circuit_id>",
+            ),
+            (
+                {"circuit_id": "[circuit_id]"},
+                {"OPTIONS", "HEAD", "GET"},
+                "/api/kytos/mef_eline/v2/evc/<circuit_id>",
+            ),
+            (
+                {"circuit_id": "[circuit_id]"},
+                {"OPTIONS", "PATCH"},
+                "/api/kytos/mef_eline/v2/evc/<circuit_id>",
+            ),
+            (
+                {"circuit_id": "[circuit_id]"},
+                {"OPTIONS", "HEAD", "GET"},
+                "/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata",
+            ),
+            (
+                {"circuit_id": "[circuit_id]"},
+                {"OPTIONS", "POST"},
+                "/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata",
+            ),
+            (
+                {"circuit_id": "[circuit_id]", "key": "[key]"},
+                {"OPTIONS", "DELETE"},
+                "/api/kytos/mef_eline/v2/evc/<circuit_id>/metadata/<key>",
+            ),
+            (
+                {"circuit_id": "[circuit_id]"},
+                {"OPTIONS", "PATCH"},
+                "/api/kytos/mef_eline/v2/evc/<circuit_id>/redeploy",
+            ),
+            (
+                {},
+                {"OPTIONS", "GET", "HEAD"},
+                "/api/kytos/mef_eline/v2/evc/schedule",
+            ),
+            ({}, {"POST", "OPTIONS"}, "/api/kytos/mef_eline/v2/evc/schedule/"),
+            (
+                {"schedule_id": "[schedule_id]"},
+                {"OPTIONS", "DELETE"},
+                "/api/kytos/mef_eline/v2/evc/schedule/<schedule_id>",
+            ),
+            (
+                {"schedule_id": "[schedule_id]"},
+                {"OPTIONS", "PATCH"},
+                "/api/kytos/mef_eline/v2/evc/schedule/<schedule_id>",
+            ),
+        ]
         urls = self.get_napp_urls(self.napp)
         self.assertEqual(len(expected_urls), len(urls))
 

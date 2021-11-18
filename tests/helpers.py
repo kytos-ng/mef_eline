@@ -56,6 +56,19 @@ def get_link_mocked(**kwargs):
     return link
 
 
+def get_mocked_requests(_):
+    """Mock requests.get."""
+    return MockResponse(
+        {
+            "links": {
+                "abc": {"active": False, "enabled": True},
+                "def": {"active": True, "enabled": True},
+            }
+        },
+        200,
+    )
+
+
 def get_uni_mocked(**kwargs):
     """Create an uni mocked.
 

@@ -6,11 +6,6 @@ NApp to provision circuits from user request.
 from threading import Lock
 
 from flask import jsonify, request
-from napps.kytos.mef_eline import settings
-from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
-from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
-from napps.kytos.mef_eline.storehouse import StoreHouse
-from napps.kytos.mef_eline.utils import emit_event
 from openapi_core import create_spec
 from openapi_core.contrib.flask import FlaskOpenAPIRequest
 from openapi_core.validation.request.validators import RequestValidator
@@ -376,8 +371,8 @@ class Main(KytosNApp):
         try:
             return jsonify({"metadata":
                             self.circuits[circuit_id].metadata}), 200
-        except KeyError:
-            raise NotFound(f'circuit_id {circuit_id} not found.')
+        except KeyError as error:
+            raise NotFound(f'circuit_id {circuit_id} not found.') from error
 
     @rest('v2/evc/<circuit_id>/metadata', methods=['POST'])
     def add_metadata(self, circuit_id):
@@ -385,9 +380,9 @@ class Main(KytosNApp):
         try:
             metadata = request.get_json()
             content_type = request.content_type
-        except BadRequest:
+        except BadRequest as error:
             result = 'The request body is not a well-formed JSON.'
-            raise BadRequest(result)
+            raise BadRequest(result) from error
         if content_type is None:
             result = 'The request body is empty.'
             raise BadRequest(result)
@@ -401,8 +396,8 @@ class Main(KytosNApp):
 
         try:
             evc = self.circuits[circuit_id]
-        except KeyError:
-            raise NotFound(f'circuit_id {circuit_id} not found.')
+        except KeyError as error:
+            raise NotFound(f'circuit_id {circuit_id} not found.') from error
 
         evc.extend_metadata(metadata)
         evc.sync()
@@ -413,8 +408,8 @@ class Main(KytosNApp):
         """Delete metadata from an EVC."""
         try:
             evc = self.circuits[circuit_id]
-        except KeyError:
-            raise NotFound(f'circuit_id {circuit_id} not found.')
+        except KeyError as error:
+            raise NotFound(f'circuit_id {circuit_id} not found.') from error
 
         evc.remove_metadata(key)
         evc.sync()

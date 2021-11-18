@@ -1,4 +1,4 @@
-"""Classes used in the main application."""
+"""Classes used in the main application."""  # pylint: disable=too-many-lines
 from datetime import datetime
 from threading import Lock
 from uuid import uuid4

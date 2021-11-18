@@ -7,10 +7,10 @@ from unittest.mock import Mock
 
 from napps.kytos.mef_eline.models import EVC, Path  # NOQA pycodestyle
 from napps.kytos.mef_eline.tests.helpers import (
-    MockResponse,
     get_link_mocked,
     get_uni_mocked,
     get_controller_mock,
+    get_mocked_requests,
 )  # NOQA pycodestyle
 
 
@@ -140,20 +140,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         install_nni_flows_mocked.assert_called_with(evc.primary_path)
         self.assertTrue(deployed)
 
-    # This method will be used by the mock to replace requests.get
-    def _mocked_requests_get_path_down(self):
-        # pylint: disable=no-self-use
-        return MockResponse(
-            {
-                "links": {
-                    "abc": {"active": False, "enabled": True},
-                    "def": {"active": True, "enabled": True},
-                }
-            },
-            200,
-        )
-
-    @patch("requests.get", side_effect=_mocked_requests_get_path_down)
+    @patch("requests.get", side_effect=get_mocked_requests)
     def test_deploy_to_case_3(self, requests_mocked):
         # pylint: disable=unused-argument
         """Test deploy with one link down."""
