@@ -20,7 +20,6 @@ from kytos.core.events import KytosEvent
 from kytos.core.helpers import listen_to
 from kytos.core.interface import TAG, UNI
 from kytos.core.link import Link
-from kytos.core.napps import NAppsManager
 from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
@@ -45,11 +44,8 @@ class Main(KytosNApp):
         So, if you have any setup routine, insert it here.
         """
         # Validate Spec
-        self.napps_manager = NAppsManager(self.controller)
-        enabled_path = str(self.napps_manager._enabled_path)
-        if enabled_path[:2] == "//":
-            enabled_path = enabled_path[1:]
-        yml_file = enabled_path + "/.installed/kytos/mef_eline/openapi.yml"
+        napp_dir = FSPath(__file__).parent
+        yml_file = napp_dir/"openapi.yml"
         spec_dict, _ = read_from_filename(yml_file)
 
         validate_spec(spec_dict)
