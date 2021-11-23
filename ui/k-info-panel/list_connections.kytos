@@ -61,15 +61,20 @@
 module.exports = {
   data(){
     return {
-        component_key: 0,
-         data_header_id:  ['mef_dpid_id', 'mef_lst_name', 'mef_lst_end_a', 'mef_lst_tag_a',
-                          'mef_lst_end_z', 'mef_lst_tag_z', 'mef_lst_enabled',
-                          'mef_lst_active'],                         
-        data_headers: ['id', 'Name', 'Endpoint A', 'Tag A', 'Endpoint Z', 'Tag Z',
-                       'Enabled', 'Active'],
-        data_rows: [],
-        currentSort: 0,
-        currentSortDir: []
+      component_key: 0,
+        data_header_id:  ['mef_dpid_id', 'mef_lst_name', 
+                        'mef_lst_sw_a', 'mef_lst_prt_a', 'mef_lst_int_a', 'mef_lst_tag_a',
+                        'mef_lst_sw_z', 'mef_lst_prt_z', 'mef_lst_int_z', 'mef_lst_tag_z', 
+                        'mef_lst_enabled',
+                        'mef_lst_active'],                         
+      data_headers: ['id', 'Name', 'Switch A', 'Port A', 'Interf. A', 'Tag A', 
+                      'Switch Z', 'Port Z', 'Interf. Z', 'Tag Z',
+                      'Enabled', 'Active'],
+      data_rows: [],
+      currentSort: 0,
+      currentSortDir: [],
+      dpid_names: {},  // DPIDs names
+      interface_names: {} // DPIDs and interface data and metadata
     }
   },
   methods: {
@@ -100,9 +105,15 @@ module.exports = {
       return '▴';
     },
     rowClicked: function(id) {
-      this.open_circuit(id);
+      /**
+      * Action triggered with a click in a list item
+      */
+      this.openCircuit(id);
     },
-    open_circuit: function(id) {
+    openCircuit: function(id) {
+      /**
+      * Open the circuit detail in another panel.
+      */
       var content = {
         "component": 'kytos-mef_eline-k-info-panel-show_circuit',
         "content": {'id':id},
@@ -169,9 +180,15 @@ module.exports = {
       }
     },
     forceRerender: function() {
+      /**
+       * Force Vue to re-render the view.
+       */
       this.component_key += 1;
     },
     listEVCs: function() {
+      /**
+       * Call mef_eline REST endpoint to load EVC list.
+       */
       this.component_key = 0;
       var tableRows = [];
       var _this = this;
@@ -184,29 +201,36 @@ module.exports = {
         contentType: "application/json; charset=utf-8"
       });
       request.done(function(data) {
-          $.each(data, function(i , evc) {
-            if (evc) {
-              let _endpoint_a =  (evc.uni_a) ? evc.uni_a.interface_id : "";
-              let _tag_a = (evc.uni_a && evc.uni_a.tag) ? evc.uni_a.tag.value : "";  
-              let _endpoint_z =  (evc.uni_z) ? evc.uni_z.interface_id : "";
-              let _tag_z = (evc.uni_z && evc.uni_z.tag) ? evc.uni_z.tag.value : "";  
-              
-              let connection = {
-                "id": evc.id,
-                "Name": evc.name,
-                "Endpoint A": _endpoint_a,
-                "Tag A": _tag_a,
-                "Endpoint Z": _endpoint_z,
-                "Tag Z": _tag_z,
-                "Enabled": evc.enabled,
-                "Active": evc.active
-              };
-              tableRows.push(connection);
-            }
-          });
+        $.each(data, function(i , evc) {
+          if (evc) {
+            let endpoint_a =  (evc.uni_a) ? evc.uni_a.interface_id : "";
+            let endpoint_data_a = _this.getEndpointData(endpoint_a);
+            let tag_a = (evc.uni_a && evc.uni_a.tag) ? evc.uni_a.tag.value : "";
 
-          _this.data_rows = tableRows;
-          _this.forceRerender(); 
+            let endpoint_z =  (evc.uni_z) ? evc.uni_z.interface_id : "";
+            let endpoint_data_z = _this.getEndpointData(endpoint_z);
+            let tag_z = (evc.uni_z && evc.uni_z.tag) ? evc.uni_z.tag.value : "";  
+            
+            let connection = {
+              "id": evc.id,
+              "Name": evc.name,
+              "Switch A": endpoint_data_a.node_name,
+              "Port A": endpoint_data_a.port,
+              "Interf. A": endpoint_data_a.interface_name,
+              "Tag A": tag_a,
+              "Switch Z": endpoint_data_z.node_name,
+              "Port Z": endpoint_data_z.port,
+              "Interf. Z": endpoint_data_z.interface_name,
+              "Tag Z": tag_z,
+              "Enabled": evc.enabled,
+              "Active": evc.active
+            };
+            tableRows.push(connection);
+          }
+        });
+
+        _this.data_rows = tableRows;
+        _this.forceRerender(); 
       });
 
       request.fail(function( jqXHR, textStatus ) {
@@ -215,6 +239,56 @@ module.exports = {
       
       return tableRows;
     },
+    loadDpidNames: function() {
+      /**
+      * Call REST endpoint with switch and interface attributes and metadata.
+      */
+      let _dpid_names = {};
+      let _interface_names = {};
+      var _this = this;
+
+      var request = $.ajax({
+        url: this.$kytos_server_api + "kytos/topology/v3/switches",
+        type:"GET",
+        data: JSON.stringify(),
+        dataType: "json",
+        contentType: "application/json; charset=utf-8"
+      });
+      request.done(function(data) {
+        let switches = data.switches;
+        $.each(switches, function(i , sw) {
+          if(sw.metadata.node_name) {
+            _dpid_names[sw.dpid] = sw.metadata.node_name;
+          }
+          if(sw.interfaces) {
+            $.each(sw.interfaces, function(j , interface) {
+              _interface_names[interface.id] = interface.name;
+            });
+          }
+        });
+        _this.dpid_names = _dpid_names;
+        _this.interface_names = _interface_names;
+      });
+      request.fail(function( jqXHR, textStatus ) {
+        alert( "Request failed: " + textStatus );
+      });
+    },
+    getEndpointData: function(endpoint) {
+      /**
+      * Get DPID and Interface attributes and metadata.
+      * Parameter: <switch>:<port>
+      */
+      let dpid = endpoint.substring(0, 23);
+      let port = endpoint.substring(24);
+      let interface_name = (endpoint in this.interface_names) ? this.interface_names[endpoint] : port;
+      let node_name = (dpid in this.dpid_names) ? this.dpid_names[dpid] : dpid
+      return {
+        "dpid": dpid,
+        "node_name": node_name,
+        "port": port,
+        "interface_name": interface_name
+      };
+    }
   },
   computed: {
     rowsOfPage: function() {
@@ -237,6 +311,9 @@ module.exports = {
     },
   },
   mounted() {
+      // Load DPID attributes and metadata
+    this.loadDpidNames();
+      // Load EVCs
     this.listEVCs();
     // Make the panel fill the screen except the left menu width
     this.$parent.$el.style.width = "calc(100% - 300px)";
@@ -298,7 +375,7 @@ module.exports = {
   margin: 0 0.2em 0 0.2em;
 }
 .mef-table tbody tr:nth-child(even) {
-  background: #414141;
+  background: #313131;
 }
 .mef-table tbody tr:hover {
     color: #eee;
@@ -310,6 +387,8 @@ module.exports = {
 .mef-table-divisor {
   height: 190px;
 }
+#mef_lst_prt_a_search,
+#mef_lst_prt_z_search,
 #mef_lst_tag_a_search,
 #mef_lst_tag_z_search {
   width: 4em;

@@ -1,5 +1,4 @@
 <template>
-
     <div class="mef_circuit_container">
       <div class="mef-back-button">
         <k-button tooltip="List installed EVCs" title="< Back to list" :on_click="showInfoPanel">
@@ -18,8 +17,8 @@
             <template v-for="(column, cindex) in flags"> 
               <tr><th>{{cindex}}</th>
               <td>
-                <i class="material-icons" style="color:green" v-if="column">done</i>
-                <i class="material-icons" style="color:#c00000" v-else>close</i>
+                <i class="material-icons check_true" v-if="column">done</i>
+                <i class="material-icons check_false" v-else>close</i>
               </td></tr>
             </template>
           </table>
@@ -43,19 +42,16 @@
          <table class="table">
             <tbody>
               <tr>
+                <th></th>
                 <th>UNI A</th>
                 <th>UNI Z</th>
               </tr>
-              <template v-if="circuit['uni_a'] && circuit['uni_a']['interface_id']">
+              <template v-for="data in endpoints_data">
                 <tr>
-                  <td>{{circuit['uni_a']['interface_id']}}</td>
-                  <td>{{circuit['uni_z']['interface_id']}}</td>
-                </tr>
-              </template>
-              <template v-if="circuit['uni_a'] && circuit['uni_a']['tag']">
-                <tr>
-                  <td>Tag {{circuit['uni_a']['tag']['tag_type']}} {{circuit['uni_a']['tag']['value']}}</td>
-                  <td>Tag {{circuit['uni_z']['tag']['tag_type']}} {{circuit['uni_z']['tag']['value']}}</td>
+                  <template v-for="(col, index) in data">
+                    <th v-if="index == 0">{{col}}</th>
+                    <td v-else>{{col}}</td>
+                  </template>
                 </tr>
               </template>
             </tbody>
@@ -63,19 +59,25 @@
         </div>
 
         <template v-for="(path, pindex) in paths">
-          <div class="mef-circuit-table" id="mef-table-curr-path">
-          <table class="table">
+          <div class="mef-circuit-table mef-circuit-table-path">
+            <table class="table">
               <tbody>
                 <tr>
                   <th>{{pindex}}</th>
-                  <td>
-                      <table v-for="(column, cindex) in path">
-                        <tr><th>Endpoint A</th><th>Endpoint B</th></tr>
-                        <tr><td>{{column['endpoint_a']['name']}}</td><td>{{column['endpoint_b']['name']}}</td></tr>
-                        <tr><td>{{column['endpoint_a']['id']}}</td><td>{{column['endpoint_b']['id']}}</td></tr>
-                        <tr><td>{{column['endpoint_a']['mac']}}</td><td>{{column['endpoint_b']['mac']}}</td></tr>
+                  <td v-if="path && path.length > 0">
+                    <template v-for="step in path">
+                      <table class="mef-path-table">
+                        <tr>
+                          <th></th><th>Endpoint A</th><th>Endpoint B</th>
+                        </tr>
+                        <template v-for="(attr, cindex) in step">
+                          <tr>
+                            <th>{{cindex}}</th><td>{{attr[0]}}</td><td>{{attr[1]}}</td>
+                          </tr>
+                        </template>
                       </table>
-                  </td>
+                    </template>
+                </td>
                 </tr>
               </tbody>
             </table>
@@ -99,14 +101,17 @@ module.exports = {
   data(){
     return {
         component_key: 0,
-        circuit: {},
-        basics: {},
-        flags: {},
-        others: {},
-        dates: {},
-        paths: {},
-        links: {},
-        circuit_scheduler: {}
+        circuit: {},  // EVC data
+        dpid_names: {},  // DPIDs names
+        interface_data: {},  // DPIDs and interface data and metadata
+        endpoints_data: {}, // EVC endpoints data
+        basics: {}, // EVC basic data
+        flags: {}, // EVC flags data
+        others: {}, // EVC others data
+        dates: {}, // EVC dates
+        paths: {}, // EVC paths data
+        links: {}, // EVC links data
+        circuit_scheduler: {} // EVC scheduler data
     }
   },
   methods: {
@@ -121,9 +126,15 @@ module.exports = {
       this.$kytos.$emit("showInfoPanel", listConnections);
     },
     forceRerender: function() {
+      /**
+       * Force Vue to re-render the view.
+       */
       this.component_key += 1;
     },
-    getEVC: function(id) {
+    loadEVC: function(id) {
+      /**
+       * Call mef_eline REST endpoint to load EVC data.
+       */
       this.component_key = 0;
       var _this = this;
 
@@ -136,48 +147,175 @@ module.exports = {
       });
       
       request.done(function(data) {
-          _this.circuit = data;
-
-          _this.basics = {'ID': data['id'],
-                       'Name': data['name']
-                      };
-          _this.flags = {'Enabled': data['enabled'],
-                        'Active': data['active'],
-                        'Archived': data['archived'],
-                        'Dynamic backup path': data['dynamic_backup_path'],
-                      };
-          _this.others = {'Owner': data['owner'],
-                       'Priority': data['priority'],
-                       'Bandwidth': data['bandwidth'],
-                       'Queue': data['queue_id']
-                      };
-          _this.dates = {
-                       'Request time': data['request_time'],
-                       'Creation time': data['creation_time'],
-                       'Start date': data['start_date'],
-                       'End date': data['end_date']
-                      };
-          _this.paths = {"Current path": data['current_path'],
-                      "Primary path": data['primary_path'],
-                      "Backup path": data['backup_path']
-                      };
-
-          _this.links = {"Primary links": data['primary_links'],
-                         "Backup links": data['backup_links']
-                        };
-          
-          _this.circuit_scheduler = data['circuit_scheduler'];
-
+          _this.buidEvcView(data);
           _this.forceRerender();
       });
       request.fail(function( jqXHR, textStatus ) {
         alert( "Request failed: " + textStatus );
       });
     },
+    buidEvcView: function(data) {
+      /**
+      * Build EVC data for exibition.
+      * Parameter: 
+      *   data: evc json from mef_eline
+      */
+      this.circuit = data;
+
+      let uni_a = this.circuit['uni_a']['interface_id'];
+      let uni_a_data = this.getEndpointData(uni_a);
+      let uni_z = this.circuit['uni_z']['interface_id'];
+      let uni_z_data = this.getEndpointData(uni_z);
+
+      this.endpoints_data = [
+        ['DPID', uni_a, uni_z],
+        ['Node', uni_a_data['node_name'], uni_z_data['node_name']],
+        ['Interface', uni_a_data['interface_name'], uni_z_data['interface_name']],
+        ['Port', uni_a_data['port_name'], uni_z_data['port_name']]
+      ];
+      if(this.circuit['uni_a']['tag']) {
+         this.endpoints_data.push(['Tag Value', 
+                                    this.circuit['uni_a']['tag']['value'], 
+                                    this.circuit['uni_z']['tag']['value']])
+      }
+      this.basics = {'ID': data['id'],
+                     'Name': data['name']
+                    };
+      this.flags = {'Enabled': data['enabled'],
+                    'Active': data['active'],
+                    'Archived': data['archived'],
+                    'Dynamic backup path': data['dynamic_backup_path'],
+                   };
+      this.others = {'Owner': data['owner'],
+                     'Priority': data['priority'],
+                     'Bandwidth': data['bandwidth'],
+                     'Queue': data['queue_id']
+                    };
+      this.dates = {'Request time': data['request_time'],
+                    'Creation time': data['creation_time'],
+                    'Start date': data['start_date'],
+                    'End date': data['end_date']
+                   };
+      this.paths = {"Current path": this.buildPathView(data['current_path']),
+                    "Primary path": this.buildPathView(data['primary_path']),
+                    "Backup path": this.buildPathView(data['backup_path'])
+                   };
+
+      this.links = {"Primary links": data['primary_links'],
+                      "Backup links": data['backup_links']
+                   };
+      
+      this.circuit_scheduler = data['circuit_scheduler'];
+    },
+    buildPathView: function(path_data) {
+      /**
+      * Build path data for exibition. (current, primary and backup paths)
+      * Parameter:
+      *   path_data: json with path data
+      */
+      let _path = [];
+      if(path_data) {
+        for(key_path in path_data) {
+          let path_step = path_data[key_path];
+
+          let svlan = ('metadata' in path_step && 's_vlan' in path_step['metadata']) ?
+                     path_step['metadata']['s_vlan']['value'] : "";
+
+          let dpid_a = path_step['endpoint_a']['id'];
+          let data_a = this.getEndpointData(dpid_a);
+
+          let dpid_b = path_step['endpoint_b']['id'];
+          data_b = this.getEndpointData(dpid_b);
+
+          let _item = {
+            'DPID': [dpid_a, dpid_b],
+            'Node': [data_a['node_name'], data_b['node_name']],
+            'Interface': [data_a['interface_name'], data_b['interface_name']],
+            'Port': [data_a['port_name'], data_b['port_name']],
+            'Link': [data_a['link_name'], data_b['link_name']],
+            'S-VLAN': [svlan, svlan]
+          };
+          _path.push(_item);
+        }
+      }
+      return _path;
+    },
+    loadDpidNames: function() {
+      /**
+      * Call REST endpoint with switch and interface attributes and metadata.
+      */
+      let _dpid_names = {};
+      let _interface_data = {};
+      var _this = this;
+
+      var request = $.ajax({
+        url: this.$kytos_server_api + "kytos/topology/v3/switches",
+        type:"GET",
+        data: JSON.stringify(),
+        dataType: "json",
+        contentType: "application/json; charset=utf-8"
+      });
+      request.done(function(data) {
+        let switches = data.switches;
+        $.each(switches, function(i , sw) {
+          if(sw.metadata.node_name) {
+            _dpid_names[sw.dpid] = sw.metadata.node_name;
+          }
+          if(sw.interfaces) {
+            $.each(sw.interfaces, function(j , interface) {
+              let metadata = interface.metadata;
+              _interface_data[interface.id] = {
+                "name": interface.name,
+                "link_name": (metadata && "link_name" in metadata) ? interface.metadata.link_name : "",
+                "port_name": (metadata && "port_name" in metadata) ? interface.metadata.port_name : ""
+              };
+            });
+          }
+        });
+        _this.dpid_names = _dpid_names;
+        _this.interface_data = _interface_data;
+      });
+      request.fail(function( jqXHR, textStatus ) {
+        alert( "Request failed: " + textStatus );
+      });
+    },
+    getEndpointData: function(endpoint) {
+      /**
+      * Get DPID and Interface attributes and metadata.
+      * Parameter: <switch>:<port>
+      */
+      let dpid = endpoint.substring(0, 23);
+      let port = endpoint.substring(24);
+      let node_name = (dpid in this.dpid_names) ? this.dpid_names[dpid] : dpid;
+
+      let interface_name =  port;
+      let link_name = "";
+      let port_name = "";
+      if(endpoint in this.interface_data) {
+        let _data = this.interface_data[endpoint];
+        interface_name = _data["name"];
+        link_name = ("link_name" in _data) ? _data["link_name"] : "";
+        port_name = ("port_name" in _data) ? _data["port_name"] : "";
+      }
+      
+      let result = {
+        "dpid": dpid,
+        "node_name": node_name,
+        "port": port,
+        "interface_name": interface_name,
+        "link_name": link_name,
+        "port_name": port_name
+      };
+
+      return result;
+    }
   },
   mounted() {
     if(this.content && this.content.id) {
-      this.getEVC(this.content.id);
+      // Load DPID attributes and metadata
+      this.loadDpidNames();
+      // Load EVC
+      this.loadEVC(this.content.id);
       // Make the panel fill the screen except the left menu width
       this.$parent.$el.style.width = "calc(100% - 300px)";
     }
@@ -185,13 +323,22 @@ module.exports = {
 }
 </script>
 <style>
-/* Import icons */
-@import "https://fonts.googleapis.com/icon?family=Material+Icons";
+  /* Import icons */
+  @import "https://fonts.googleapis.com/icon?family=Material+Icons";
 
   .empty-con-list {
     margin-top: 10px;
     color: #ccc;
     font-size: 0.8rem;
+  }
+  .mef_circuit_container .check_true {
+    color: green;
+  }
+  .mef_circuit_container .check_false {
+    color: #c00000;
+  }
+  .mef_circuit_container tbody tr:hover {
+    background: inherit;
   }
   .mef_circuit_container table {
     border-collapse: collapse;
@@ -221,12 +368,17 @@ module.exports = {
   .mef-circuit-table th {
     width: 75px;
   }
+  .mef-path-table th {
+    width: 50px;
+  }
+  .mef-circuit-table table + table {
+    margin-top:4px;
+  }
   .mef-back-button {
     clear: both;
   }
   #mef-flags {
     clear:both;
-
   }
   #mef-flags th {
     width: 125px;
@@ -239,8 +391,8 @@ module.exports = {
     clear:both;
     width:520px;
   }
-  #mef-table-curr-path {
-  clear:both; 
-  width:520px;
+  .mef-circuit-table-path {
+    clear:both; 
+    width:520px;
   }
 </style>
