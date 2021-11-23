@@ -6,11 +6,6 @@ NApp to provision circuits from user request.
 from threading import Lock
 
 from flask import jsonify, request
-from openapi_core import create_spec
-from openapi_core.contrib.flask import FlaskOpenAPIRequest
-from openapi_core.validation.request.validators import RequestValidator
-from openapi_spec_validator import validate_spec
-from openapi_spec_validator.readers import read_from_filename
 from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
                                  MethodNotAllowed, NotFound,
                                  UnsupportedMediaType)
@@ -25,7 +20,7 @@ from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
 from napps.kytos.mef_eline.storehouse import StoreHouse
-from napps.kytos.mef_eline.utils import emit_event
+from napps.kytos.mef_eline.utils import emit_event, validate, load_spec
 
 
 # pylint: disable=too-many-public-methods
@@ -34,6 +29,7 @@ class Main(KytosNApp):
 
     This class is the entry point for this napp.
     """
+    spec = load_spec()
 
     def setup(self):
         """Replace the '__init__' method for the KytosNApp subclass.
@@ -43,15 +39,6 @@ class Main(KytosNApp):
 
         So, if you have any setup routine, insert it here.
         """
-        # Validate Spec
-        napp_dir = FSPath(__file__).parent
-        yml_file = napp_dir/"openapi.yml"
-        spec_dict, _ = read_from_filename(yml_file)
-
-        validate_spec(spec_dict)
-
-        self.spec = create_spec(spec_dict)
-
         # object used to scheduler circuit events
         self.sched = Scheduler()
 
@@ -153,7 +140,8 @@ class Main(KytosNApp):
         return jsonify(result), status
 
     @rest("/v2/evc/", methods=["POST"])
-    def create_circuit(self):
+    @validate(spec)
+    def create_circuit(self, data):
         """Try to create a new circuit.
 
         Firstly, for EVPL: E-Line NApp verifies if UNI_A's requested C-VID and
@@ -179,33 +167,7 @@ class Main(KytosNApp):
         """
         # Try to create the circuit object
         log.debug("create_circuit /v2/evc/")
-        try:
-            data = request.get_json()
-        except BadRequest:
-            result = "The request body is not a well-formed JSON."
-            log.debug("create_circuit result %s %s", result, 400)
-            raise BadRequest(result) from BadRequest
-        validator = RequestValidator(self.spec)
-        openapi_request = FlaskOpenAPIRequest(request)
-        result = validator.validate(openapi_request)
-        if result.errors:
-            errors = result.errors[0]
-            if hasattr(errors, "schema_errors"):
-                schema_errors = errors.schema_errors[0]
-                error_response = {
-                    "error_message": schema_errors.message,
-                    "error_validator": schema_errors.validator,
-                    "error_validator_value": schema_errors.validator_value,
-                    "error_path": list(schema_errors.path),
-                    "error_schema": schema_errors.schema,
-                    "error_schema_path": list(schema_errors.schema_path),
-                }
-                log.debug("error response: %s", error_response)
-            else:
-                error_response = (
-                    "The request body mimetype is not application/json."
-                )
-            raise BadRequest(error_response) from BadRequest
+
         try:
             evc = self._evc_from_dict(data)
         except ValueError as exception:

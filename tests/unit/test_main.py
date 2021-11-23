@@ -516,7 +516,7 @@ class TestMain(TestCase):
         current_data = json.loads(response.data)
         expected_message = "The request body mimetype is not application/json."
         expected_data = expected_message
-        self.assertEqual(400, response.status_code, response.data)
+        self.assertEqual(415, response.status_code, response.data)
         self.assertEqual(current_data["description"], expected_data)
 
     def test_create_a_circuit_case_3(self):
