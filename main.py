@@ -20,7 +20,7 @@ from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
 from napps.kytos.mef_eline.storehouse import StoreHouse
-from napps.kytos.mef_eline.utils import emit_event, validate, load_spec
+from napps.kytos.mef_eline.utils import emit_event, load_spec, validate
 
 
 # pylint: disable=too-many-public-methods

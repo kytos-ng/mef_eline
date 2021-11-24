@@ -1,15 +1,18 @@
 """Utility functions."""
 import functools
 from pathlib import Path
+
 from flask import request
-from werkzeug.exceptions import BadRequest, UnsupportedMediaType
-from kytos.core import log
-from kytos.core.events import KytosEvent
 from openapi_core import create_spec
 from openapi_core.contrib.flask import FlaskOpenAPIRequest
 from openapi_core.validation.request.validators import RequestValidator
 from openapi_spec_validator import validate_spec
 from openapi_spec_validator.readers import read_from_filename
+from werkzeug.exceptions import BadRequest, UnsupportedMediaType
+
+from kytos.core import log
+from kytos.core.events import KytosEvent
+
 
 def emit_event(controller, name, **kwargs):
     """Send an event when something happens with an EVC."""
@@ -40,7 +43,7 @@ def load_spec():
 
 def validate(spec):
     """Decorator to validate a REST endpoint input.
-    
+
     Uses the schema defined in the openapi.yml file
     to validate.
     """
