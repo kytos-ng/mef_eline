@@ -6,9 +6,14 @@ NApp to provision circuits from user request.
 from threading import Lock
 
 from flask import jsonify, request
-from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
-                                 MethodNotAllowed, NotFound,
-                                 UnsupportedMediaType)
+from werkzeug.exceptions import (
+    BadRequest,
+    Conflict,
+    Forbidden,
+    MethodNotAllowed,
+    NotFound,
+    UnsupportedMediaType,
+)
 
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
@@ -29,6 +34,7 @@ class Main(KytosNApp):
 
     This class is the entry point for this napp.
     """
+
     spec = load_spec()
 
     def setup(self):
@@ -74,9 +80,9 @@ class Main(KytosNApp):
         for circuit in tuple(self.circuits.values()):
             stored_circuits.pop(circuit.id, None)
             if (
-                circuit.is_enabled() and
-                not circuit.is_active() and
-                not circuit.lock.locked()
+                circuit.is_enabled()
+                and not circuit.is_active()
+                and not circuit.lock.locked()
             ):
                 if circuit.check_traces():
                     log.info(f"{circuit} enabled but inactive - activating")
@@ -176,18 +182,22 @@ class Main(KytosNApp):
 
         if evc.primary_path:
             try:
-                evc.primary_path.is_valid(evc.uni_a.interface.switch,
-                                          evc.uni_z.interface.switch,
-                                          bool(evc.circuit_scheduler))
+                evc.primary_path.is_valid(
+                    evc.uni_a.interface.switch,
+                    evc.uni_z.interface.switch,
+                    bool(evc.circuit_scheduler),
+                )
             except InvalidPath as exception:
-                raise BadRequest(f'primary_path is not valid: {exception}')
+                raise BadRequest(f"primary_path is not valid: {exception}")
         if evc.backup_path:
             try:
-                evc.backup_path.is_valid(evc.uni_a.interface.switch,
-                                         evc.uni_z.interface.switch,
-                                         bool(evc.circuit_scheduler))
+                evc.backup_path.is_valid(
+                    evc.uni_a.interface.switch,
+                    evc.uni_z.interface.switch,
+                    bool(evc.circuit_scheduler),
+                )
             except InvalidPath as exception:
-                raise BadRequest(f'backup_path is not valid: {exception}')
+                raise BadRequest(f"backup_path is not valid: {exception}")
 
         # verify duplicated evc
         if self._is_duplicated_evc(evc):
@@ -219,9 +229,7 @@ class Main(KytosNApp):
                 evc.deploy()
 
         # Notify users
-        event = KytosEvent(
-            name="kytos.mef_eline.created", content=evc.as_dict()
-        )
+        event = KytosEvent(name="kytos.mef_eline.created", content=evc.as_dict())
         self.controller.buffers.app.put(event)
 
         result = {"circuit_id": evc.id}
@@ -261,9 +269,7 @@ class Main(KytosNApp):
             raise UnsupportedMediaType(result) from UnsupportedMediaType
 
         try:
-            enable, redeploy = evc.update(
-                **self._evc_dict_with_instances(data)
-            )
+            enable, redeploy = evc.update(**self._evc_dict_with_instances(data))
         except ValueError as exception:
             log.error(exception)
             log.debug("update result %s %s", exception, 400)
@@ -323,57 +329,58 @@ class Main(KytosNApp):
         emit_event(self.controller, "deleted", evc_id=evc.id)
         return jsonify(result), status
 
-    @rest('v2/evc/<circuit_id>/metadata', methods=['GET'])
+    @rest("v2/evc/<circuit_id>/metadata", methods=["GET"])
     def get_metadata(self, circuit_id):
         """Get metadata from an EVC."""
         try:
-            return jsonify({"metadata":
-                            self.circuits[circuit_id].metadata}), 200
+            return jsonify({"metadata": self.circuits[circuit_id].metadata}), 200
         except KeyError as error:
-            raise NotFound(f'circuit_id {circuit_id} not found.') from error
+            raise NotFound(f"circuit_id {circuit_id} not found.") from error
 
-    @rest('v2/evc/<circuit_id>/metadata', methods=['POST'])
+    @rest("v2/evc/<circuit_id>/metadata", methods=["POST"])
     def add_metadata(self, circuit_id):
         """Add metadata to an EVC."""
         try:
             metadata = request.get_json()
             content_type = request.content_type
         except BadRequest as error:
-            result = 'The request body is not a well-formed JSON.'
+            result = "The request body is not a well-formed JSON."
             raise BadRequest(result) from error
         if content_type is None:
-            result = 'The request body is empty.'
+            result = "The request body is empty."
             raise BadRequest(result)
         if metadata is None:
-            if content_type != 'application/json':
-                result = ('The content type must be application/json '
-                          f'(received {content_type}).')
+            if content_type != "application/json":
+                result = (
+                    "The content type must be application/json "
+                    f"(received {content_type})."
+                )
             else:
-                result = 'Metadata is empty.'
+                result = "Metadata is empty."
             raise UnsupportedMediaType(result)
 
         try:
             evc = self.circuits[circuit_id]
         except KeyError as error:
-            raise NotFound(f'circuit_id {circuit_id} not found.') from error
+            raise NotFound(f"circuit_id {circuit_id} not found.") from error
 
         evc.extend_metadata(metadata)
         evc.sync()
         return jsonify("Operation successful"), 201
 
-    @rest('v2/evc/<circuit_id>/metadata/<key>', methods=['DELETE'])
+    @rest("v2/evc/<circuit_id>/metadata/<key>", methods=["DELETE"])
     def delete_metadata(self, circuit_id, key):
         """Delete metadata from an EVC."""
         try:
             evc = self.circuits[circuit_id]
         except KeyError as error:
-            raise NotFound(f'circuit_id {circuit_id} not found.') from error
+            raise NotFound(f"circuit_id {circuit_id} not found.") from error
 
         evc.remove_metadata(key)
         evc.sync()
         return jsonify("Operation successful"), 200
 
-    @rest('/v2/evc/<circuit_id>/redeploy', methods=['PATCH'])
+    @rest("/v2/evc/<circuit_id>/redeploy", methods=["PATCH"])
     def redeploy(self, circuit_id):
         """Endpoint to force the redeployment of an EVC."""
         log.debug("redeploy /v2/evc/%s/redeploy", circuit_id)
@@ -647,8 +654,7 @@ class Main(KytosNApp):
             evc = self._evc_from_dict(circuit_dict)
         except ValueError as exception:
             log.error(
-                f'Could not load EVC {circuit_dict["id"]} '
-                f"because {exception}"
+                f'Could not load EVC {circuit_dict["id"]} ' f"because {exception}"
             )
             return None
 
@@ -700,13 +706,13 @@ class Main(KytosNApp):
             #     primary_links_cache,
             #     backup_links_cache
             if "links" in attribute:
-                data[attribute] = [
-                    self._link_from_dict(link) for link in value
-                ]
+                data[attribute] = [self._link_from_dict(link) for link in value]
 
             # Ex: current_path,
-                    [self._link_from_dict(link) for link in value]
-                )
+            #     primary_path,
+            #     backup_path
+            if "path" in attribute and attribute != "dynamic_backup_path":
+                data[attribute] = Path([self._link_from_dict(link) for link in value])
 
         return data
 

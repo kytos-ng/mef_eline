@@ -36,32 +36,33 @@ class Path(list, GenericEntity):
         """Choose the VLANs to be used for the circuit."""
         for link in self:
             tag = link.get_next_available_tag()
-            link.add_metadata('s_vlan', tag)
+            link.add_metadata("s_vlan", tag)
 
     def make_vlans_available(self):
         """Make the VLANs used in a path available when undeployed."""
         for link in self:
-            link.make_tag_available(link.get_metadata('s_vlan'))
-            link.remove_metadata('s_vlan')
+            link.make_tag_available(link.get_metadata("s_vlan"))
+            link.remove_metadata("s_vlan")
 
     def is_valid(self, switch_a, switch_z, is_scheduled=False):
         """Check if this is a valid path."""
         previous = switch_a
         for link in self:
             if link.endpoint_a.switch != previous:
-                raise InvalidPath(f'{link.endpoint_a} switch is different'
-                                  f' from previous.')
+                raise InvalidPath(
+                    f"{link.endpoint_a} switch is different" f" from previous."
+                )
             if is_scheduled is False and (
-                link.endpoint_a.link is None or
-                link.endpoint_a.link != link or
-                link.endpoint_b.link is None or
-                link.endpoint_b.link != link
+                link.endpoint_a.link is None
+                or link.endpoint_a.link != link
+                or link.endpoint_b.link is None
+                or link.endpoint_b.link != link
             ):
-                raise InvalidPath(f'Link {link} is not available.')
+                raise InvalidPath(f"Link {link} is not available.")
             previous = link.endpoint_b.switch
         if previous == switch_z:
             return True
-        raise InvalidPath(f'Last endpoint is different from uni_z')
+        raise InvalidPath(f"Last endpoint is different from uni_z")
 
     @property
     def status(self):
@@ -72,22 +73,25 @@ class Path(list, GenericEntity):
         if not self:
             return EntityStatus.DISABLED
 
-        endpoint = '%s/%s' % (settings.TOPOLOGY_URL, 'links')
+        endpoint = "%s/%s" % (settings.TOPOLOGY_URL, "links")
         api_reply = requests.get(endpoint)
-        if api_reply.status_code != getattr(requests.codes, 'ok'):
-            log.error('Failed to get links at %s. Returned %s',
-                      endpoint, api_reply.status_code)
+        if api_reply.status_code != getattr(requests.codes, "ok"):
+            log.error(
+                "Failed to get links at %s. Returned %s",
+                endpoint,
+                api_reply.status_code,
+            )
             return None
-        links = api_reply.json()['links']
+        links = api_reply.json()["links"]
         return_status = EntityStatus.UP
         for path_link in self:
             try:
                 link = links[path_link.id]
             except KeyError:
                 return EntityStatus.DISABLED
-            if link['enabled'] is False:
+            if link["enabled"] is False:
                 return EntityStatus.DISABLED
-            if link['active'] is False:
+            if link["active"] is False:
                 return_status = EntityStatus.DOWN
         return return_status
 
@@ -110,16 +114,21 @@ class DynamicPathManager:
     def get_paths(circuit):
         """Get a valid path for the circuit from the Pathfinder."""
         endpoint = settings.PATHFINDER_URL
-        request_data = {"source": circuit.uni_a.interface.id,
-                        "destination": circuit.uni_z.interface.id}
+        request_data = {
+            "source": circuit.uni_a.interface.id,
+            "destination": circuit.uni_z.interface.id,
+        }
         api_reply = requests.post(endpoint, json=request_data)
 
-        if api_reply.status_code != getattr(requests.codes, 'ok'):
-            log.error("Failed to get paths at %s. Returned %s",
-                      endpoint, api_reply.status_code)
+        if api_reply.status_code != getattr(requests.codes, "ok"):
+            log.error(
+                "Failed to get paths at %s. Returned %s",
+                endpoint,
+                api_reply.status_code,
+            )
             return None
         reply_data = api_reply.json()
-        return reply_data.get('paths')
+        return reply_data.get("paths")
 
     @staticmethod
     def _clear_path(path):
@@ -131,14 +140,14 @@ class DynamicPathManager:
         """Return the best path available for a circuit, if exists."""
         paths = cls.get_paths(circuit)
         if paths:
-            return cls.create_path(cls.get_paths(circuit)[0]['hops'])
+            return cls.create_path(cls.get_paths(circuit)[0]["hops"])
         return None
 
     @classmethod
     def get_best_paths(cls, circuit):
         """Return the best paths available for a circuit, if they exist."""
         for path in cls.get_paths(circuit):
-            yield cls.create_path(path['hops'])
+            yield cls.create_path(path["hops"])
 
     @classmethod
     def create_path(cls, path):

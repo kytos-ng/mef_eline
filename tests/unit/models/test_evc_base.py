@@ -4,13 +4,14 @@ from unittest import TestCase
 from unittest.mock import patch
 
 # pylint: disable=wrong-import-position
-sys.path.insert(0, '/var/lib/kytos/napps/..')
+sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
 from napps.kytos.mef_eline.models import EVC  # NOQA  pycodestyle
-from napps.kytos.mef_eline.scheduler import \
-    CircuitSchedule   # NOQA  pycodestyle
-from napps.kytos.mef_eline.tests.helpers import get_uni_mocked, \
-    get_controller_mock  # NOQA  pycodestyle
+from napps.kytos.mef_eline.scheduler import CircuitSchedule  # NOQA  pycodestyle
+from napps.kytos.mef_eline.tests.helpers import (
+    get_uni_mocked,
+    get_controller_mock,
+)  # NOQA  pycodestyle
 
 
 class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
@@ -26,8 +27,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
 
     def test_without_uni_a(self):
         """Test if the EVC raises and error with UNI A is required."""
-        attributes = {"controller": get_controller_mock(),
-                      "name": "circuit_name"}
+        attributes = {"controller": get_controller_mock(), "name": "circuit_name"}
         error_message = "uni_a is required."
         with self.assertRaises(ValueError) as handle_error:
             EVC(**attributes)
@@ -38,7 +38,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         attributes = {
             "controller": get_controller_mock(),
             "name": "circuit_name",
-            "uni_a": get_uni_mocked(tag_value=82)
+            "uni_a": get_uni_mocked(tag_value=82),
         }
         error_message = "VLAN tag 82 is not available in uni_a"
         with self.assertRaises(ValueError) as handle_error:
@@ -50,7 +50,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         attributes = {
             "controller": get_controller_mock(),
             "name": "circuit_name",
-            "uni_a": get_uni_mocked(is_valid=True)
+            "uni_a": get_uni_mocked(is_valid=True),
         }
         error_message = "uni_z is required."
         with self.assertRaises(ValueError) as handle_error:
@@ -63,7 +63,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "controller": get_controller_mock(),
             "name": "circuit_name",
             "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(tag_value=83)
+            "uni_z": get_uni_mocked(tag_value=83),
         }
         error_message = "VLAN tag 83 is not available in uni_z"
         with self.assertRaises(ValueError) as handle_error:
@@ -76,14 +76,14 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "controller": get_controller_mock(),
             "name": "circuit_name",
             "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True)
+            "uni_z": get_uni_mocked(is_valid=True),
         }
         update_attr = [
             ("archived", True),
             ("_id", True),
             ("active", True),
             ("current_path", []),
-            ("creation_time", "date")
+            ("creation_time", "date"),
         ]
 
         for name, value in update_attr:
@@ -95,7 +95,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                     evc.update(**update_dict)
                 self.assertEqual(str(handle_error.exception), error_message)
 
-    @patch('napps.kytos.mef_eline.models.EVC.sync')
+    @patch("napps.kytos.mef_eline.models.EVC.sync")
     def test_update_disable(self, _sync_mock):
         """Test if evc is disabled."""
         attributes = {
@@ -103,16 +103,14 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "name": "circuit_name",
             "enable": True,
             "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True)
+            "uni_z": get_uni_mocked(is_valid=True),
         }
-        update_dict = {
-            "enable": False
-        }
+        update_dict = {"enable": False}
         evc = EVC(**attributes)
         evc.update(**update_dict)
         self.assertIs(evc.is_enabled(), False)
 
-    @patch('napps.kytos.mef_eline.models.EVC.sync')
+    @patch("napps.kytos.mef_eline.models.EVC.sync")
     def test_update_queue(self, _sync_mock):
         """Test if evc is set to redeploy."""
         attributes = {
@@ -120,11 +118,9 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "name": "circuit_name",
             "enable": True,
             "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True)
+            "uni_z": get_uni_mocked(is_valid=True),
         }
-        update_dict = {
-            "queue_id": 3
-        }
+        update_dict = {"queue_id": 3}
         evc = EVC(**attributes)
         _, redeploy = evc.update(**update_dict)
         self.assertTrue(redeploy)
@@ -135,10 +131,10 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "controller": get_controller_mock(),
             "name": "circuit_name",
             "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True)
+            "uni_z": get_uni_mocked(is_valid=True),
         }
         evc = EVC(**attributes)
-        expected_value = f'EVC({evc.id}, {evc.name})'
+        expected_value = f"EVC({evc.id}, {evc.name})"
         self.assertEqual(str(evc), expected_value)
 
     def test_comparison_method(self):
@@ -147,7 +143,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "controller": get_controller_mock(),
             "name": "circuit_name",
             "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True)
+            "uni_z": get_uni_mocked(is_valid=True),
         }
         evc1 = EVC(**attributes)
         evc2 = EVC(**attributes)
@@ -156,7 +152,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "controller": get_controller_mock(),
             "name": "circuit_name_2",
             "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True)
+            "uni_z": get_uni_mocked(is_valid=True),
         }
         evc3 = EVC(**attributes)
         evc4 = EVC(**attributes)
@@ -174,56 +170,48 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "name": "custom_name",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
-            "start_date": '2018-08-21T18:44:54',
-            "end_date": '2018-08-21T18:44:55',
-            'primary_links': [],
-            'request_time': '2018-08-21T19:10:41',
-            'creation_time': '2018-08-21T18:44:54',
-            'owner': "my_name",
-            'circuit_scheduler': [
-                CircuitSchedule.from_dict({"id": 234243247, "action": "create",
-                                          "frequency": "1 * * * *"}),
-                CircuitSchedule.from_dict({"id": 234243239, "action": "create",
-                                          "interval": {"hours": 2}})
+            "start_date": "2018-08-21T18:44:54",
+            "end_date": "2018-08-21T18:44:55",
+            "primary_links": [],
+            "request_time": "2018-08-21T19:10:41",
+            "creation_time": "2018-08-21T18:44:54",
+            "owner": "my_name",
+            "circuit_scheduler": [
+                CircuitSchedule.from_dict(
+                    {"id": 234243247, "action": "create", "frequency": "1 * * * *"}
+                ),
+                CircuitSchedule.from_dict(
+                    {"id": 234243239, "action": "create", "interval": {"hours": 2}}
+                ),
             ],
-            'enabled': True,
-            'priority': 2
+            "enabled": True,
+            "priority": 2,
         }
         evc = EVC(**attributes)
 
         expected_dict = {
-            'id': 'custom_id',
-            'name': 'custom_name',
-            'uni_a': attributes['uni_a'].as_dict(),
-            'uni_z': attributes['uni_z'].as_dict(),
-            'start_date': '2018-08-21T18:44:54',
-            'end_date': '2018-08-21T18:44:55',
-            'bandwidth': 0,
-            'primary_links': [],
-            'backup_links': [],
-            'current_path': [],
-            'primary_path': [],
-            'backup_path': [],
-            'dynamic_backup_path': False,
-            'request_time': '2018-08-21T19:10:41',
-            'creation_time': '2018-08-21T18:44:54',
-            'circuit_scheduler': [
-                {
-                    "id": 234243247,
-                    "action": "create",
-                    "frequency": "1 * * * *"
-                },
-                {
-                    "id": 234243239,
-                    "action": "create",
-                    "interval": {
-                        "hours": 2
-                    }
-                }
+            "id": "custom_id",
+            "name": "custom_name",
+            "uni_a": attributes["uni_a"].as_dict(),
+            "uni_z": attributes["uni_z"].as_dict(),
+            "start_date": "2018-08-21T18:44:54",
+            "end_date": "2018-08-21T18:44:55",
+            "bandwidth": 0,
+            "primary_links": [],
+            "backup_links": [],
+            "current_path": [],
+            "primary_path": [],
+            "backup_path": [],
+            "dynamic_backup_path": False,
+            "request_time": "2018-08-21T19:10:41",
+            "creation_time": "2018-08-21T18:44:54",
+            "circuit_scheduler": [
+                {"id": 234243247, "action": "create", "frequency": "1 * * * *"},
+                {"id": 234243239, "action": "create", "interval": {"hours": 2}},
             ],
-            'active': False,
-            'enabled': True,
-            'priority': 2
+            "active": False,
+            "enabled": True,
+            "priority": 2,
         }
         actual_dict = evc.as_dict()
         for name, value in expected_dict.items():

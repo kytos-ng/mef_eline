@@ -197,12 +197,12 @@ class TestPath(TestCase):
 
     def test_is_valid(self):
         """Test is_valid method."""
-        switch1 = '00:00:00:00:00:00:00:01'
-        switch2 = '00:00:00:00:00:00:00:02'
-        switch3 = '00:00:00:00:00:00:00:03'
-        switch4 = '00:00:00:00:00:00:00:04'
-        switch5 = '00:00:00:00:00:00:00:05'
-        switch6 = '00:00:00:00:00:00:00:06'
+        switch1 = "00:00:00:00:00:00:00:01"
+        switch2 = "00:00:00:00:00:00:00:02"
+        switch3 = "00:00:00:00:00:00:00:03"
+        switch4 = "00:00:00:00:00:00:00:04"
+        switch5 = "00:00:00:00:00:00:00:05"
+        switch6 = "00:00:00:00:00:00:00:06"
 
         links1 = [
             get_link_mocked(switch_a=switch1, switch_b=switch2),
@@ -215,20 +215,20 @@ class TestPath(TestCase):
         links2 = [
             get_link_mocked(switch_a=switch1, switch_b=switch2),
             get_link_mocked(switch_a=switch3, switch_b=switch2),
-            get_link_mocked(switch_a=switch3, switch_b=switch4)
+            get_link_mocked(switch_a=switch3, switch_b=switch4),
         ]
 
         for links, switch_a, switch_z, expected in (
-                (links1, switch1, switch6, True),
-                (links2, switch1, switch4, False),
-                (links1, switch2, switch6, False)
-                ):
-            with self.subTest(links=links, switch_a=switch_a,
-                              switch_z=switch_z, expected=expected):
+            (links1, switch1, switch6, True),
+            (links2, switch1, switch4, False),
+            (links1, switch2, switch6, False),
+        ):
+            with self.subTest(
+                links=links, switch_a=switch_a, switch_z=switch_z, expected=expected
+            ):
                 path = Path(links)
                 if expected:
-                    self.assertEqual(path.is_valid(switch_a, switch_z),
-                                     expected)
+                    self.assertEqual(path.is_valid(switch_a, switch_z), expected)
                 else:
                     with self.assertRaises(InvalidPath):
                         path.is_valid(switch_a, switch_z)

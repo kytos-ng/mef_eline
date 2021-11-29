@@ -140,10 +140,7 @@ class Scheduler:
             self.scheduler.add_job(job_call, "interval", **data)
 
         elif circuit_scheduler.frequency:
-            cron = CronTrigger.from_crontab(
-                circuit_scheduler.frequency,
-                timezone=utc
-            )
+            cron = CronTrigger.from_crontab(circuit_scheduler.frequency, timezone=utc)
             self.scheduler.add_job(job_call, cron, **data)
 
     def cancel_job(self, circuit_scheduler_id):

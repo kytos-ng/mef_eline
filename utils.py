@@ -33,7 +33,7 @@ def compare_endpoint_trace(endpoint, vlan, trace):
 def load_spec():
     """Validate openapi spec."""
     napp_dir = Path(__file__).parent
-    yml_file = napp_dir/"openapi.yml"
+    yml_file = napp_dir / "openapi.yml"
     spec_dict, _ = read_from_filename(yml_file)
 
     validate_spec(spec_dict)
@@ -47,6 +47,7 @@ def validate(spec):
     Uses the schema defined in the openapi.yml file
     to validate.
     """
+
     def validate_decorator(func):
         @functools.wraps(func)
         def wrapper_validate(*args, **kwargs):
@@ -84,5 +85,7 @@ def validate(spec):
                     )
                 raise BadRequest(error_response) from BadRequest
             return func(*args, data=data, **kwargs)
+
         return wrapper_validate
+
     return validate_decorator

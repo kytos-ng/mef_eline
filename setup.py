@@ -82,12 +82,8 @@ class TestCommand(Command):
     def finalize_options(self):
         """Post-process."""
         try:
-            assert self.size in self.sizes, (
-                "ERROR: Invalid size:" f":{self.size}"
-            )
-            assert self.type in self.types, (
-                "ERROR: Invalid type:" f":{self.type}"
-            )
+            assert self.size in self.sizes, "ERROR: Invalid size:" f":{self.size}"
+            assert self.type in self.types, "ERROR: Invalid type:" f":{self.type}"
         except AssertionError as exc:
             print(exc)
             sys.exit(-1)
@@ -141,17 +137,13 @@ class TestCoverage(Test):
     def run(self):
         """Run tests quietly and display coverage report."""
         # cmd = 'coverage3 run setup.py pytest %s' % self.get_args()
-        tmpl = Template(
-            "coverage3 run setup.py pytest ${arg1} && coverage3 report"
-        )
+        tmpl = Template("coverage3 run setup.py pytest ${arg1} && coverage3 report")
         cmd = tmpl.substitute(arg1=self.get_args())
         try:
             check_call(cmd, shell=True)
         except CalledProcessError as exc:
             print(exc)
-            print(
-                "Coverage tests failed. Fix the errors abov e and try again."
-            )
+            print("Coverage tests failed. Fix the errors abov e and try again.")
             sys.exit(-1)
 
 
@@ -179,9 +171,7 @@ class CITest(TestCommand):
 
     def run(self):
         """Run unit tests with coverage, doc tests and linter."""
-        coverage_cmd = f"python3.6 setup.py coverage {0}".format(
-            self.get_args()
-        )
+        coverage_cmd = f"python3.6 setup.py coverage {0}".format(self.get_args())
         lint_cmd = "python3.6 setup.py lint"
         cmd = f"{0} && {1}".format(coverage_cmd, lint_cmd)
         check_call(cmd, shell=True)
