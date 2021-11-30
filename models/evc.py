@@ -159,7 +159,9 @@ class EVCBase(GenericEntity):
                 raise ValueError(f'The attribute "{attribute}" is invalid.')
             if attribute in ("primary_path", "backup_path"):
                 try:
-                    value.is_valid(uni_a.interface.switch, uni_z.interface.switch)
+                    value.is_valid(
+                        uni_a.interface.switch, uni_z.interface.switch
+                    )
                 except InvalidPath as exception:
                     raise ValueError(
                         f"{attribute} is not a " f"valid path: {exception}"
@@ -271,7 +273,9 @@ class EVCBase(GenericEntity):
         evc_dict["creation_time"] = time
 
         evc_dict["owner"] = self.owner
-        evc_dict["circuit_scheduler"] = [sc.as_dict() for sc in self.circuit_scheduler]
+        evc_dict["circuit_scheduler"] = [
+            sc.as_dict() for sc in self.circuit_scheduler
+        ]
 
         evc_dict["active"] = self.is_active()
         evc_dict["enabled"] = self.is_enabled()
@@ -450,7 +454,8 @@ class EVCDeploy(EVCBase):
                 self._send_flow_mods(switch, [match], 'delete', force=force)
             except FlowModException:
                 log.error(
-                    f"Error removing flows from switch {switch.id} for" f"EVC {self}"
+                    f"Error removing flows from switch {switch.id} for"
+                    f"EVC {self}"
                 )
 
         current_path.make_vlans_available()
@@ -523,7 +528,9 @@ class EVCDeploy(EVCBase):
                 use_path = Path()
                 self._install_direct_uni_flows()
             else:
-                log.warn(f"{self} was not deployed. " "No available path was found.")
+                log.warn(
+                    f"{self} was not deployed. " "No available path was found."
+                )
                 return False
         except FlowModException:
             log.error(f"Error deploying EVC {self} when calling flow_manager.")
@@ -572,7 +579,9 @@ class EVCDeploy(EVCBase):
             flow_mod_az["actions"].insert(
                 0, {"action_type": "set_vlan", "vlan_id": vlan_z}
             )
-        self._send_flow_mods(self.uni_a.interface.switch, [flow_mod_az, flow_mod_za])
+        self._send_flow_mods(
+            self.uni_a.interface.switch, [flow_mod_az, flow_mod_za]
+        )
 
     def _install_nni_flows(self, path=None):
         """Install NNI flows."""
@@ -697,9 +706,13 @@ class EVCDeploy(EVCBase):
 
     def _prepare_flow_mod(self, in_interface, out_interface, queue_id=None):
         """Prepare a common flow mod."""
-        default_actions = [{"action_type": "output", "port": out_interface.port_number}]
+        default_actions = [
+            {"action_type": "output", "port": out_interface.port_number}
+        ]
         if queue_id:
-            default_actions.append({"action_type": "set_queue", "queue_id": queue_id})
+            default_actions.append(
+                {"action_type": "set_queue", "queue_id": queue_id}
+            )
 
         flow_mod = {
             "match": {"in_port": in_interface.port_number},
@@ -714,7 +727,9 @@ class EVCDeploy(EVCBase):
     def _prepare_nni_flow(self, *args, queue_id=None):
         """Create NNI flows."""
         in_interface, out_interface, in_vlan, out_vlan = args
-        flow_mod = self._prepare_flow_mod(in_interface, out_interface, queue_id)
+        flow_mod = self._prepare_flow_mod(
+            in_interface, out_interface, queue_id
+        )
         flow_mod["match"]["dl_vlan"] = in_vlan
 
         new_action = {"action_type": "set_vlan", "vlan_id": out_vlan}
@@ -738,7 +753,9 @@ class EVCDeploy(EVCBase):
         # assign all arguments
         in_interface, out_interface, in_vlan, out_vlan = args
 
-        flow_mod = self._prepare_flow_mod(in_interface, out_interface, queue_id)
+        flow_mod = self._prepare_flow_mod(
+            in_interface, out_interface, queue_id
+        )
 
         # the service tag must be always pushed
         new_action = {"action_type": "set_vlan", "vlan_id": out_vlan}
@@ -759,7 +776,9 @@ class EVCDeploy(EVCBase):
     ):
         # pylint: disable=too-many-arguments
         """Prepare pop flow."""
-        flow_mod = self._prepare_flow_mod(in_interface, out_interface, queue_id)
+        flow_mod = self._prepare_flow_mod(
+            in_interface, out_interface, queue_id
+        )
         flow_mod["match"]["dl_vlan"] = out_vlan
         if in_vlan:
             new_action = {"action_type": "set_vlan", "vlan_id": in_vlan}

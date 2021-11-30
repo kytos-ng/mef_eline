@@ -52,12 +52,20 @@ class TestCircuitSchedule(TestCase):
         }
         circuit_schedule = CircuitSchedule.from_dict(circuit_schedule_dict)
         self.assertEqual(circuit_schedule.id, circuit_schedule_dict["id"])
-        self.assertEqual(circuit_schedule.action, circuit_schedule_dict["action"])
-        self.assertEqual(circuit_schedule.frequency, circuit_schedule_dict["frequency"])
+        self.assertEqual(
+            circuit_schedule.action, circuit_schedule_dict["action"]
+        )
+        self.assertEqual(
+            circuit_schedule.frequency, circuit_schedule_dict["frequency"]
+        )
 
     def test_as_dict(self):
         """Test method as_dict from circuit_schedule."""
-        options = {"id": 234243242, "action": "create", "frequency": "1 * * * *"}
+        options = {
+            "id": 234243242,
+            "action": "create",
+            "frequency": "1 * * * *",
+        }
         circuit_schedule_dict = CircuitSchedule(**options).as_dict()
         self.assertEqual(options, circuit_schedule_dict)
 
@@ -75,7 +83,9 @@ class TestScheduler(TestCase):
 
     @patch("apscheduler.schedulers.background.BackgroundScheduler.add_job")
     @patch("napps.kytos.mef_eline.models.EVC._validate")
-    def test_new_circuit_with_run_time(self, validate_mock, scheduler_add_job_mock):
+    def test_new_circuit_with_run_time(
+        self, validate_mock, scheduler_add_job_mock
+    ):
         """Test if add new circuit with run_time."""
         scheduler_add_job_mock.return_value = True
         validate_mock.return_value = True
@@ -101,7 +111,9 @@ class TestScheduler(TestCase):
 
     @patch("apscheduler.schedulers.background.BackgroundScheduler.add_job")
     @patch("napps.kytos.mef_eline.models.EVC._validate")
-    def test_new_circuit_with_interval(self, validate_mock, scheduler_add_job_mock):
+    def test_new_circuit_with_interval(
+        self, validate_mock, scheduler_add_job_mock
+    ):
         """Test if add new circuit with interval."""
         scheduler_add_job_mock.return_value = True
         validate_mock.return_value = True
@@ -142,9 +154,13 @@ class TestScheduler(TestCase):
         validate_mock.return_value = True
 
         frequency = "* * * * *"
-        circuit_scheduler = CircuitSchedule(action="create", frequency=frequency)
+        circuit_scheduler = CircuitSchedule(
+            action="create", frequency=frequency
+        )
 
-        trigger = CronTrigger.from_crontab(circuit_scheduler.frequency, timezone=utc)
+        trigger = CronTrigger.from_crontab(
+            circuit_scheduler.frequency, timezone=utc
+        )
         trigger_mock.return_value = trigger
 
         options = {

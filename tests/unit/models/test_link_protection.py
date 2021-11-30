@@ -25,7 +25,9 @@ DEPLOY_TO_PRIMARY_PATH = (
 DEPLOY_TO_BACKUP_PATH = (
     "napps.kytos.mef_eline.models.evc.LinkProtection.deploy_to_backup_path"
 )
-GET_BEST_PATH = "napps.kytos.mef_eline.models.path.DynamicPathManager.get_best_path"
+GET_BEST_PATH = (
+    "napps.kytos.mef_eline.models.path.DynamicPathManager.get_best_path"
+)
 
 
 class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
@@ -36,18 +38,18 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_1",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "backup_path": [
                 get_link_mocked(
-                    endpoint_a_port=9,
-                    endpoint_b_port=10,
+                    endpoint_a_port=10,
+                    endpoint_b_port=9,
                     metadata={"s_vlan": 5},
                 ),
                 get_link_mocked(
-                    endpoint_a_port=11,
-                    endpoint_b_port=12,
+                    endpoint_a_port=12,
+                    endpoint_b_port=11,
                     metadata={"s_vlan": 6},
                 ),
             ],
@@ -62,16 +64,16 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         """Test test is using primary path."""
         primary_path = [
             get_link_mocked(
-                endpoint_a_port=9, endpoint_b_port=10, metadata={"s_vlan": 5}
+                endpoint_a_port=10, endpoint_b_port=9, metadata={"s_vlan": 5}
             ),
             get_link_mocked(
-                endpoint_a_port=11, endpoint_b_port=12, metadata={"s_vlan": 6}
+                endpoint_a_port=12, endpoint_b_port=11, metadata={"s_vlan": 6}
             ),
         ]
 
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_2",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -86,15 +88,15 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         """Test if the path is equal to current_path."""
         primary_path = [
             get_link_mocked(
-                endpoint_a_port=9, endpoint_b_port=10, metadata={"s_vlan": 5}
+                endpoint_a_port=10, endpoint_b_port=9, metadata={"s_vlan": 5}
             ),
             get_link_mocked(
-                endpoint_a_port=11, endpoint_b_port=12, metadata={"s_vlan": 6}
+                endpoint_a_port=12, endpoint_b_port=11, metadata={"s_vlan": 6}
             ),
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_3",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -133,7 +135,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_4",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -157,7 +159,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         primary_path = [link1, link2]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_5",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -219,7 +221,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_6",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -279,7 +281,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_13",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -337,7 +339,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_7",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -363,7 +365,11 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
     @patch(DEPLOY_TO_PRIMARY_PATH)
     @patch("napps.kytos.mef_eline.models.path.Path.status", EntityStatus.DOWN)
     def test_handle_link_down_case_4(
-        self, deploy_to_mocked, _send_flow_mods_mocked, deploy_mocked, log_mocked
+        self,
+        deploy_to_mocked,
+        _send_flow_mods_mocked,
+        deploy_mocked,
+        log_mocked,
     ):
         """Test if circuit with dynamic path is return success."""
         deploy_mocked.return_value = True
@@ -398,7 +404,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_8",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -457,7 +463,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_9",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -510,7 +516,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_10",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -574,7 +580,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_11",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,
@@ -650,7 +656,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         attributes = {
             "controller": get_controller_mock(),
-            "name": "circuit_name",
+            "name": "circuit_12",
             "uni_a": get_uni_mocked(is_valid=True),
             "uni_z": get_uni_mocked(is_valid=True),
             "primary_path": primary_path,

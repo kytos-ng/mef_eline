@@ -149,7 +149,9 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         expected_flow_mod = {
             "match": {"in_port": interface_a.port_number},
             "cookie": evc.get_cookie(),
-            "actions": [{"action_type": "output", "port": interface_z.port_number}],
+            "actions": [
+                {"action_type": "output", "port": interface_z.port_number}
+            ],
         }
         self.assertEqual(expected_flow_mod, flow_mod)
 
@@ -167,7 +169,9 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         in_vlan = 10
 
         # pylint: disable=protected-access
-        flow_mod = evc._prepare_pop_flow(interface_a, interface_z, None, in_vlan)
+        flow_mod = evc._prepare_pop_flow(
+            interface_a, interface_z, None, in_vlan
+        )
 
         expected_flow_mod = {
             "match": {"in_port": interface_a.port_number, "dl_vlan": in_vlan},
@@ -205,12 +209,17 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                     "actions": [
                         {"action_type": "push_vlan", "tag_type": "s"},
                         {"action_type": "set_vlan", "vlan_id": out_vlan_a},
-                        {"action_type": "output", "port": interface_z.port_number},
+                        {
+                            "action_type": "output",
+                            "port": interface_z.port_number,
+                        },
                     ],
                 }
                 if in_vlan_a:
                     expected_flow_mod["match"]["dl_vlan"] = in_vlan_a
-                    expected_flow_mod["actions"].insert(0, {"action_type": "pop_vlan"})
+                    expected_flow_mod["actions"].insert(
+                        0, {"action_type": "pop_vlan"}
+                    )
                 self.assertEqual(expected_flow_mod, flow_mod)
 
     @staticmethod
@@ -221,10 +230,16 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         This test will verify the flows send to the send_flow_mods method.
         """
         uni_a = get_uni_mocked(
-            interface_port=2, tag_value=82, switch_id="switch_uni_a", is_valid=True
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
         )
         uni_z = get_uni_mocked(
-            interface_port=3, tag_value=83, switch_id="switch_uni_z", is_valid=True
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
         )
 
         attributes = {
@@ -234,10 +249,14 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "uni_z": uni_z,
             "primary_links": [
                 get_link_mocked(
-                    endpoint_a_port=9, endpoint_b_port=10, metadata={"s_vlan": 5}
+                    endpoint_a_port=9,
+                    endpoint_b_port=10,
+                    metadata={"s_vlan": 5},
                 ),
                 get_link_mocked(
-                    endpoint_a_port=11, endpoint_b_port=12, metadata={"s_vlan": 6}
+                    endpoint_a_port=11,
+                    endpoint_b_port=12,
+                    metadata={"s_vlan": 6},
                 ),
             ],
         }
@@ -258,7 +277,9 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                     {"action_type": "push_vlan", "tag_type": "s"},
                     {
                         "action_type": "set_vlan",
-                        "vlan_id": evc.primary_links[0].get_metadata("s_vlan").value,
+                        "vlan_id": evc.primary_links[0]
+                        .get_metadata("s_vlan")
+                        .value,
                     },
                     {
                         "action_type": "output",
@@ -269,19 +290,29 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             {
                 "match": {
                     "in_port": evc.primary_links[0].endpoint_a.port_number,
-                    "dl_vlan": evc.primary_links[0].get_metadata("s_vlan").value,
+                    "dl_vlan": evc.primary_links[0]
+                    .get_metadata("s_vlan")
+                    .value,
                 },
                 "cookie": evc.get_cookie(),
                 "actions": [
                     {"action_type": "pop_vlan"},
                     {"action_type": "push_vlan", "tag_type": "c"},
-                    {"action_type": "set_vlan", "vlan_id": uni_a.user_tag.value},
-                    {"action_type": "output", "port": uni_a.interface.port_number},
+                    {
+                        "action_type": "set_vlan",
+                        "vlan_id": uni_a.user_tag.value,
+                    },
+                    {
+                        "action_type": "output",
+                        "port": uni_a.interface.port_number,
+                    },
                 ],
             },
         ]
 
-        send_flow_mods_mock.assert_any_call(uni_a.interface.switch, expected_flow_mod_a)
+        send_flow_mods_mock.assert_any_call(
+            uni_a.interface.switch, expected_flow_mod_a
+        )
 
         expected_flow_mod_z = [
             {
@@ -295,7 +326,9 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                     {"action_type": "push_vlan", "tag_type": "s"},
                     {
                         "action_type": "set_vlan",
-                        "vlan_id": evc.primary_links[-1].get_metadata("s_vlan").value,
+                        "vlan_id": evc.primary_links[-1]
+                        .get_metadata("s_vlan")
+                        .value,
                     },
                     {
                         "action_type": "output",
@@ -306,19 +339,29 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             {
                 "match": {
                     "in_port": evc.primary_links[-1].endpoint_b.port_number,
-                    "dl_vlan": evc.primary_links[-1].get_metadata("s_vlan").value,
+                    "dl_vlan": evc.primary_links[-1]
+                    .get_metadata("s_vlan")
+                    .value,
                 },
                 "cookie": evc.get_cookie(),
                 "actions": [
                     {"action_type": "pop_vlan"},
                     {"action_type": "push_vlan", "tag_type": "c"},
-                    {"action_type": "set_vlan", "vlan_id": uni_z.user_tag.value},
-                    {"action_type": "output", "port": uni_z.interface.port_number},
+                    {
+                        "action_type": "set_vlan",
+                        "vlan_id": uni_z.user_tag.value,
+                    },
+                    {
+                        "action_type": "output",
+                        "port": uni_z.interface.port_number,
+                    },
                 ],
             },
         ]
 
-        send_flow_mods_mock.assert_any_call(uni_z.interface.switch, expected_flow_mod_z)
+        send_flow_mods_mock.assert_any_call(
+            uni_z.interface.switch, expected_flow_mod_z
+        )
 
     @staticmethod
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
@@ -328,10 +371,16 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         This test will verify the flows send to the send_flow_mods method.
         """
         uni_a = get_uni_mocked(
-            interface_port=2, tag_value=82, switch_id="switch_uni_a", is_valid=True
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
         )
         uni_z = get_uni_mocked(
-            interface_port=3, tag_value=83, switch_id="switch_uni_z", is_valid=True
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
         )
 
         attributes = {
@@ -341,10 +390,14 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "uni_z": uni_z,
             "primary_links": [
                 get_link_mocked(
-                    endpoint_a_port=9, endpoint_b_port=10, metadata={"s_vlan": 5}
+                    endpoint_a_port=9,
+                    endpoint_b_port=10,
+                    metadata={"s_vlan": 5},
                 ),
                 get_link_mocked(
-                    endpoint_a_port=11, endpoint_b_port=12, metadata={"s_vlan": 6}
+                    endpoint_a_port=11,
+                    endpoint_b_port=12,
+                    metadata={"s_vlan": 6},
                 ),
             ],
         }
@@ -409,10 +462,16 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
 
         should_deploy_mock.return_value = True
         uni_a = get_uni_mocked(
-            interface_port=2, tag_value=82, switch_id="switch_uni_a", is_valid=True
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
         )
         uni_z = get_uni_mocked(
-            interface_port=3, tag_value=83, switch_id="switch_uni_z", is_valid=True
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
         )
         primary_links = [
             get_link_mocked(
@@ -451,12 +510,18 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
 
     @patch("requests.post")
     @patch("napps.kytos.mef_eline.models.evc.log")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.discover_new_paths", return_value=[])
+    @patch(
+        "napps.kytos.mef_eline.models.evc.EVC.discover_new_paths",
+        return_value=[],
+    )
     @patch("napps.kytos.mef_eline.models.path.Path.choose_vlans")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_nni_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_uni_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC.activate")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.should_deploy", return_value=False)
+    @patch(
+        "napps.kytos.mef_eline.models.evc.EVC.should_deploy",
+        return_value=False,
+    )
     @patch("napps.kytos.mef_eline.models.EVC.sync")
     def test_deploy_fail(self, *args):
         """Test if all methods is ignored when the should_deploy is false."""
@@ -499,10 +564,14 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "uni_z": uni_z,
             "primary_links": [
                 get_link_mocked(
-                    endpoint_a_port=9, endpoint_b_port=10, metadata={"s_vlan": 5}
+                    endpoint_a_port=9,
+                    endpoint_b_port=10,
+                    metadata={"s_vlan": 5},
                 ),
                 get_link_mocked(
-                    endpoint_a_port=11, endpoint_b_port=12, metadata={"s_vlan": 6}
+                    endpoint_a_port=11,
+                    endpoint_b_port=12,
+                    metadata={"s_vlan": 6},
                 ),
             ],
         }
@@ -521,7 +590,10 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         self.assertFalse(deployed)
 
     @patch("napps.kytos.mef_eline.models.evc.log")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.discover_new_paths", return_value=[])
+    @patch(
+        "napps.kytos.mef_eline.models.evc.EVC.discover_new_paths",
+        return_value=[],
+    )
     @patch("napps.kytos.mef_eline.models.path.Path.choose_vlans")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_nni_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC.should_deploy")
@@ -543,10 +615,16 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         install_nni_flows.side_effect = FlowModException
         should_deploy_mock.return_value = True
         uni_a = get_uni_mocked(
-            interface_port=2, tag_value=82, switch_id="switch_uni_a", is_valid=True
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
         )
         uni_z = get_uni_mocked(
-            interface_port=3, tag_value=83, switch_id="switch_uni_z", is_valid=True
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
         )
 
         primary_links = [
@@ -649,10 +727,16 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
 
         should_deploy_mock.return_value = False
         uni_a = get_uni_mocked(
-            interface_port=2, tag_value=82, switch_id="switch_uni_a", is_valid=True
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
         )
         uni_z = get_uni_mocked(
-            interface_port=3, tag_value=83, switch_id="switch_uni_z", is_valid=True
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
         )
 
         attributes = {
@@ -667,10 +751,14 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         dynamic_backup_path = Path(
             [
                 get_link_mocked(
-                    endpoint_a_port=9, endpoint_b_port=10, metadata={"s_vlan": 5}
+                    endpoint_a_port=9,
+                    endpoint_b_port=10,
+                    metadata={"s_vlan": 5},
                 ),
                 get_link_mocked(
-                    endpoint_a_port=11, endpoint_b_port=12, metadata={"s_vlan": 6}
+                    endpoint_a_port=11,
+                    endpoint_b_port=12,
+                    metadata={"s_vlan": 6},
                 ),
             ]
         )
@@ -693,10 +781,16 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
     def test_remove_current_flows(self, send_flow_mods_mocked):
         """Test remove current flows."""
         uni_a = get_uni_mocked(
-            interface_port=2, tag_value=82, switch_id="switch_uni_a", is_valid=True
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
         )
         uni_z = get_uni_mocked(
-            interface_port=3, tag_value=83, switch_id="switch_uni_z", is_valid=True
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
         )
 
         switch_a = Switch("00:00:00:00:00:01")
@@ -739,7 +833,9 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
 
         self.assertEqual(send_flow_mods_mocked.call_count, 5)
         self.assertFalse(evc.is_active())
-        flows = [{"cookie": evc.get_cookie(), "cookie_mask": 18446744073709551615}]
+        flows = [
+            {"cookie": evc.get_cookie(), "cookie_mask": 18446744073709551615}
+        ]
         switch_1 = evc.primary_links[0].endpoint_a.switch
         switch_2 = evc.primary_links[0].endpoint_b.switch
         send_flow_mods_mocked.assert_any_call(switch_1, flows, 'delete',

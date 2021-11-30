@@ -195,7 +195,9 @@ class TestMain(TestCase):
                 "interface_id": "00:00:00:00:00:00:00:02:2",
                 "tag": {"tag_type": 1, "value": 1},
             },
-            "circuit_scheduler": [{"frequency": "* * * * *", "action": "create"}],
+            "circuit_scheduler": [
+                {"frequency": "* * * * *", "action": "create"}
+            ],
             "queue_id": 5,
         }
         # pylint: disable=protected-access
@@ -234,8 +236,12 @@ class TestMain(TestCase):
             "current_path": [],
             "primary_path": [
                 {
-                    "endpoint_a": {"interface_id": "00:00:00:00:00:00:00:01:1"},
-                    "endpoint_b": {"interface_id": "00:00:00:00:00:00:00:02:2"},
+                    "endpoint_a": {
+                        "interface_id": "00:00:00:00:00:00:00:01:1"
+                    },
+                    "endpoint_b": {
+                        "interface_id": "00:00:00:00:00:00:00:02:2"
+                    },
                 }
             ],
             "backup_path": [],
@@ -278,8 +284,12 @@ class TestMain(TestCase):
             },
             "primary_links": [
                 {
-                    "endpoint_a": {"interface_id": "00:00:00:00:00:00:00:01:1"},
-                    "endpoint_b": {"interface_id": "00:00:00:00:00:00:00:02:2"},
+                    "endpoint_a": {
+                        "interface_id": "00:00:00:00:00:00:00:01:1"
+                    },
+                    "endpoint_b": {
+                        "interface_id": "00:00:00:00:00:00:00:02:2"
+                    },
                 }
             ],
             "backup_links": [],
@@ -384,7 +394,9 @@ class TestMain(TestCase):
         url = f"{self.server_name_url}/v2/evc/3"
         response = api.get(url)
         expected_result = "circuit_id 3 not found"
-        self.assertEqual(json.loads(response.data)["description"], expected_result)
+        self.assertEqual(
+            json.loads(response.data)["description"], expected_result
+        )
 
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
@@ -833,7 +845,9 @@ class TestMain(TestCase):
         ]
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(expected, json.loads(response.data)["circuit_scheduler"])
+        self.assertEqual(
+            expected, json.loads(response.data)["circuit_scheduler"]
+        )
 
     def test_get_specific_schedules_from_storehouse_not_found(self):
         """Test get specific schedule ID that does not exist."""
@@ -902,8 +916,12 @@ class TestMain(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         scheduler_add_job_mock.assert_called_once()
         save_evc_mock.assert_called_once()
-        self.assertEqual(payload["schedule"]["frequency"], response_json["frequency"])
-        self.assertEqual(payload["schedule"]["action"], response_json["action"])
+        self.assertEqual(
+            payload["schedule"]["frequency"], response_json["frequency"]
+        )
+        self.assertEqual(
+            payload["schedule"]["action"], response_json["action"]
+        )
         self.assertIsNotNone(response_json["id"])
 
     @patch("apscheduler.schedulers.background.BackgroundScheduler.remove_job")
@@ -1119,7 +1137,7 @@ class TestMain(TestCase):
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     def test_update_circuit(self, *args):
         """Test update a circuit circuit."""
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals,duplicate-code
         (
             evc_as_dict_mock,
             uni_from_dict_mock,
@@ -1127,9 +1145,6 @@ class TestMain(TestCase):
             *mocks,
             requests_mock,
         ) = args
-        response = MagicMock()
-        response.status_code = 201
-        requests_mock.return_value = response
 
         for mock in mocks:
             mock.return_value = True
@@ -1138,6 +1153,10 @@ class TestMain(TestCase):
             get_uni_mocked(switch_dpid="00:00:00:00:00:00:00:02"),
         ]
         uni_from_dict_mock.side_effect = 2 * unis
+
+        response = MagicMock()
+        response.status_code = 201
+        requests_mock.return_value = response
 
         api = self.get_app_test_client(self.napp)
         payloads = [
@@ -1494,7 +1513,9 @@ class TestMain(TestCase):
         evc_mock = create_autospec(EVC)
         evc_mock.is_enabled = MagicMock(side_effect=[True, False, True])
         evc_mock.lock = MagicMock()
-        type(evc_mock).archived = PropertyMock(side_effect=[True, False, False])
+        type(evc_mock).archived = PropertyMock(
+            side_effect=[True, False, False]
+        )
         evcs = [evc_mock, evc_mock, evc_mock]
         event = KytosEvent(name="test", content={"link": "abc"})
         self.napp.circuits = dict(zip(["1", "2", "3"], evcs))
@@ -1504,7 +1525,9 @@ class TestMain(TestCase):
     def test_handle_link_down(self):
         """Test handle_link_down method."""
         evc_mock = create_autospec(EVC)
-        evc_mock.is_affected_by_link = MagicMock(side_effect=[True, False, True])
+        evc_mock.is_affected_by_link = MagicMock(
+            side_effect=[True, False, True]
+        )
         evc_mock.lock = MagicMock()
         evc_mock.handle_link_down = MagicMock(side_effect=[True, True])
         evcs = [evc_mock, evc_mock, evc_mock]

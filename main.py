@@ -6,14 +6,9 @@ NApp to provision circuits from user request.
 from threading import Lock
 
 from flask import jsonify, request
-from werkzeug.exceptions import (
-    BadRequest,
-    Conflict,
-    Forbidden,
-    MethodNotAllowed,
-    NotFound,
-    UnsupportedMediaType,
-)
+from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
+                                 MethodNotAllowed, NotFound,
+                                 UnsupportedMediaType)
 
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
@@ -188,7 +183,9 @@ class Main(KytosNApp):
                     bool(evc.circuit_scheduler),
                 )
             except InvalidPath as exception:
-                raise BadRequest(f"primary_path is not valid: {exception}")
+                raise BadRequest(
+                    f"primary_path is not valid: {exception}"
+                ) from exception
         if evc.backup_path:
             try:
                 evc.backup_path.is_valid(
@@ -197,7 +194,9 @@ class Main(KytosNApp):
                     bool(evc.circuit_scheduler),
                 )
             except InvalidPath as exception:
-                raise BadRequest(f"backup_path is not valid: {exception}")
+                raise BadRequest(
+                    f"backup_path is not valid: {exception}"
+                ) from exception
 
         # verify duplicated evc
         if self._is_duplicated_evc(evc):
@@ -229,7 +228,9 @@ class Main(KytosNApp):
                 evc.deploy()
 
         # Notify users
-        event = KytosEvent(name="kytos.mef_eline.created", content=evc.as_dict())
+        event = KytosEvent(
+            name="kytos.mef_eline.created", content=evc.as_dict()
+        )
         self.controller.buffers.app.put(event)
 
         result = {"circuit_id": evc.id}
@@ -269,7 +270,9 @@ class Main(KytosNApp):
             raise UnsupportedMediaType(result) from UnsupportedMediaType
 
         try:
-            enable, redeploy = evc.update(**self._evc_dict_with_instances(data))
+            enable, redeploy = evc.update(
+                **self._evc_dict_with_instances(data)
+            )
         except ValueError as exception:
             log.error(exception)
             log.debug("update result %s %s", exception, 400)
@@ -333,7 +336,10 @@ class Main(KytosNApp):
     def get_metadata(self, circuit_id):
         """Get metadata from an EVC."""
         try:
-            return jsonify({"metadata": self.circuits[circuit_id].metadata}), 200
+            return (
+                jsonify({"metadata": self.circuits[circuit_id].metadata}),
+                200,
+            )
         except KeyError as error:
             raise NotFound(f"circuit_id {circuit_id} not found.") from error
 
@@ -654,7 +660,8 @@ class Main(KytosNApp):
             evc = self._evc_from_dict(circuit_dict)
         except ValueError as exception:
             log.error(
-                f'Could not load EVC {circuit_dict["id"]} ' f"because {exception}"
+                f'Could not load EVC {circuit_dict["id"]} '
+                f"because {exception}"
             )
             return None
 
@@ -706,13 +713,17 @@ class Main(KytosNApp):
             #     primary_links_cache,
             #     backup_links_cache
             if "links" in attribute:
-                data[attribute] = [self._link_from_dict(link) for link in value]
+                data[attribute] = [
+                    self._link_from_dict(link) for link in value
+                ]
 
             # Ex: current_path,
             #     primary_path,
             #     backup_path
             if "path" in attribute and attribute != "dynamic_backup_path":
-                data[attribute] = Path([self._link_from_dict(link) for link in value])
+                data[attribute] = Path(
+                    [self._link_from_dict(link) for link in value]
+                )
 
         return data
 

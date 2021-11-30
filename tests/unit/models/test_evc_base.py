@@ -7,7 +7,9 @@ from unittest.mock import patch
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
 from napps.kytos.mef_eline.models import EVC  # NOQA  pycodestyle
-from napps.kytos.mef_eline.scheduler import CircuitSchedule  # NOQA  pycodestyle
+from napps.kytos.mef_eline.scheduler import (
+    CircuitSchedule,
+)  # NOQA  pycodestyle
 from napps.kytos.mef_eline.tests.helpers import (
     get_uni_mocked,
     get_controller_mock,
@@ -27,7 +29,10 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
 
     def test_without_uni_a(self):
         """Test if the EVC raises and error with UNI A is required."""
-        attributes = {"controller": get_controller_mock(), "name": "circuit_name"}
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+        }
         error_message = "uni_a is required."
         with self.assertRaises(ValueError) as handle_error:
             EVC(**attributes)
@@ -178,10 +183,18 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "owner": "my_name",
             "circuit_scheduler": [
                 CircuitSchedule.from_dict(
-                    {"id": 234243247, "action": "create", "frequency": "1 * * * *"}
+                    {
+                        "id": 234243247,
+                        "action": "create",
+                        "frequency": "1 * * * *",
+                    }
                 ),
                 CircuitSchedule.from_dict(
-                    {"id": 234243239, "action": "create", "interval": {"hours": 2}}
+                    {
+                        "id": 234243239,
+                        "action": "create",
+                        "interval": {"hours": 2},
+                    }
                 ),
             ],
             "enabled": True,
@@ -206,8 +219,16 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "request_time": "2018-08-21T19:10:41",
             "creation_time": "2018-08-21T18:44:54",
             "circuit_scheduler": [
-                {"id": 234243247, "action": "create", "frequency": "1 * * * *"},
-                {"id": 234243239, "action": "create", "interval": {"hours": 2}},
+                {
+                    "id": 234243247,
+                    "action": "create",
+                    "frequency": "1 * * * *",
+                },
+                {
+                    "id": 234243239,
+                    "action": "create",
+                    "interval": {"hours": 2},
+                },
             ],
             "active": False,
             "enabled": True,

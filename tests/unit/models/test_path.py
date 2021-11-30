@@ -224,11 +224,16 @@ class TestPath(TestCase):
             (links1, switch2, switch6, False),
         ):
             with self.subTest(
-                links=links, switch_a=switch_a, switch_z=switch_z, expected=expected
+                links=links,
+                switch_a=switch_a,
+                switch_z=switch_z,
+                expected=expected,
             ):
                 path = Path(links)
                 if expected:
-                    self.assertEqual(path.is_valid(switch_a, switch_z), expected)
+                    self.assertEqual(
+                        path.is_valid(switch_a, switch_z), expected
+                    )
                 else:
                     with self.assertRaises(InvalidPath):
                         path.is_valid(switch_a, switch_z)
