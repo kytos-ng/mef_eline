@@ -211,7 +211,7 @@ class Main(KytosNApp):
         ):
             result = "The EVC must have a primary path or allow dynamic paths."
             log.debug("create_circuit result %s %s", result, 400)
-            raise BadRequest(result) from BadRequest
+            raise BadRequest(result)
 
         # store circuit in dictionary
         self.circuits[evc.id] = evc
