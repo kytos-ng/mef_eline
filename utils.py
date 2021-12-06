@@ -51,7 +51,6 @@ def validate(spec):
     def validate_decorator(func):
         @functools.wraps(func)
         def wrapper_validate(*args, **kwargs):
-            print(f"Spec {spec}")
             try:
                 data = request.get_json()
             except BadRequest:
