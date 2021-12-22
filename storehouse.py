@@ -84,6 +84,8 @@ class StoreHouse:
         }
         name = "kytos.storehouse.retrieve"
         event = KytosEvent(name=name, content=content)
+        self._lock.acquire()  # Lock to avoid race condition
+        log.debug(f'Lock {self._lock} acquired.')
         self.controller.buffers.app.put(event)
         log.debug(f"Retrieve box with {box_id} from {self.namespace}.")
 
@@ -93,7 +95,9 @@ class StoreHouse:
             log.error(f"Box {data.box_id} not found in {self.namespace}.")
 
         self.box = data
-        log.debug(f"Box {self.box.box_id} was loaded from storehouse.")
+        self._lock.release()
+        log.debug(f'Lock {self._lock} released.')
+        log.debug(f'Box {self.box.box_id} was loaded from storehouse.')
 
     def save_evc(self, evc):
         """Save a EVC using the storehouse."""

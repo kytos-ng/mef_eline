@@ -56,3 +56,53 @@ class TestStoreHouse(TestCase):
         self.storehouse.box.box_id = 2
         self.storehouse.get_data()
         get_stored_box_mock.assert_called_once_with(2)
+
+    @patch('napps.kytos.mef_eline.storehouse.log')
+    def test_create_box_callback(self, log_mock):
+        # pylint: disable=protected-access
+        """Test _create_box_callback method."""
+        data = Mock()
+        data.box_id = 1
+        self.storehouse._create_box_callback('event', data, None)
+        log_mock.error.assert_not_called()
+        log_mock.debug.assert_called_once()
+
+        # test with error
+        log_mock.debug.call_count = 0
+        self.storehouse._create_box_callback('event', data, 'error')
+        log_mock.error.assert_called_once()
+        log_mock.debug.assert_called_once()
+
+    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.get_stored_box')
+    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.create_box')
+    def test_get_or_create_box(self, create_box_mock, get_stored_box_mock):
+        """Test _get_or_create_a_box_from_list_of_boxes method."""
+        # pylint: disable=protected-access
+        self.storehouse._get_or_create_a_box_from_list_of_boxes(
+            'event', [2], None
+        )
+        get_stored_box_mock.assert_called_once_with(2)
+
+        self.storehouse._get_or_create_a_box_from_list_of_boxes(
+            'event', None, 'error'
+        )
+        create_box_mock.assert_called_once()
+
+    @patch('napps.kytos.mef_eline.storehouse.log')
+    def test_get_box_callback(self, log_mock):
+        # pylint: disable=protected-access
+        """Test _get_box_callback method."""
+        self.storehouse._lock = Mock()
+        data = Mock()
+        data.box_id = 1
+        self.storehouse._get_box_callback('event', data, None)
+        self.storehouse._lock.release.assert_called_once()
+        log_mock.error.assert_not_called()
+
+        # test with error
+        self.storehouse._lock.release.call_count = 0
+        log_mock.debug.call_count = 0
+        self.storehouse._get_box_callback('event', data, 'error')
+        self.storehouse._lock.release.assert_called_once()
+        log_mock.error.assert_called_once()
+        self.assertEqual(log_mock.debug.call_count, 2)

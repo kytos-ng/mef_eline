@@ -1,22 +1,22 @@
 <template>
     <div class="mef_circuit_container">
       <div class="mef-buttons">
-        <div class="mef-back-button">
-          <k-button tooltip="List installed EVCs" title="< Back to list" :on_click="showInfoPanel">
-          </k-button>
-        </div>      
-        <div class="mef-save-button">
-          <k-button tooltip="Save EVC" title="Save EVC" :on_click="saveEvc">
-          </k-button>
+        <div class="mef-buttons-left">
+          <div class="mef-back-button">
+            <k-button tooltip="List installed EVCs" title="< Back to list" :on_click="showInfoPanel">
+            </k-button>
+          </div>
         </div>
-        <div class="mef-delete-button">
-          <k-button tooltip="Delete EVC" title="Delete EVC" :on_click="showModalDeleteEvc">
-          </k-button>
+        <div class="mef-buttons-right">
+          <div class="mef-save-button">
+            <k-button tooltip="Save EVC" title="Save EVC" :on_click="saveEvc">
+            </k-button>
+          </div>
+          <div class="mef-delete-button">
+            <k-button tooltip="Delete EVC" title="Delete EVC" :on_click="showModalDeleteEvc">
+            </k-button>
+          </div>
         </div>
-      </div>
-      <div class="mef-save-button">
-        <k-button tooltip="Save EVC" title="Save EVC" :on_click="saveEvc">
-        </k-button>
       </div>
       <div class="mef-table no-compact">
         <div class="mef-circuit-table">
@@ -91,10 +91,19 @@
                   <th>{{cindex}}</th>
                   <template v-for="col in data">
                     <td>
-                      <k-input v-if="col.editable" :id="col.name" :value.sync="col.value"></k-input>
-                      <span v-else>
-                        {{col.value}}
-                      </span>
+                      <k-input-auto
+                        :value.sync="col.value"
+                        title="col.name"
+                        :candidates="dpids"
+                        @focus="loadDpidNames"
+                        v-if="compexists && (col.name=='uni_a' || col.name=='uni_z')">
+                      </k-input-auto>
+                      <template v-else>
+                        <k-input v-if="col.editable" :id="col.name" :value.sync="col.value"></k-input>
+                        <span v-else>
+                          {{col.value}}
+                        </span>
+                      </template>
                     </td>
                   </template>
                 </tr>
@@ -173,6 +182,7 @@ module.exports = {
     return {
         component_key: 0,
         circuit: {},  // EVC data
+        dpids: [],  // DPIDs - used for autocomplete
         dpid_names: {},  // DPIDs names
         interface_data: {},  // DPIDs and interface data and metadata
         endpoints_data: {}, // EVC endpoints data
@@ -390,6 +400,11 @@ module.exports = {
           }
           if(sw.interfaces) {
             $.each(sw.interfaces, function(j , interface) {
+              // store autocomplete dpids
+              if(!_this.dpids.includes(interface.id)) {
+                _this.dpids.push(interface.id);
+              }
+                // store interface name data 
               let metadata = interface.metadata;
               _interface_data[interface.id] = {
                 "name": interface.name,
@@ -399,6 +414,7 @@ module.exports = {
             });
           }
         });
+        _this.dpids.sort();
         _this.dpid_names = _dpid_names;
         _this.interface_data = _interface_data;
       });
@@ -481,6 +497,7 @@ module.exports = {
           description: ''
         }
         _this.$kytos.$emit("setNotification" , notification);
+        _this.loadEVC(_this.content.id);
       });
       request.fail(function( jqXHR, textStatus ) {
         let notification = {
@@ -499,7 +516,12 @@ module.exports = {
       this.loadEVC(this.content.id);
       // Make the panel fill the screen except the left menu width
       this.$parent.$el.style.width = "calc(100% - 300px)";
+      this.$kytos.dpids = this.dpids;
     }
+  },
+  created() {
+    // Check if the UI component k-input-auto exists
+    compexists = this.$root.$options.components['k-input-auto'] != null;
   }
 }
 </script>
@@ -520,12 +542,13 @@ module.exports = {
   }
   .mef_circuit_container .mef-buttons {
     display: flow-root;
-  }  
-  .mef-buttons .mef-back-button {
+  }
+  .mef-buttons .mef-buttons-left {
     float: left;
   }
-  .mef-buttons .mef-delete-button {
+  .mef-buttons .mef-buttons-right {
     float: right;
+    display: flex;
   }
   .mef-buttons .mef-delete-button button {
     background: darkred;
