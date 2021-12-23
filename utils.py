@@ -69,7 +69,7 @@ def validate(spec):
                 errors = result.errors[0]
                 if hasattr(errors, "schema_errors"):
                     schema_errors = errors.schema_errors[0]
-                    error_response = {
+                    error_log = {
                         "error_message": schema_errors.message,
                         "error_validator": schema_errors.validator,
                         "error_validator_value": schema_errors.validator_value,
@@ -77,7 +77,9 @@ def validate(spec):
                         "error_schema": schema_errors.schema,
                         "error_schema_path": list(schema_errors.schema_path),
                     }
-                    log.debug("error response: %s", error_response)
+                    log.debug("error response: %s", error_log)
+                    error_response = f"{schema_errors.message} for field"
+                    error_response += f" {'/'.join(schema_errors.path)}."
                 else:
                     error_response = (
                         "The request body mimetype is not application/json."
