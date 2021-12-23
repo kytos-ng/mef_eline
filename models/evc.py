@@ -702,7 +702,7 @@ class EVCDeploy(EVCBase):
     def get_id_from_cookie(cookie):
         """Return the evc id given a cookie value."""
         evc_id = cookie - (settings.COOKIE_PREFIX << 56)
-        return f"{evc_id:x}"
+        return f"{evc_id:14x}"
 
     def _prepare_flow_mod(self, in_interface, out_interface, queue_id=None):
         """Prepare a common flow mod."""
