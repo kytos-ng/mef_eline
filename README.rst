@@ -46,4 +46,4 @@ Requirements
    :target: https://scrutinizer-ci.com/g/kytos-ng/mef_eline/
 .. |Quality| image:: https://scrutinizer-ci.com/g/kytos-ng/mef_eline/badges/quality-score.png?b=master
    :alt: Code-quality score
-   :target: https://scrutinizer-ci.com/g/kytos/mef_eline/
+   :target: https://scrutinizer-ci.com/g/kytos-ng/mef_eline/
