@@ -1,13 +1,7 @@
 Overview
 ========
 
-**WARNING: As previously announced on our communication channels, the Kytos
-project will enter the "shutdown" phase on May 31, 2021. After this date,
-only critical patches (security and core bug fixes) will be accepted, and the
-project will be in "critical-only" mode for another six months (until November
-30, 2021). For more information visit the FAQ at <https://kytos.io/faq>. We'll
-have eternal gratitude to the entire community of developers and users that made
-the project so far.**
+This Network Application is part of the Kytos-NG project.
 
 |Experimental| |License| |Build| |Coverage| |Quality|
 
@@ -19,19 +13,23 @@ the project so far.**
 
 This Napp allows a user to create a point to point L2 Ethernet Virtual Circuit.
 
-When fully implemented, this napp will provide a REST API to create/modify/delete circuits. For now, the list of installed circuits is kept in memory,
-but it should be later kept in a permanent storage.
-Circuits will be installed at the time of request or at a predefined time, and can also have a time to be deleted.
-The Napp also will listen for PortStatus events, modifying circuits that use a port that went down.
+Features
+========
+- REST API to create/modify/delete circuits;
+- REST API to create/modify/delete circuit scheduling;
+- list of circuits in memory and also synchronized to a permanent storage;
+- circuits can be installed at time of request or have an installation schedule;
+- circuits can use a predefined path or find a dynamic path;
+- the NApp will move circuits to another path in case of a link down;
+- web UI for circuits management.
 
-The cookie flow field is used to identify to which EVC the flow belongs. The first two bytes of the cookie is a prefix identifying the NApp using it,
-and the remaining 14 bytes are the EVC id.
 
 Requirements
 ============
 - kytos/flow_manager
 - kytos/pathfinder
 - kytos/topology
+- amlight/sndtrace_cp
 
 
 .. TAGs
