@@ -232,6 +232,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         evc.current_path = evc.primary_path
         evc.activate()
+        deploy_to_mocked.reset_mock()
         current_handle_link_down = evc.handle_link_down()
         self.assertEqual(deploy_mocked.call_count, 0)
         deploy_to_mocked.assert_called_once()
@@ -267,13 +268,13 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         backup_path = [
             get_link_mocked(
-                endpoint_a_port=9,
+                endpoint_a_port=7,
                 endpoint_b_port=10,
                 metadata={"s_vlan": 5},
                 status=EntityStatus.DOWN,
             ),
             get_link_mocked(
-                endpoint_a_port=11,
+                endpoint_a_port=15,
                 endpoint_b_port=12,
                 metadata={"s_vlan": 6},
                 status=EntityStatus.UP,
@@ -291,6 +292,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         evc = EVC(**attributes)
         evc.current_path = evc.backup_path
+        deploy_to_mocked.reset_mock()
         current_handle_link_down = evc.handle_link_down()
         self.assertEqual(deploy_mocked.call_count, 0)
         deploy_to_mocked.assert_called_once()
@@ -349,6 +351,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         evc = EVC(**attributes)
         evc.current_path = evc.backup_path
+        deploy_to_mocked.reset_mock()
         current_handle_link_down = evc.handle_link_down()
 
         self.assertEqual(get_paths_mocked.call_count, 0)
@@ -420,6 +423,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         evc._storehouse.box = Mock()  # pylint: disable=protected-access
         evc._storehouse.box.data = {}  # pylint: disable=protected-access
 
+        deploy_to_mocked.reset_mock()
         current_handle_link_down = evc.handle_link_down()
         self.assertEqual(deploy_to_mocked.call_count, 1)
 
@@ -450,12 +454,12 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         backup_path = [
             get_link_mocked(
                 endpoint_a_port=9,
-                endpoint_b_port=10,
+                endpoint_b_port=14,
                 metadata={"s_vlan": 5},
                 status=EntityStatus.UP,
             ),
             get_link_mocked(
-                endpoint_a_port=11,
+                endpoint_a_port=15,
                 endpoint_b_port=12,
                 metadata={"s_vlan": 6},
                 status=EntityStatus.UP,
@@ -474,6 +478,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         evc = EVC(**attributes)
         evc.current_path = evc.primary_path
+        deploy_to_mocked.reset_mock()
         current_handle_link_up = evc.handle_link_up(backup_path[0])
         self.assertEqual(deploy_mocked.call_count, 0)
         self.assertEqual(deploy_to_mocked.call_count, 0)
@@ -503,12 +508,12 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         backup_path = [
             get_link_mocked(
                 endpoint_a_port=9,
-                endpoint_b_port=10,
+                endpoint_b_port=14,
                 metadata={"s_vlan": 5},
                 status=EntityStatus.UP,
             ),
             get_link_mocked(
-                endpoint_a_port=11,
+                endpoint_a_port=15,
                 endpoint_b_port=12,
                 metadata={"s_vlan": 6},
                 status=EntityStatus.UP,
@@ -527,6 +532,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         evc = EVC(**attributes)
         evc.current_path = evc.backup_path
+        deploy_to_path_mocked.reset_mock()
         current_handle_link_up = evc.handle_link_up(primary_path[0])
         self.assertEqual(deploy_mocked.call_count, 0)
         self.assertEqual(deploy_to_path_mocked.call_count, 1)
@@ -566,13 +572,13 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         ]
         backup_path = [
             get_link_mocked(
-                endpoint_a_port=13,
+                endpoint_a_port=9,
                 endpoint_b_port=14,
                 metadata={"s_vlan": 5},
                 status=EntityStatus.DOWN,
             ),
             get_link_mocked(
-                endpoint_a_port=11,
+                endpoint_a_port=15,
                 endpoint_b_port=12,
                 metadata={"s_vlan": 6},
                 status=EntityStatus.UP,
@@ -596,6 +602,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         evc._storehouse.box.data = {}  # pylint: disable=protected-access
 
         evc.current_path = Path([])
+        deploy_to_path_mocked.reset_mock()
         current_handle_link_up = evc.handle_link_up(backup_path[0])
 
         self.assertEqual(get_best_path_mocked.call_count, 0)
@@ -672,6 +679,7 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         evc._storehouse.box = Mock()  # pylint: disable=protected-access
         evc._storehouse.box.data = {}  # pylint: disable=protected-access
 
+        deploy_to_path_mocked.reset_mock()
         current_handle_link_up = evc.handle_link_up(backup_path[0])
 
         self.assertEqual(get_best_path_mocked.call_count, 0)
