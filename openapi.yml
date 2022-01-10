@@ -307,15 +307,15 @@ components:
         primary_links:
           type: array
           items:
-            $ref: '#/components/schemas/Path'
+            $ref: '#/components/schemas/NewLink'
         backup_links:
           type: array
           items:
-            $ref: '#/components/schemas/Path'
+            $ref: '#/components/schemas/NewLink'
         primary_path:
           type: array
           items:
-            $ref: '#/components/schemas/Path'
+            $ref: '#/components/schemas/NewLink'
         dynamic_backup_path:
           type: boolean
         circuit_scheduler:
@@ -327,7 +327,26 @@ components:
           format: int64
         enabled:
           type: boolean
-
+    NewLink:
+      type: object
+      required:
+        - endpoint_a
+        - endpoint_b
+      properties:
+        endpoint_a:
+          $ref: '#/components/schemas/NewEndpoint'
+        endpoint_b:
+          $ref: '#/components/schemas/NewEndpoint'
+    NewEndpoint:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          minLength: 25
+          maxLength: 30
+          pattern: '^([0-9A-Fa-f]{2}[:-]){8}(\d{1,5})$'          
     Endpoint: # Can be referenced via '#/components/schemas/Endpoint'
       type: object
       required:
