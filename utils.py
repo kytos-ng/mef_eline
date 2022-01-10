@@ -79,7 +79,9 @@ def validate(spec):
                     }
                     log.debug("error response: %s", error_log)
                     error_response = f"{schema_errors.message} for field"
-                    error_response += f" {'/'.join(schema_errors.path)}."
+                    error_response += (
+                        f" {'/'.join(map(str,schema_errors.path))}."
+                    )
                 else:
                     error_response = (
                         "The request body mimetype is not application/json."
