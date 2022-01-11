@@ -6,11 +6,6 @@ This Network Application is part of the Kytos-NG project.
 |Stable| |Tag| |License| |Build| |Coverage| |Quality|
 
 
-.. attention::
-
-    THIS NAPP IS STILL EXPERIMENTAL AND IT'S EVENTS, METHODS AND STRUCTURES MAY
-    CHANGE A LOT ON THE NEXT FEW DAYS/WEEKS, USE IT AT YOUR OWN DISCERNEMENT
-
 This Napp allows a user to create a point to point L2 Ethernet Virtual Circuit.
 
 Features
