@@ -253,3 +253,19 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         evc_id = evc.id
         assert evc_id
         assert evc.get_id_from_cookie(evc.get_cookie()) == evc_id
+
+    @staticmethod
+    def test_get_id_from_cookie_with_leading_zeros():
+        """Test get_id_from_cookie with leading zeros."""
+
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "enable": True,
+            "uni_a": get_uni_mocked(is_valid=True),
+            "uni_z": get_uni_mocked(is_valid=True)
+        }
+        evc = EVC(**attributes)
+        evc_id = "0a2d672d99ff41"
+        evc._id = evc_id
+        assert EVC.get_id_from_cookie(evc.get_cookie()) == evc_id
