@@ -316,6 +316,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NewLink'
+        backup_path:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewLink'
         dynamic_backup_path:
           type: boolean
         circuit_scheduler:
