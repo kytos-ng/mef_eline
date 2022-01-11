@@ -267,5 +267,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         }
         evc = EVC(**attributes)
         evc_id = "0a2d672d99ff41"
+        # pylint: disable=protected-access
         evc._id = evc_id
+        # pylint: enable=protected-access
         assert EVC.get_id_from_cookie(evc.get_cookie()) == evc_id
