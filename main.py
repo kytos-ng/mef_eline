@@ -10,6 +10,7 @@ from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
                                  MethodNotAllowed, NotFound,
                                  UnsupportedMediaType)
 
+
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
 from kytos.core.helpers import listen_to
