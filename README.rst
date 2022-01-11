@@ -44,4 +44,3 @@ Requirements
    :target: https://scrutinizer-ci.com/g/kytos-ng/mef_eline/
 .. |Tag| image:: https://img.shields.io/github/tag/kytos-ng/mef_eline.svg
    :target: https://github.com/kytos-ng/mef_eline/tags
-   :target: https://github.com/kytos-ng/mef_eline
