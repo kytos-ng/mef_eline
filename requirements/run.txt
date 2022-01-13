@@ -28,8 +28,6 @@ glom==20.11.0
     # via -r requirements/run.in
 idna==3.3
     # via requests
-importlib-metadata==4.8.3
-    # via jsonschema
 isodate==0.6.1
     # via openapi-core
 jsonschema==3.2.0
@@ -66,16 +64,12 @@ six==1.16.0
     #   isodate
     #   openapi-core
     #   openapi-spec-validator
-typing-extensions==4.0.1
-    # via importlib-metadata
 tzlocal==2.1
     # via apscheduler
 urllib3==1.26.7
     # via requests
 werkzeug==1.0.1
     # via openapi-core
-zipp==3.6.0
-    # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
