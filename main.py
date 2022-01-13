@@ -135,7 +135,7 @@ class Main(KytosNApp):
         except KeyError:
             result = f"circuit_id {circuit_id} not found"
             log.debug("get_circuit result %s %s", result, 404)
-            raise BadRequest(result) from KeyError
+            raise NotFound(result) from KeyError
         status = 200
         log.debug("get_circuit result %s %s", result, status)
         return jsonify(result), status

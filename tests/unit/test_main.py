@@ -860,7 +860,7 @@ class TestMain(TestCase):
 
         expected = "circuit_id blah not found"
         # Assert response not found
-        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.status_code, 404, response.data)
         self.assertEqual(expected, json.loads(response.data)["description"])
 
     def _uni_from_dict_side_effect(self, uni_dict):
@@ -1217,6 +1217,13 @@ class TestMain(TestCase):
         api = self.get_app_test_client(self.napp)
         url = f'{self.server_name_url}/v2/evc/schedule/1'
         response = api.delete(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_circuit_not_found(self):
+        """Test /v2/evc/<circuit_id> 404."""
+        api = self.get_app_test_client(self.napp)
+        url = f'{self.server_name_url}/v2/evc/1234'
+        response = api.get(url)
         self.assertEqual(response.status_code, 404)
 
     @patch('requests.post')
