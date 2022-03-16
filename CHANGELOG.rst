@@ -3,12 +3,38 @@ Changelog
 #########
 All notable changes to the MEF_ELine NApp will be documented in this file.
 
+[2022.1.5] - 2022-02-11
+***********************
+
+Fixed
+=====
+
+- Adjust default value for `settings.WAIT_FOR_OLD_PATH` since now it measured
+  in execution rounds instead of seconds
+
+
+[2022.1.4] - 2022-02-11
+***********************
+
+Fixed
+=====
+-  Fix UI to keep kytos panel width with default value
+
+
+[2022.1.3] - 2022-02-11
+***********************
+
+Fixed
+=====
+-  Fix UI to display the scrollbar in the autocomplete results list
+
+
 [2022.1.2] - 2022-02-03
 ***********************
 
 Fixed
 =====
--  Fix to make tag fields optional and editable
+-  Fix UI to make tag fields optional and editable
 
 
 [2022.1.1] - 2022-02-03
@@ -16,7 +42,7 @@ Fixed
 
 Fixed
 =====
--  Fix list button not re-rendering the content
+-  Fix UI list button not re-rendering the content
 
 
 [2022.1.0] - 2022-01-31

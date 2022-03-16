@@ -1,10 +1,18 @@
-Overview
-========
-
-This Network Application is part of the Kytos-NG project.
-
 |Stable| |Tag| |License| |Build| |Coverage| |Quality|
 
+.. raw:: html
+
+  <div align="center">
+    <h1><code>kytos/mef_eline</code></h1>
+
+    <strong>NApp that manages point to point L2 Ethernet Virtual Circuits</strong>
+
+    <h3><a href="https://kytos-ng.github.io/api/mef_eline.html">OpenAPI Docs</a></h3>
+  </div>
+
+
+Overview
+========
 
 This Napp allows a user to create a point to point L2 Ethernet Virtual Circuit.
 
@@ -21,11 +29,28 @@ Features
 
 Requirements
 ============
-- kytos/flow_manager
-- kytos/pathfinder
-- kytos/topology
-- amlight/sndtrace_cp
+- `kytos/flow_manager <https://github.com/kytos-ng/flow_manager.git>`_
+- `kytos/pathfinder <https://github.com/kytos-ng/pathfinder.git>`_
+- `kytos/topology <https://github.com/kytos-ng/topology.git>`_
+- `amlight/sdntrace_cp <https://github.com/amlight/sdntrace_cp.git>`_
 
+Events
+======
+
+Subscribed
+----------
+
+- ``kytos/topology.link_up``
+- ``kytos/topology.link_down``
+- ``kytos/flow_manager.flow.error``
+
+Published
+---------
+
+kytos/mef_eline.created
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Event reporting that a L2 circuit was created.
 
 .. TAGs
 

@@ -228,8 +228,12 @@ module.exports = {
     height: 1.1em;
     padding-top: 0.4em;
   }
-  .autocomplete-result-list {
-    width: 110% !important;
+  #endpoint-a-input .autocomplete-result-list,
+  #endpoint-z-input .autocomplete-result-list {
+    width: 100% !important;
+    outline: 0;
+    border: 1px #515151 solid;
+    border-radius: 3px;
   }
   .autocomplete-result-list li {
     white-space: nowrap;

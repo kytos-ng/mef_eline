@@ -553,20 +553,27 @@ module.exports = {
       // Load EVC
       this.loadEVC(this.content.id);
       // Make the panel fill the screen except the left menu width
-      this.$parent.$el.style.width = "calc(100% - 300px)";
+      $('.k-info-panel:has(.mef_circuit_container)').addClass('mef-k-info-panel');
+      
       this.$kytos.dpids = this.dpids;
     }
   },
   created() {
     // Check if the UI component k-input-auto exists
     compexists = this.$root.$options.components['k-input-auto'] != null;
+  },
+  destroyed() {
+    $('.k-info-panel').removeClass('mef-k-info-panel');
   }
 }
 </script>
 <style>
   /* Import icons */
   @import "https://fonts.googleapis.com/icon?family=Material+Icons";
-
+  
+  .mef-k-info-panel {
+    width: calc(100% - 300px);
+  }
   .empty-con-list {
     margin-top: 10px;
     color: #ccc;
@@ -718,8 +725,11 @@ module.exports = {
     color: #ffc5c5;
     background: #be0000;
   }
-  .autocomplete-result-list {
+  #mef-unis .autocomplete-result-list {
     width: 110% !important;
+    outline: 0;
+    border: 1px #515151 solid;
+    border-radius: 3px;
   }
   .autocomplete-result-list li {
     white-space: nowrap;
