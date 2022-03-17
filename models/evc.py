@@ -755,14 +755,14 @@ class EVCDeploy(EVCBase):
             out_interface(str): Interface output.
             in_vlan(str): Vlan input.
             out_vlan(str): Vlan output.
-            new_in_vlan(str): Interface input.
+            new_c_vlan(str): New client vlan.
 
         Return:
             dict: An python dictionary representing a FlowMod
 
         """
         # assign all arguments
-        in_interface, out_interface, in_vlan, out_vlan , new_in_vlan = args
+        in_interface, out_interface, in_vlan, out_vlan , new_c_vlan = args
 
         flow_mod = self._prepare_flow_mod(
             in_interface, out_interface, queue_id
@@ -778,9 +778,9 @@ class EVCDeploy(EVCBase):
         if in_vlan:
             # if in_vlan is set, it must be included in the match
             flow_mod["match"]["dl_vlan"] = in_vlan
-        if new_in_vlan:
+        if new_c_vlan:
             # new_in_vlan is set, so an action to set it is necessary
-            new_action = {"action_type": "set_vlan", "vlan_id": new_in_vlan}
+            new_action = {"action_type": "set_vlan", "vlan_id": new_c_vlan}
             flow_mod["actions"].insert(0, new_action)
             if not in_vlan:
                 # new_in_vlan is set, but in_vlan is not, so there was no
