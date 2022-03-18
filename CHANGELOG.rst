@@ -3,6 +3,15 @@ Changelog
 #########
 All notable changes to the MEF_ELine NApp will be documented in this file.
 
+[Unreleased]
+************
+
+Added
+=====
+
+- Reintroduced Q-in-Q when creating the flows for an EVC.
+  
+
 [2022.1.5] - 2022-02-11
 ***********************
 
