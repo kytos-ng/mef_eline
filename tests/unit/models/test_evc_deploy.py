@@ -871,3 +871,72 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                                               force=True)
         send_flow_mods_mocked.assert_any_call(switch_2, flows, 'delete',
                                               force=True)
+
+    @staticmethod
+    @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
+    def test_deploy_direct_uni_flows(send_flow_mods_mock):
+        """Test _install_direct_uni_flows."""
+
+        switch = Mock(spec=Switch)
+        switch.dpid = 2
+        interface_a = Interface("eth0", 1, switch)
+        interface_z = Interface("eth1", 3, switch)
+        uni_a = get_uni_mocked(
+            tag_value=82,
+            is_valid=True,
+        )
+        uni_z = get_uni_mocked(
+            tag_value=84,
+            is_valid=True,
+        )
+        uni_a.interface = interface_a
+        uni_z.interface = interface_z
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "enabled": True,
+            "active": True,
+        }
+        evc = EVC(**attributes)
+
+        # pylint: disable=protected-access
+        evc._install_direct_uni_flows()
+        send_flow_mods_mock.assert_called_once_with(
+            switch, [
+                {
+                    "match": {
+                        "in_port": 1,
+                        "dl_vlan": 82,
+                    },
+                    "cookie": evc.get_cookie(),
+                    "actions": [
+                        {
+                            "action_type": "set_vlan",
+                            "vlan_id": 84,
+                        },
+                        {
+                            "action_type": "output",
+                            "port": 3,
+                        },
+                    ]
+                },
+                {
+                    "match": {
+                        "in_port": 3,
+                        "dl_vlan": 84,
+                    },
+                    "cookie": evc.get_cookie(),
+                    "actions": [
+                        {
+                            "action_type": "set_vlan",
+                            "vlan_id": 82,
+                        },
+                        {
+                            "action_type": "output",
+                            "port": 1,
+                        },
+                    ]
+                }
+            ])
