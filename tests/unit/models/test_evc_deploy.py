@@ -129,6 +129,24 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             expected_endpoint, json=expected_data
         )
 
+    @patch("napps.kytos.mef_eline.models.evc.requests")
+    def test_send_flow_mods_error(self, requests_mock):
+        """Test flow_manager call fails."""
+        flow_mods = {"id": 20}
+        switch = Mock(spec=Switch, id=1)
+        response = MagicMock()
+        response.status_code = 415
+        requests_mock.post.return_value = response
+
+        # pylint: disable=protected-access
+        with self.assertRaises(FlowModException):
+            EVC._send_flow_mods(
+                switch,
+                flow_mods,
+                command='delete',
+                force=True
+            )
+
     def test_prepare_flow_mod(self):
         """Test prepare flow_mod method."""
         interface_a = Interface("eth0", 1, Mock(spec=Switch))
