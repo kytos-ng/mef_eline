@@ -1073,6 +1073,21 @@ class TestMain(TestCase):
         self.assertEqual(payload["action"], response_json["action"])
         self.assertIsNotNone(response_json["id"])
 
+    @patch('napps.kytos.mef_eline.main.Main._find_evc_by_schedule_id')
+    def test_update_no_schedule(self, find_evc_by_schedule_id_mock):
+        """Test update a circuit schedule."""
+        api = self.get_app_test_client(self.napp)
+        url = f"{self.server_name_url}/v2/evc/schedule/1"
+        payload = {"frequency": "*/1 * * * *", "action": "create"}
+
+        find_evc_by_schedule_id_mock.return_value = None, None
+
+        response = api.patch(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -1723,6 +1738,104 @@ class TestMain(TestCase):
 
         self.assertEqual(response.status_code, 201)
         evc_mock.extend_metadata.assert_called_with(payload)
+
+    def test_add_metadata_malformed_json(self):
+        """Test method to add metadata with a malformed json"""
+        api = self.get_app_test_client(self.napp)
+        payload = '{"metadata1": 1, "metadata2": 2,}'
+        response = api.post(
+            f"{self.server_name_url}/v2/evc/1234/metadata",
+            data=payload,
+            content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json["description"],
+            "The request body is not a well-formed JSON."
+        )
+
+    def test_add_metadata_no_body(self):
+        """Test method to add metadata with no body"""
+        api = self.get_app_test_client(self.napp)
+        response = api.post(
+            f"{self.server_name_url}/v2/evc/1234/metadata"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json["description"],
+            "The request body is empty."
+        )
+
+    def test_add_metadata_no_evc(self):
+        """Test method to add metadata with no evc"""
+        api = self.get_app_test_client(self.napp)
+        payload = {"metadata1": 1, "metadata2": 2}
+        response = api.post(
+            f"{self.server_name_url}/v2/evc/1234/metadata",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.json["description"],
+            "circuit_id 1234 not found."
+        )
+
+    def test_add_metadata_wrong_content_type(self):
+        """Test method to add metadata with wrong content type"""
+        api = self.get_app_test_client(self.napp)
+        payload = {"metadata1": 1, "metadata2": 2}
+        response = api.post(
+            f"{self.server_name_url}/v2/evc/1234/metadata",
+            data=json.dumps(payload),
+            content_type="application/xml",
+        )
+        self.assertEqual(response.status_code, 415)
+        self.assertEqual(
+            response.json["description"],
+            "The content type must be application/json "
+            "(received application/xml)."
+        )
+
+    def test_get_metadata(self):
+        """Test method to get metadata"""
+        evc_mock = create_autospec(EVC)
+        evc_mock.metadata = {'metadata1': 1, 'metadata2': 2}
+        evc_mock.id = 1234
+        self.napp.circuits = {"1234": evc_mock}
+
+        api = self.get_app_test_client(self.napp)
+        response = api.get(
+            f"{self.server_name_url}/v2/evc/1234/metadata",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"metadata": evc_mock.metadata})
+
+    def test_delete_metadata(self):
+        """Test method to delete metadata"""
+        evc_mock = create_autospec(EVC)
+        evc_mock.metadata = {'metadata1': 1, 'metadata2': 2}
+        evc_mock.id = 1234
+        self.napp.circuits = {"1234": evc_mock}
+
+        api = self.get_app_test_client(self.napp)
+        response = api.delete(
+            f"{self.server_name_url}/v2/evc/1234/metadata/metadata1",
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_delete_metadata_no_evc(self):
+        """Test method to delete metadata with no evc"""
+        api = self.get_app_test_client(self.napp)
+        response = api.delete(
+            f"{self.server_name_url}/v2/evc/1234/metadata/metadata1",
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.json["description"],
+            "circuit_id 1234 not found."
+        )
 
     @patch('napps.kytos.mef_eline.storehouse.StoreHouse.get_data')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
