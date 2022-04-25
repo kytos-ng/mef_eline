@@ -100,6 +100,22 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                     evc.update(**update_dict)
                 self.assertEqual(str(handle_error.exception), error_message)
 
+    def test_update_invalid(self):
+        """Test updating with an invalid attr"""
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "uni_a": get_uni_mocked(is_valid=True),
+            "uni_z": get_uni_mocked(is_valid=True),
+        }
+        evc = EVC(**attributes)
+        with self.assertRaises(ValueError) as handle_error:
+            evc.update(xyz="abc")
+        self.assertEqual(
+            str(handle_error.exception),
+            'The attribute "xyz" is invalid.'
+        )
+
     @patch("napps.kytos.mef_eline.models.EVC.sync")
     def test_update_disable(self, _sync_mock):
         """Test if evc is disabled."""

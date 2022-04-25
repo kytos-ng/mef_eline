@@ -10,7 +10,7 @@ from kytos.core.switch import Switch
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
 
-from napps.kytos.mef_eline.models import EVC, Path  # NOQA
+from napps.kytos.mef_eline.models import EVC, EVCDeploy, Path  # NOQA
 from napps.kytos.mef_eline.settings import MANAGER_URL  # NOQA
 from napps.kytos.mef_eline.exceptions import FlowModException  # NOQA
 from napps.kytos.mef_eline.tests.helpers import (
@@ -22,6 +22,15 @@ from napps.kytos.mef_eline.tests.helpers import (
 
 class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
     """Tests to verify EVC class."""
+
+    def setUp(self):
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_for_tests",
+            "uni_a": get_uni_mocked(is_valid=True),
+            "uni_z": get_uni_mocked(is_valid=True),
+        }
+        self.evc_deploy = EVCDeploy(**attributes)
 
     def test_primary_links_zipped(self):
         """Test primary links zipped method."""
@@ -940,3 +949,38 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
                     ]
                 }
             ])
+
+    def test_is_affected_by_link(self):
+        """Test is_affected_by_link method"""
+        self.evc_deploy.current_path = Path(['a', 'b', 'c'])
+        self.assertTrue(self.evc_deploy.is_affected_by_link('b'))
+
+    def test_is_backup_path_affected_by_link(self):
+        """Test is_backup_path_affected_by_link method"""
+        self.evc_deploy.backup_path = Path(['a', 'b', 'c'])
+        self.assertFalse(self.evc_deploy.is_backup_path_affected_by_link('d'))
+
+    def test_is_primary_path_affected_by_link(self):
+        """Test is_primary_path_affected_by_link method"""
+        self.evc_deploy.primary_path = Path(['a', 'b', 'c'])
+        self.assertTrue(self.evc_deploy.is_primary_path_affected_by_link('c'))
+
+    def test_is_using_primary_path(self):
+        """Test is_using_primary_path method"""
+        self.evc_deploy.primary_path = Path(['a', 'b', 'c'])
+        self.evc_deploy.current_path = Path(['e', 'f', 'g'])
+        self.assertFalse(self.evc_deploy.is_using_primary_path())
+
+    def test_is_using_backup_path(self):
+        """Test is_using_backup_path method"""
+        self.evc_deploy.backup_path = Path(['a', 'b', 'c'])
+        self.evc_deploy.current_path = Path(['e', 'f', 'g'])
+        self.assertFalse(self.evc_deploy.is_using_backup_path())
+
+    @patch('napps.kytos.mef_eline.models.path.Path.status')
+    def test_is_using_dynamic_path(self, mock_status):
+        """Test is_using_dynamic_path method"""
+        mock_status.return_value = False
+        self.evc_deploy.backup_path = Path([])
+        self.evc_deploy.primary_path = Path([])
+        self.assertFalse(self.evc_deploy.is_using_dynamic_path())
