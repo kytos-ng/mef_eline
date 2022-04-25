@@ -10,7 +10,7 @@ from kytos.core.common import EntityStatus
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
 from napps.kytos.mef_eline.exceptions import InvalidPath  # NOQA pycodestyle
-from napps.kytos.mef_eline.models import Path  # NOQA pycodestyle
+from napps.kytos.mef_eline.models import Path, DynamicPathManager  # NOQA pycodestyle
 from napps.kytos.mef_eline.tests.helpers import (
     MockResponse,
     get_link_mocked,
@@ -237,3 +237,43 @@ class TestPath(TestCase):
                 else:
                     with self.assertRaises(InvalidPath):
                         path.is_valid(switch_a, switch_z)
+
+
+class TestDynamicPathManager(TestCase):
+    """Tests for the DynamicPathManager class"""
+
+    def test_clear_path(self):
+        """Test _clear_path method"""
+        path = [
+            '00:00:00:00:00:00:00:01:1',
+            '00:00:00:00:00:00:00:02:3',
+            '00:00:00:00:00:00:00:02',
+            '00:00:00:00:00:00:00:02:4',
+            '00:00:00:00:00:00:00:03:2',
+            '00:00:00:00:00:00:00:03',
+            '00:00:00:00:00:00:00:03:1',
+            '00:00:00:00:00:00:00:04:1'
+        ]
+        expected_path = [
+            '00:00:00:00:00:00:00:01:1',
+            '00:00:00:00:00:00:00:02:3',
+            '00:00:00:00:00:00:00:02:4',
+            '00:00:00:00:00:00:00:03:2',
+            '00:00:00:00:00:00:00:03:1',
+            '00:00:00:00:00:00:00:04:1'
+        ]
+        # pylint: disable=protected-access
+        self.assertEqual(DynamicPathManager._clear_path(path), expected_path)
+
+    def test_create_path_invalid(self):
+        """Test create_path method"""
+        path = [
+            '00:00:00:00:00:00:00:01:1',
+            '00:00:00:00:00:00:00:02:3',
+            '00:00:00:00:00:00:00:02',
+            '00:00:00:00:00:00:00:02:4',
+            '00:00:00:00:00:00:00:03:2',
+            '00:00:00:00:00:00:00:03',
+            '00:00:00:00:00:00:00:03:1',
+        ]
+        self.assertIsNone(DynamicPathManager.create_path(path))
