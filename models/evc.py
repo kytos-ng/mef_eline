@@ -11,7 +11,7 @@ from kytos.core.common import EntityStatus, GenericEntity
 from kytos.core.exceptions import KytosNoTagAvailableError
 from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI
-from napps.kytos.mef_eline import settings
+from napps.kytos.mef_eline import controllers, settings
 from napps.kytos.mef_eline.exceptions import FlowModException, InvalidPath
 from napps.kytos.mef_eline.storehouse import StoreHouse
 from napps.kytos.mef_eline.utils import (
@@ -118,6 +118,7 @@ class EVCBase(GenericEntity):
 
         self._storehouse = StoreHouse(controller)
         self._controller = controller
+        self._mongo_controller = controllers.ELineController()
 
         if kwargs.get("active", False):
             self.activate()
@@ -137,7 +138,8 @@ class EVCBase(GenericEntity):
 
     def sync(self):
         """Sync this EVC in the storehouse."""
-        self._storehouse.save_evc(self)
+        #self._storehouse.save_evc(self)
+        self._mongo_controller.upsert_evc(self.as_dict())
         log.info(f"EVC {self.id} was synced to the storehouse.")
 
     def update(self, **kwargs):

@@ -15,11 +15,10 @@ from kytos.core.events import KytosEvent
 from kytos.core.helpers import listen_to
 from kytos.core.interface import TAG, UNI
 from kytos.core.link import Link
-from napps.kytos.mef_eline import settings
+from napps.kytos.mef_eline import controllers, settings
 from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC, DynamicPathManager, Path
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
-from napps.kytos.mef_eline.storehouse import StoreHouse
 from napps.kytos.mef_eline.utils import emit_event, load_spec, validate
 
 
@@ -44,7 +43,8 @@ class Main(KytosNApp):
         self.sched = Scheduler()
 
         # object to save and load circuits
-        self.storehouse = StoreHouse(self.controller)
+        self.mongo_controller = self.get_eline_controller()
+        self.mongo_controller.bootstrap_indexes()
 
         # set the controller that will manager the dynamic paths
         DynamicPathManager.set_controller(self.controller)
@@ -54,13 +54,21 @@ class Main(KytosNApp):
         self.circuits = {}
 
         self._lock = Lock()
-
+        self.execution_rounds = -1
         self.execute_as_loop(settings.DEPLOY_EVCS_INTERVAL)
-        self.execution_rounds = 0
+
         self.load_all_evcs()
+
+    @staticmethod
+    def get_eline_controller():
+        """Return the ELineController instance."""
+        return controllers.ELineController()
 
     def execute(self):
         """Execute once when the napp is running."""
+        if self.execution_rounds < 0:
+            self.execution_rounds += 1
+            return
         if self._lock.locked():
             return
         log.debug("Starting consistency routine")
@@ -71,7 +79,7 @@ class Main(KytosNApp):
     def execute_consistency(self):
         """Execute consistency routine."""
         self.execution_rounds += 1
-        stored_circuits = self.storehouse.get_data().copy()
+        stored_circuits = self.mongo_controller.get_circuits()['circuits']
         for circuit in tuple(self.circuits.values()):
             stored_circuits.pop(circuit.id, None)
             if (
@@ -108,7 +116,7 @@ class Main(KytosNApp):
         """
         log.debug("list_circuits /v2/evc")
         archived = request.args.get("archived", False)
-        circuits = self.storehouse.get_data()
+        circuits = self.mongo_controller.get_circuits()['circuits']
         if not circuits:
             return jsonify({}), 200
         if archived:
@@ -128,7 +136,7 @@ class Main(KytosNApp):
     def get_circuit(self, circuit_id):
         """Endpoint to return a circuit based on id."""
         log.debug("get_circuit /v2/evc/%s", circuit_id)
-        circuits = self.storehouse.get_data()
+        circuits = self.mongo_controller.get_circuits()['circuits']
 
         try:
             result = circuits[circuit_id]
@@ -217,7 +225,7 @@ class Main(KytosNApp):
         self.circuits[evc.id] = evc
 
         # save circuit
-        self.storehouse.save_evc(evc)
+        evc.sync()
 
         # Schedule the circuit deploy
         self.sched.add(evc)
@@ -418,7 +426,8 @@ class Main(KytosNApp):
          "schedule": <schedule object>}]
         """
         log.debug("list_schedules /v2/evc/schedule")
-        circuits = self.storehouse.get_data().values()
+        circuits = self.mongo_controller.get_circuits()['circuits'].values()
+        print(circuits)
         if not circuits:
             result = {}
             status = 200
@@ -659,7 +668,8 @@ class Main(KytosNApp):
 
     def load_all_evcs(self):
         """Try to load all EVCs on startup."""
-        for circuit_id, circuit in self.storehouse.get_data().items():
+        circuits = self.mongo_controller.get_circuits()['circuits'].items()
+        for circuit_id, circuit in circuits:
             if circuit_id not in self.circuits:
                 self._load_evc(circuit)
 
@@ -703,16 +713,15 @@ class Main(KytosNApp):
         This method will convert: [UNI, Link]
         """
         data = evc_dict.copy()  # Do not modify the original dict
-
         for attribute, value in data.items():
             # Get multiple attributes.
             # Ex: uni_a, uni_z
             if "uni" in attribute:
                 try:
                     data[attribute] = self._uni_from_dict(value)
-                except ValueError:
+                except ValueError as exception:
                     result = "Error creating UNI: Invalid value"
-                    raise BadRequest(result) from BadRequest
+                    raise ValueError(result) from exception
 
             if attribute == "circuit_scheduler":
                 data[attribute] = []
@@ -818,7 +827,7 @@ class Main(KytosNApp):
         """
         if not self.circuits:
             # Load storehouse circuits to buffer
-            circuits = self.storehouse.get_data()
+            circuits = self.mongo_controller.get_circuits()['circuits']
             for c_id, circuit in circuits.items():
                 evc = self._evc_from_dict(circuit)
                 self.circuits[c_id] = evc
