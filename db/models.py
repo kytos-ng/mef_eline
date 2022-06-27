@@ -68,7 +68,6 @@ class EVCBaseDoc(DocumentBaseModel):
     enabled: bool
     
     def __init__(self, *args, **kwargs):
-        print(args, kwargs)
         super().__init__(*args, **kwargs)
 
     @staticmethod
