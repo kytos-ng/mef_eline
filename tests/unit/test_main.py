@@ -31,7 +31,7 @@ class TestMain(TestCase):
         patch("kytos.core.helpers.run_on_thread", lambda x: x).start()
         # pylint: disable=import-outside-toplevel
         from napps.kytos.mef_eline.main import Main
-
+        Main.get_eline_controller = MagicMock()
         self.addCleanup(patch.stopall)
         self.napp = Main(get_controller_mock())
 
@@ -112,6 +112,7 @@ class TestMain(TestCase):
     @patch('napps.kytos.mef_eline.main.Main.execute_consistency')
     def test_execute(self, mock_execute_consistency, mock_log):
         """Test execute."""
+        self.napp.execution_rounds = 0
         self.napp.execute()
         mock_execute_consistency.assert_called()
         self.assertEqual(mock_log.debug.call_count, 2)
@@ -129,15 +130,18 @@ class TestMain(TestCase):
 
     @patch('napps.kytos.mef_eline.main.settings')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
-    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.get_data')
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     def test_execute_consistency(self, *args):
         """Test execute_consistency."""
-        (mock_get_data, mock_load_evc, mock_settings) = args
+        (mongo_controller_upsert_mock, mock_load_evc, mock_settings) = args
 
         stored_circuits = {'1': {'name': 'circuit_1'},
                            '2': {'name': 'circuit_2'},
                            '3': {'name': 'circuit_3'}}
-        mock_get_data.return_value = stored_circuits
+        mongo_controller_upsert_mock.return_value = True
+        self.napp.mongo_controller.get_circuits.return_value = {
+            "circuits": stored_circuits
+        }
         mock_settings.WAIT_FOR_OLD_PATH = -1
         evc1 = MagicMock()
         evc1.is_enabled.return_value = True
@@ -327,68 +331,81 @@ class TestMain(TestCase):
         expected_result = circuits
         self.assertEqual(json.loads(response.data), expected_result)
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_list_with_circuits_stored(self, storehouse_data_mock):
+    def test_list_with_circuits_stored(self):
         """Test if list circuits return all circuits stored."""
-        circuits = {"1": {"name": "circuit_1"}, "2": {"name": "circuit_2"}}
-        storehouse_data_mock.return_value = circuits
+        circuits = {
+            'circuits':
+            {"1": {"name": "circuit_1"}, "2": {"name": "circuit_2"}}
+        }
+        self.napp.mongo_controller.get_circuits.return_value = circuits
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/"
 
         response = api.get(url)
-        expected_result = circuits
+        expected_result = circuits["circuits"]
         self.assertEqual(json.loads(response.data), expected_result)
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_list_with_archived_circuits_stored_1(self, storehouse_data_mock):
+    def test_list_with_archived_circuits_stored_1(self):
         """Test if list circuits return only circuits not archived."""
         circuits = {
-            "1": {"name": "circuit_1"},
-            "2": {"name": "circuit_2", "archived": True},
+            'circuits':
+            {
+                "1": {"name": "circuit_1"},
+                "2": {"name": "circuit_2", "archived": True},
+            }
         }
-        storehouse_data_mock.return_value = circuits
+        self.napp.mongo_controller.get_circuits.return_value = circuits
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/"
 
         response = api.get(url)
-        expected_result = {"1": circuits["1"]}
+        expected_result = {"1": circuits["circuits"]["1"]}
         self.assertEqual(json.loads(response.data), expected_result)
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_list_with_archived_circuits_stored_2(self, storehouse_data_mock):
+    def test_list_with_archived_circuits_stored_2(self):
         """Test if list circuits return all circuits."""
         circuits = {
-            "1": {"name": "circuit_1"},
-            "2": {"name": "circuit_2", "archived": True},
+            'circuits': {
+                "1": {"name": "circuit_1"},
+                "2": {"name": "circuit_2", "archived": True},
+            }
         }
-        storehouse_data_mock.return_value = circuits
+        self.napp.mongo_controller.get_circuits.return_value = circuits
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/?archived=True"
 
         response = api.get(url)
-        expected_result = circuits
+        expected_result = circuits["circuits"]
         self.assertEqual(json.loads(response.data), expected_result)
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_circuit_with_valid_id(self, storehouse_data_mock):
+    def test_circuit_with_valid_id(self):
         """Test if get_circuit return the circuit attributes."""
-        circuits = {"1": {"name": "circuit_1"}, "2": {"name": "circuit_2"}}
-        storehouse_data_mock.return_value = circuits
+        circuits = {
+            "circuits": {
+                "1": {"name": "circuit_1"},
+                "2": {"name": "circuit_2"}
+            }
+        }
+        self.napp.mongo_controller.get_circuits.return_value = circuits
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/1"
         response = api.get(url)
-        expected_result = circuits["1"]
+        expected_result = circuits["circuits"]["1"]
         self.assertEqual(json.loads(response.data), expected_result)
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_circuit_with_invalid_id(self, storehouse_data_mock):
+    def test_circuit_with_invalid_id(self):
         """Test if get_circuit return invalid circuit_id."""
-        circuits = {"1": {"name": "circuit_1"}, "2": {"name": "circuit_2"}}
-        storehouse_data_mock.return_value = circuits
+        circuits = {
+            "circuits": {
+                "1": {"name": "circuit_1"},
+                "2": {"name": "circuit_2"}
+            }
+        }
+        self.napp.mongo_controller.get_circuits.return_value = circuits
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/3"
@@ -399,10 +416,9 @@ class TestMain(TestCase):
         )
 
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     def test_create_a_circuit_case_1(self, *args):
@@ -411,15 +427,14 @@ class TestMain(TestCase):
         (
             validate_mock,
             evc_as_dict_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             uni_from_dict_mock,
             sched_add_mock,
-            storehouse_data_mock,
             evc_deploy_mock,
         ) = args
 
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         evc_deploy_mock.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
@@ -430,7 +445,7 @@ class TestMain(TestCase):
         uni_from_dict_mock.side_effect = [uni1, uni2]
         evc_as_dict_mock.return_value = {}
         sched_add_mock.return_value = True
-        storehouse_data_mock.return_value = {}
+        self.napp.mongo_controller.get_circuits.return_value = {}
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/"
@@ -472,10 +487,10 @@ class TestMain(TestCase):
             dynamic_backup_path=True,
         )
         # verify save method is called
-        save_evc_mock.assert_called_once()
+        mongo_controller_upsert_mock.assert_called_once()
 
         # verify evc as dict is called to save in the box
-        evc_as_dict_mock.assert_called_once()
+        evc_as_dict_mock.assert_called()
         # verify add circuit in sched
         sched_add_mock.assert_called_once()
 
@@ -540,11 +555,17 @@ class TestMain(TestCase):
         self.assertEqual(current_data["description"], expected_data)
 
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    def test_create_a_circuit_case_4(self, uni_from_dict_mock):
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    def test_create_a_circuit_case_4(
+        self,
+        mongo_controller_upsert_mock,
+        uni_from_dict_mock
+    ):
         """Test create a new circuit trying to send request with an
         invalid value."""
         # pylint: disable=too-many-locals
         uni_from_dict_mock.side_effect = ValueError("Could not instantiate")
+        mongo_controller_upsert_mock.return_value = True
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/"
 
@@ -572,7 +593,7 @@ class TestMain(TestCase):
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     def test_create_circuit_already_enabled(self, *args):
@@ -581,14 +602,14 @@ class TestMain(TestCase):
         (
             evc_as_dict_mock,
             validate_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             uni_from_dict_mock,
             sched_add_mock,
             evc_deploy_mock,
         ) = args
 
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         uni1 = create_autospec(UNI)
@@ -696,33 +717,23 @@ class TestMain(TestCase):
         response = api.patch(url)
         self.assertEqual(response.status_code, 404, response.data)
 
-    def test_list_schedules__no_data(self):
-        """Test list of schedules."""
-        api = self.get_app_test_client(self.napp)
-        url = f"{self.server_name_url}/v2/evc/schedule"
-        response = api.get(url)
-        self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(json.loads(response.data.decode()), {})
-
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_list_schedules__no_data_stored(self, storehouse_data_mock):
+    def test_list_schedules__no_data_stored(self):
         """Test if list circuits return all circuits stored."""
-        circuits = {}
-        storehouse_data_mock.return_value = circuits
+        self.napp.mongo_controller.get_circuits.return_value = {"circuits": {}}
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/schedule"
 
         response = api.get(url)
-        expected_result = circuits
+        expected_result = {}
 
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(json.loads(response.data), expected_result)
 
     # pylint: disable=no-self-use
-    def _add_storehouse_schedule_data(self, storehouse_data_mock):
+    def _add_storehouse_schedule_data(self, data_mock):
         """Add schedule data to storehouse mock object."""
-        circuits = {}
+        circuits = {"circuits": {}}
         payload_1 = {
             "id": "aa:aa:aa",
             "name": "my evc1",
@@ -739,7 +750,7 @@ class TestMain(TestCase):
                 {"id": "2", "frequency": "1 * * * *", "action": "remove"},
             ],
         }
-        circuits.update({"aa:aa:aa": payload_1})
+        circuits["circuits"].update({"aa:aa:aa": payload_1})
         payload_2 = {
             "id": "bb:bb:bb",
             "name": "my second evc2",
@@ -756,7 +767,7 @@ class TestMain(TestCase):
                 {"id": "4", "frequency": "2 * * * *", "action": "remove"},
             ],
         }
-        circuits.update({"bb:bb:bb": payload_2})
+        circuits["circuits"].update({"bb:bb:bb": payload_2})
         payload_3 = {
             "id": "cc:cc:cc",
             "name": "my third evc3",
@@ -769,14 +780,15 @@ class TestMain(TestCase):
                 "tag": {"tag_type": 1, "value": 100},
             },
         }
-        circuits.update({"cc:cc:cc": payload_3})
+        circuits["circuits"].update({"cc:cc:cc": payload_3})
         # Add one circuit to the storehouse.
-        storehouse_data_mock.return_value = circuits
+        data_mock.return_value = circuits
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_list_schedules_from_storehouse(self, storehouse_data_mock):
+    def test_list_schedules_from_storehouse(self):
         """Test if list circuits return specific circuits stored."""
-        self._add_storehouse_schedule_data(storehouse_data_mock)
+        self._add_storehouse_schedule_data(
+            self.napp.mongo_controller.get_circuits
+        )
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/schedule"
@@ -826,10 +838,11 @@ class TestMain(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(expected, json.loads(response.data))
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_get_specific_schedule_from_storehouse(self, storehouse_data_mock):
+    def test_get_specific_schedule_from_storehouse(self):
         """Test get schedules from a circuit."""
-        self._add_storehouse_schedule_data(storehouse_data_mock)
+        self._add_storehouse_schedule_data(
+            self.napp.mongo_controller.get_circuits
+        )
 
         requested_circuit_id = "bb:bb:bb"
         api = self.get_app_test_client(self.napp)
@@ -852,6 +865,7 @@ class TestMain(TestCase):
     def test_get_specific_schedules_from_storehouse_not_found(self):
         """Test get specific schedule ID that does not exist."""
         requested_id = "blah"
+        self.napp.mongo_controller.get_circuits.return_value = {"circuits": {}}
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/{requested_id}"
 
@@ -870,10 +884,9 @@ class TestMain(TestCase):
         return UNI(interface, tag_dict)
 
     @patch("apscheduler.schedulers.background.BackgroundScheduler.add_job")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     def test_create_schedule(self, *args):  # pylint: disable=too-many-locals
@@ -881,21 +894,21 @@ class TestMain(TestCase):
         (
             validate_mock,
             evc_as_dict_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             uni_from_dict_mock,
             sched_add_mock,
-            storehouse_data_mock,
             scheduler_add_job_mock,
         ) = args
 
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         uni_from_dict_mock.side_effect = self._uni_from_dict_side_effect
         evc_as_dict_mock.return_value = {}
         sched_add_mock.return_value = True
-        storehouse_data_mock.return_value = {}
 
-        self._add_storehouse_schedule_data(storehouse_data_mock)
+        self._add_storehouse_schedule_data(
+            self.napp.mongo_controller.get_circuits
+        )
 
         requested_id = "bb:bb:bb"
         api = self.get_app_test_client(self.napp)
@@ -915,7 +928,7 @@ class TestMain(TestCase):
 
         self.assertEqual(response.status_code, 201, response.data)
         scheduler_add_job_mock.assert_called_once()
-        save_evc_mock.assert_called_once()
+        mongo_controller_upsert_mock.assert_called_once()
         self.assertEqual(
             payload["schedule"]["frequency"], response_json["frequency"]
         )
@@ -1009,10 +1022,9 @@ class TestMain(TestCase):
         self.assertEqual(response.status_code, 403)
 
     @patch('apscheduler.schedulers.background.BackgroundScheduler.remove_job')
-    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.get_data')
     @patch('napps.kytos.mef_eline.scheduler.Scheduler.add')
     @patch('napps.kytos.mef_eline.main.Main._uni_from_dict')
-    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.save_evc')
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch('napps.kytos.mef_eline.main.EVC.as_dict')
     @patch('napps.kytos.mef_eline.models.evc.EVC._validate')
     def test_update_schedule(self, *args):  # pylint: disable=too-many-locals
@@ -1020,37 +1032,42 @@ class TestMain(TestCase):
         (
             validate_mock,
             evc_as_dict_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             uni_from_dict_mock,
             sched_add_mock,
-            storehouse_data_mock,
             scheduler_remove_job_mock,
         ) = args
 
-        storehouse_payload_1 = {
-            "aa:aa:aa": {
-                "id": "aa:aa:aa",
-                "name": "my evc1",
-                "uni_a": {
-                    "interface_id": "00:00:00:00:00:00:00:01:1",
-                    "tag": {"tag_type": 1, "value": 80},
-                },
-                "uni_z": {
-                    "interface_id": "00:00:00:00:00:00:00:02:2",
-                    "tag": {"tag_type": 1, "value": 1},
-                },
-                "circuit_scheduler": [
-                    {"id": "1", "frequency": "* * * * *", "action": "create"}
-                ],
+        mongo_payload_1 = {
+            "circuits": {
+                "aa:aa:aa": {
+                    "id": "aa:aa:aa",
+                    "name": "my evc1",
+                    "uni_a": {
+                        "interface_id": "00:00:00:00:00:00:00:01:1",
+                        "tag": {"tag_type": 1, "value": 80},
+                    },
+                    "uni_z": {
+                        "interface_id": "00:00:00:00:00:00:00:02:2",
+                        "tag": {"tag_type": 1, "value": 1},
+                    },
+                    "circuit_scheduler": [
+                        {
+                            "id": "1",
+                            "frequency": "* * * * *",
+                            "action": "create"
+                        }
+                    ],
+                }
             }
         }
 
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
         evc_as_dict_mock.return_value = {}
-        storehouse_data_mock.return_value = storehouse_payload_1
+        self.napp.mongo_controller.get_circuits.return_value = mongo_payload_1
         scheduler_remove_job_mock.return_value = True
 
         requested_schedule_id = "1"
@@ -1068,7 +1085,7 @@ class TestMain(TestCase):
 
         self.assertEqual(response.status_code, 200, response.data)
         scheduler_remove_job_mock.assert_called_once()
-        save_evc_mock.assert_called_once()
+        mongo_controller_upsert_mock.assert_called_once()
         self.assertEqual(payload["frequency"], response_json["frequency"])
         self.assertEqual(payload["action"], response_json["action"])
         self.assertIsNotNone(response_json["id"])
@@ -1088,7 +1105,6 @@ class TestMain(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
@@ -1101,17 +1117,22 @@ class TestMain(TestCase):
             evc_as_dict_mock,
             uni_from_dict_mock,
             sched_add_mock,
-            storehouse_data_mock,
         ) = args
 
-        storehouse_payload_1 = {
-            "aa:aa:aa": {
-                "id": "aa:aa:aa",
-                "name": "my evc1",
-                "archived": True,
-                "circuit_scheduler": [
-                    {"id": "1", "frequency": "* * * * *", "action": "create"}
-                ],
+        mongo_payload_1 = {
+            "circuits": {
+                "aa:aa:aa": {
+                    "id": "aa:aa:aa",
+                    "name": "my evc1",
+                    "archived": True,
+                    "circuit_scheduler": [
+                        {
+                            "id": "1",
+                            "frequency": "* * * * *",
+                            "action": "create"
+                        }
+                    ],
+                }
             }
         }
 
@@ -1119,7 +1140,7 @@ class TestMain(TestCase):
         sched_add_mock.return_value = True
         uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
         evc_as_dict_mock.return_value = {}
-        storehouse_data_mock.return_value = storehouse_payload_1
+        self.napp.mongo_controller.get_circuits.return_value = mongo_payload_1
 
         requested_schedule_id = "1"
         api = self.get_app_test_client(self.napp)
@@ -1135,9 +1156,8 @@ class TestMain(TestCase):
         self.assertEqual(response.status_code, 403, response.data)
 
     @patch("apscheduler.schedulers.background.BackgroundScheduler.remove_job")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     def test_delete_schedule(self, *args):
@@ -1145,34 +1165,39 @@ class TestMain(TestCase):
         (
             validate_mock,
             evc_as_dict_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             uni_from_dict_mock,
-            storehouse_data_mock,
             scheduler_remove_job_mock,
         ) = args
 
-        storehouse_payload_1 = {
-            "2": {
-                "id": "2",
-                "name": "my evc1",
-                "uni_a": {
-                    "interface_id": "00:00:00:00:00:00:00:01:1",
-                    "tag": {"tag_type": 1, "value": 80},
-                },
-                "uni_z": {
-                    "interface_id": "00:00:00:00:00:00:00:02:2",
-                    "tag": {"tag_type": 1, "value": 1},
-                },
-                "circuit_scheduler": [
-                    {"id": "1", "frequency": "* * * * *", "action": "create"}
-                ],
+        mongo_payload_1 = {
+            "circuits": {
+                "2": {
+                    "id": "2",
+                    "name": "my evc1",
+                    "uni_a": {
+                        "interface_id": "00:00:00:00:00:00:00:01:1",
+                        "tag": {"tag_type": 1, "value": 80},
+                    },
+                    "uni_z": {
+                        "interface_id": "00:00:00:00:00:00:00:02:2",
+                        "tag": {"tag_type": 1, "value": 1},
+                    },
+                    "circuit_scheduler": [
+                        {
+                            "id": "1",
+                            "frequency": "* * * * *",
+                            "action": "create"
+                        }
+                    ],
+                }
             }
         }
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
         evc_as_dict_mock.return_value = {}
-        storehouse_data_mock.return_value = storehouse_payload_1
+        self.napp.mongo_controller.get_circuits.return_value = mongo_payload_1
         scheduler_remove_job_mock.return_value = True
 
         requested_schedule_id = "1"
@@ -1184,10 +1209,9 @@ class TestMain(TestCase):
 
         self.assertEqual(response.status_code, 200, response.data)
         scheduler_remove_job_mock.assert_called_once()
-        save_evc_mock.assert_called_once()
+        mongo_controller_upsert_mock.assert_called_once()
         self.assertIn("Schedule removed", f"{response.data}")
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
@@ -1197,24 +1221,29 @@ class TestMain(TestCase):
             validate_mock,
             evc_as_dict_mock,
             uni_from_dict_mock,
-            storehouse_data_mock,
         ) = args
 
-        storehouse_payload_1 = {
-            "2": {
-                "id": "2",
-                "name": "my evc1",
-                "archived": True,
-                "circuit_scheduler": [
-                    {"id": "1", "frequency": "* * * * *", "action": "create"}
-                ],
+        mongo_payload_1 = {
+            "circuits": {
+                "2": {
+                    "id": "2",
+                    "name": "my evc1",
+                    "archived": True,
+                    "circuit_scheduler": [
+                        {
+                            "id": "1",
+                            "frequency": "* * * * *",
+                            "action": "create"
+                        }
+                    ],
+                }
             }
         }
 
         validate_mock.return_value = True
         uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
         evc_as_dict_mock.return_value = {}
-        storehouse_data_mock.return_value = storehouse_payload_1
+        self.napp.mongo_controller.get_circuits.return_value = mongo_payload_1
 
         requested_schedule_id = "1"
         api = self.get_app_test_client(self.napp)
@@ -1236,6 +1265,7 @@ class TestMain(TestCase):
 
     def test_get_circuit_not_found(self):
         """Test /v2/evc/<circuit_id> 404."""
+        self.napp.mongo_controller.get_circuits.return_value = {"circuits": {}}
         api = self.get_app_test_client(self.napp)
         url = f'{self.server_name_url}/v2/evc/1234'
         response = api.get(url)
@@ -1243,7 +1273,7 @@ class TestMain(TestCase):
 
     @patch('requests.post')
     @patch('napps.kytos.mef_eline.scheduler.Scheduler.add')
-    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.save_evc')
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch('napps.kytos.mef_eline.models.evc.EVC._validate')
     @patch('kytos.core.Controller.get_interface_by_id')
     @patch('napps.kytos.mef_eline.models.path.Path.is_valid')
@@ -1403,7 +1433,7 @@ class TestMain(TestCase):
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     def test_update_circuit_invalid_json(self, *args):
@@ -1412,14 +1442,14 @@ class TestMain(TestCase):
         (
             evc_as_dict_mock,
             validate_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             uni_from_dict_mock,
             sched_add_mock,
             evc_deploy_mock,
         ) = args
 
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         uni1 = create_autospec(UNI)
@@ -1473,7 +1503,7 @@ class TestMain(TestCase):
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
     @patch("napps.kytos.mef_eline.main.Main._link_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     @patch("napps.kytos.mef_eline.models.path.Path.is_valid")
@@ -1484,7 +1514,7 @@ class TestMain(TestCase):
             is_valid_mock,
             evc_as_dict_mock,
             validate_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             link_from_dict_mock,
             uni_from_dict_mock,
             sched_add_mock,
@@ -1493,7 +1523,7 @@ class TestMain(TestCase):
 
         is_valid_mock.side_effect = InvalidPath("error")
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         link_from_dict_mock.return_value = 1
@@ -1552,23 +1582,20 @@ class TestMain(TestCase):
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
-    @patch("napps.kytos.mef_eline.main.EVC.as_dict")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     def test_update_evc_no_json_mime(self, *args):
         """Test update a circuit with wrong mimetype."""
         # pylint: disable=too-many-locals
         (
-            evc_as_dict_mock,
+            mongo_controller_upsert_mock,
             validate_mock,
-            save_evc_mock,
             uni_from_dict_mock,
             sched_add_mock,
             evc_deploy_mock,
         ) = args
 
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         uni1 = create_autospec(UNI)
@@ -1578,6 +1605,7 @@ class TestMain(TestCase):
         uni1.interface.switch = "00:00:00:00:00:00:00:01"
         uni2.interface.switch = "00:00:00:00:00:00:00:02"
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
+        mongo_controller_upsert_mock.return_value = True
 
         api = self.get_app_test_client(self.napp)
         payload1 = {
@@ -1595,7 +1623,6 @@ class TestMain(TestCase):
 
         payload2 = {"dynamic_backup_path": False}
 
-        evc_as_dict_mock.return_value = payload1
         response = api.post(
             f"{self.server_name_url}/v2/evc/",
             data=json.dumps(payload1),
@@ -1603,7 +1630,6 @@ class TestMain(TestCase):
         )
         self.assertEqual(201, response.status_code)
 
-        evc_as_dict_mock.return_value = payload2
         current_data = json.loads(response.data)
         circuit_id = current_data["circuit_id"]
         response = api.patch(
@@ -1627,7 +1653,7 @@ class TestMain(TestCase):
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     def test_delete_archived_evc(self, *args):
@@ -1636,7 +1662,7 @@ class TestMain(TestCase):
         (
             evc_as_dict_mock,
             validate_mock,
-            save_evc_mock,
+            mongo_controller_upsert_mock,
             uni_from_dict_mock,
             sched_add_mock,
             evc_deploy_mock,
@@ -1644,7 +1670,7 @@ class TestMain(TestCase):
         ) = args
 
         validate_mock.return_value = True
-        save_evc_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         remove_current_flows_mock.return_value = True
@@ -1837,16 +1863,18 @@ class TestMain(TestCase):
             "circuit_id 1234 not found."
         )
 
-    @patch('napps.kytos.mef_eline.storehouse.StoreHouse.get_data')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
-    def test_load_all_evcs(self, load_evc_mock, get_data_mock):
+    def test_load_all_evcs(self, load_evc_mock):
         """Test load_evcs method"""
-        get_data_mock.return_value = {
-            1: 'circuit_1',
-            2: 'circuit_2',
-            3: 'circuit_3',
-            4: 'circuit_4'
+        mock_circuits = {
+            'circuits': {
+                1: 'circuit_1',
+                2: 'circuit_2',
+                3: 'circuit_3',
+                4: 'circuit_4'
+            }
         }
+        self.napp.mongo_controller.get_circuits.return_value = mock_circuits
         self.napp.circuits = {2: 'circuit_2', 3: 'circuit_3'}
         self.napp.load_all_evcs()
         load_evc_mock.assert_has_calls([call('circuit_1'), call('circuit_4')])

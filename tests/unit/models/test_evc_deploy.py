@@ -471,7 +471,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         send_flow_mods_mock.assert_called_once_with(switch, expected_flow_mods)
 
     @patch("requests.post")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.log")
     @patch("napps.kytos.mef_eline.models.path.Path.choose_vlans")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_nni_flows")
@@ -734,7 +734,7 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(deployed, True)
 
     @patch("requests.post")
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.save_evc")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.log")
     @patch("napps.kytos.mef_eline.models.path.Path.choose_vlans")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_nni_flows")
@@ -813,9 +813,10 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         log_mock.info.assert_called_with(f"{evc} was deployed.")
         self.assertTrue(deployed)
 
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.notify_link_available_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
-    def test_remove_current_flows(self, send_flow_mods_mocked, notify_mock):
+    def test_remove_current_flows(self, send_flow_mods_mocked, notify_mock, _):
         """Test remove current flows."""
         uni_a = get_uni_mocked(
             interface_port=2,
