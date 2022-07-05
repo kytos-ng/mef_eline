@@ -27,7 +27,7 @@ class CircuitScheduleDoc(BaseModel):
     """EVC circuit schedule model"""
 
     id: str
-    date: Optional[date]
+    date: Optional[str]
     frequency: Optional[str]
     interval: Optional[int]
     action: str
