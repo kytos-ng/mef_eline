@@ -68,9 +68,6 @@ class EVCBaseDoc(DocumentBaseModel):
     active: bool
     enabled: bool
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @staticmethod
     def projection() -> Dict:
         """Base projection of EVCBaseDoc model."""
