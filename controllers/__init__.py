@@ -35,7 +35,7 @@ class ELineController:
     def bootstrap_indexes(self) -> None:
         """Bootstrap mef_eline relaeted indexes."""
         index_tuples = [
-            ("evcs", [("circuit_scheduler", pymongo.ASCENDING)]),
+            ("evcs", [("circuit_scheduler.id", pymongo.ASCENDING)]),
         ]
         for collection, keys in index_tuples:
             if self.mongo.bootstrap_index(collection, keys):
