@@ -138,9 +138,7 @@ class EVCBase(GenericEntity):
 
     def sync(self):
         """Sync this EVC in the storehouse."""
-        #self._storehouse.save_evc(self)
         self._mongo_controller.upsert_evc(self.as_dict())
-        log.info(f"EVC {self.id} was synced to the storehouse.")
 
     def update(self, **kwargs):
         """Update evc attributes.
