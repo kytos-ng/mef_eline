@@ -51,6 +51,7 @@ class EVCBaseDoc(DocumentBaseModel):
     uni_a: UNIDoc
     uni_z: UNIDoc
     name: str
+    request_time: Optional[datetime]
     start_date: Optional[datetime]
     end_date: Optional[datetime]
     queue_id: Optional[int]
@@ -58,6 +59,9 @@ class EVCBaseDoc(DocumentBaseModel):
     primary_path: Optional[List]
     backup_path: Optional[List]
     current_path: Optional[List]
+    primary_links: Optional[List]
+    backup_links: Optional[List]
+    backup_links: Optional[List]
     dynamic_backup_path: bool
     creation_time: datetime
     owner: Optional[str]
@@ -71,26 +75,42 @@ class EVCBaseDoc(DocumentBaseModel):
     @staticmethod
     def projection() -> Dict:
         """Base projection of EVCBaseDoc model."""
+        time_fmt = "%Y-%m-%dT%H:%M:%S"
         return {
             "_id": 0,
             "id": 1,
             "uni_a": 1,
             "uni_z": 1,
             "name": 1,
-            "start_date": 1,
-            "end_date": 1,
-            "queue_id": 1,
             "bandwidth": 1,
             "primary_path": 1,
             "backup_path": 1,
             "current_path": 1,
             "dynamic_backup_path": 1,
-            "creation_time": 1,
-            "owner": 1,
             "priority": 1,
             "circuit_scheduler": 1,
             "archived": 1,
             "metadata": 1,
             "active": 1,
             "enabled": 1,
+            "owner": { "$ifNull": [ "$owner", None ]},
+            "queue_id": { "$ifNull": [ "$queue_id", None ]},
+            "primary_links": { "$ifNull": [ "$primary_links", [] ]},
+            "backup_links": { "$ifNull": [ "$backup_links", [] ]},
+            "start_date": { "$dateToString": {
+                "format": time_fmt, "date": "$start_date"
+            }},
+            "creation_time": { "$dateToString": {
+                "format": time_fmt, "date": "$creation_time"
+            }},
+            "request_time": { "$dateToString": {
+                "format": time_fmt, "date": {
+                    "$ifNull": [ "$request_time", "$inserted_at" ]
+                }
+            }},
+            "end_date": { "$dateToString": {
+                "format": time_fmt, "date": {
+                    "$ifNull": [ "$end_date", None ]
+                }
+            }},
         }
