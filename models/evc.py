@@ -13,7 +13,6 @@ from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI
 from napps.kytos.mef_eline import controllers, settings
 from napps.kytos.mef_eline.exceptions import FlowModException, InvalidPath
-from napps.kytos.mef_eline.storehouse import StoreHouse
 from napps.kytos.mef_eline.utils import (
     compare_endpoint_trace,
     emit_event,
@@ -116,7 +115,6 @@ class EVCBase(GenericEntity):
 
         self.metadata = kwargs.get("metadata", {})
 
-        self._storehouse = StoreHouse(controller)
         self._controller = controller
         self._mongo_controller = controllers.ELineController()
 
@@ -137,7 +135,7 @@ class EVCBase(GenericEntity):
         self._requested = kwargs
 
     def sync(self):
-        """Sync this EVC in the storehouse."""
+        """Sync this EVC in the MongoDB."""
         self._mongo_controller.upsert_evc(self.as_dict())
 
     def update(self, **kwargs):

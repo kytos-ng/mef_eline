@@ -3,7 +3,6 @@ import sys
 
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
-from unittest.mock import Mock
 
 from napps.kytos.mef_eline.models import EVC, Path  # NOQA pycodestyle
 from napps.kytos.mef_eline.tests.helpers import (
@@ -170,10 +169,6 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
             "enabled": True,
         }
         evc = EVC(**attributes)
-
-        # storehouse initialization mock
-        evc._storehouse.box = Mock()  # pylint: disable=protected-access
-        evc._storehouse.box.data = {}  # pylint: disable=protected-access
 
         deployed = evc.deploy_to("primary_path", evc.primary_path)
         self.assertFalse(deployed)
@@ -424,10 +419,6 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
         evc = EVC(**attributes)
         evc.current_path = evc.backup_path
 
-        # storehouse mock
-        evc._storehouse.box = Mock()  # pylint: disable=protected-access
-        evc._storehouse.box.data = {}  # pylint: disable=protected-access
-
         deploy_to_mocked.reset_mock()
         current_handle_link_down = evc.handle_link_down()
         self.assertEqual(deploy_to_mocked.call_count, 1)
@@ -602,10 +593,6 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         evc = EVC(**attributes)
 
-        # storehouse initialization mock
-        evc._storehouse.box = Mock()  # pylint: disable=protected-access
-        evc._storehouse.box.data = {}  # pylint: disable=protected-access
-
         evc.current_path = Path([])
         deploy_to_path_mocked.reset_mock()
         current_handle_link_up = evc.handle_link_up(backup_path[0])
@@ -679,10 +666,6 @@ class TestLinkProtection(TestCase):  # pylint: disable=too-many-public-methods
 
         evc = EVC(**attributes)
         evc.current_path = Path([])
-
-        # storehouse mock
-        evc._storehouse.box = Mock()  # pylint: disable=protected-access
-        evc._storehouse.box.data = {}  # pylint: disable=protected-access
 
         deploy_to_path_mocked.reset_mock()
         current_handle_link_up = evc.handle_link_up(backup_path[0])

@@ -724,10 +724,6 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         discover_new_paths_mocked.return_value = []
         deploy_to_path_mocked.return_value = True
 
-        # storehouse initialization mock
-        evc._storehouse.box = Mock()  # pylint: disable=protected-access
-        evc._storehouse.box.data = {}  # pylint: disable=protected-access
-
         deployed = evc.deploy_to_backup_path()
 
         deploy_to_path_mocked.assert_called_once_with()
@@ -861,10 +857,6 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
         }
 
         evc = EVC(**attributes)
-
-        # storehouse initialization mock
-        evc._storehouse.box = Mock()  # pylint: disable=protected-access
-        evc._storehouse.box.data = {}  # pylint: disable=protected-access
 
         evc.current_path = evc.primary_links
         evc.remove_current_flows()

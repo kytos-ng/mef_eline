@@ -11,6 +11,10 @@ Added
 
 - Reintroduced Q-in-Q when creating the flows for an EVC.
 - Optimize list of circuits filters
+- Migrated persistency from kytos/storehouse to MongoDB (integration with pymongo)
+- ELineController and DB models
+- ``storehouse_to_mongo.py`` script to migrate data from storehouse to MongoDB
+- Retries to handle database ``AutoReconnect`` exception.
 
 
 [2022.1.5] - 2022-02-11

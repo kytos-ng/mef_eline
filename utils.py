@@ -71,6 +71,9 @@ def validate(spec):
             openapi_request = FlaskOpenAPIRequest(request)
             result = validator.validate(openapi_request)
             if result.errors:
+                error_response = (
+                    "The request body contains invalid API data."
+                )
                 errors = result.errors[0]
                 if hasattr(errors, "schema_errors"):
                     schema_errors = errors.schema_errors[0]
@@ -82,14 +85,10 @@ def validate(spec):
                         "error_schema": schema_errors.schema,
                         "error_schema_path": list(schema_errors.schema_path),
                     }
-                    log.debug("error response: %s", error_log)
-                    error_response = f"{schema_errors.message} for field"
+                    log.warn("Invalid request (API schema): %s", error_log)
+                    error_response += f" {schema_errors.message} for field"
                     error_response += (
                         f" {'/'.join(map(str,schema_errors.path))}."
-                    )
-                else:
-                    error_response = (
-                        "The request body mimetype is not application/json."
                     )
                 raise BadRequest(error_response) from BadRequest
             return func(*args, data=data, **kwargs)

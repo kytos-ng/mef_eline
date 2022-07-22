@@ -50,7 +50,7 @@ class Main(KytosNApp):
         DynamicPathManager.set_controller(self.controller)
 
         # dictionary of EVCs created. It acts as a circuit buffer.
-        # Every create/update/delete must be synced to storehouse.
+        # Every create/update/delete must be synced to mongodb.
         self.circuits = {}
 
         self._lock = Lock()
@@ -98,7 +98,7 @@ class Main(KytosNApp):
                         with circuit.lock:
                             circuit.deploy()
         for circuit_id in stored_circuits:
-            log.info(f"EVC found in storehouse but unloaded {circuit_id}")
+            log.info(f"EVC found in mongodb but unloaded {circuit_id}")
             self._load_evc(stored_circuits[circuit_id])
 
     def shutdown(self):
@@ -517,7 +517,7 @@ class Main(KytosNApp):
         # Add schedule job
         self.sched.add_circuit_job(evc, new_schedule)
 
-        # save circuit to storehouse
+        # save circuit to mongodb
         evc.sync()
 
         result = new_schedule.as_dict()
@@ -568,7 +568,7 @@ class Main(KytosNApp):
         self.sched.cancel_job(found_schedule.id)
         # Add the new circuit schedule
         self.sched.add_circuit_job(evc, new_schedule)
-        # Save EVC to the storehouse
+        # Save EVC to mongodb
         evc.sync()
 
         result = new_schedule.as_dict()
@@ -604,7 +604,7 @@ class Main(KytosNApp):
 
         # Cancel all schedule jobs
         self.sched.cancel_job(found_schedule.id)
-        # Save EVC to the storehouse
+        # Save EVC to mongodb
         evc.sync()
 
         result = "Schedule removed"
@@ -679,7 +679,7 @@ class Main(KytosNApp):
                 self._load_evc(circuit)
 
     def _load_evc(self, circuit_dict):
-        """Load one EVC from storehouse to memory."""
+        """Load one EVC from mongodb to memory."""
         try:
             evc = self._evc_from_dict(circuit_dict)
         except ValueError as exception:
@@ -828,10 +828,10 @@ class Main(KytosNApp):
         """
         Return the circuit buffer.
 
-        If the buffer is empty, try to load data from storehouse.
+        If the buffer is empty, try to load data from mongodb.
         """
         if not self.circuits:
-            # Load storehouse circuits to buffer
+            # Load circuits from mongodb to buffer
             circuits = self.mongo_controller.get_circuits()['circuits']
             for c_id, circuit in circuits.items():
                 evc = self._evc_from_dict(circuit)

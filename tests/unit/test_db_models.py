@@ -2,7 +2,7 @@
 from unittest import TestCase
 from pydantic import ValidationError
 
-from db.models import EVCBaseDoc
+from db.models import EVCBaseDoc, DocumentBaseModel
 
 
 class TestDBModels(TestCase):
@@ -46,3 +46,9 @@ class TestDBModels(TestCase):
 
         with self.assertRaises(ValidationError):
             EVCBaseDoc(**self.evc_dict)
+
+    def test_document_base_model_dict(self):
+        """test_document_base_model_dict."""
+        self.evc_dict["_id"] = "some_id"
+        model = DocumentBaseModel(**self.evc_dict)
+        assert "_id" not in model.dict(exclude={"_id"})

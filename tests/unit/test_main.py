@@ -319,17 +319,16 @@ class TestMain(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(json.loads(response.data.decode()), {})
 
-    @patch("napps.kytos.mef_eline.storehouse.StoreHouse.get_data")
-    def test_list_no_circuits_stored(self, storehouse_data_mock):
+    def test_list_no_circuits_stored(self):
         """Test if list circuits return all circuits stored."""
-        circuits = {}
-        storehouse_data_mock.return_value = circuits
+        circuits = {"circuits": {}}
+        self.napp.mongo_controller.get_circuits.return_value = circuits
 
         api = self.get_app_test_client(self.napp)
         url = f"{self.server_name_url}/v2/evc/"
 
         response = api.get(url)
-        expected_result = circuits
+        expected_result = circuits["circuits"]
         self.assertEqual(json.loads(response.data), expected_result)
 
     def test_list_with_circuits_stored(self):
@@ -591,6 +590,12 @@ class TestMain(TestCase):
         self.assertEqual(400, response.status_code, response.data)
         self.assertEqual(current_data["description"], expected_data)
 
+        payload["name"] = 1
+        response = api.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        self.assertEqual(400, response.status_code, response.data)
+
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -732,8 +737,8 @@ class TestMain(TestCase):
         self.assertEqual(json.loads(response.data), expected_result)
 
     # pylint: disable=no-self-use
-    def _add_storehouse_schedule_data(self, data_mock):
-        """Add schedule data to storehouse mock object."""
+    def _add_mongodb_schedule_data(self, data_mock):
+        """Add schedule data to mongodb mock object."""
         circuits = {"circuits": {}}
         payload_1 = {
             "id": "aa:aa:aa",
@@ -782,12 +787,12 @@ class TestMain(TestCase):
             },
         }
         circuits["circuits"].update({"cc:cc:cc": payload_3})
-        # Add one circuit to the storehouse.
+        # Add one circuit to the mongodb.
         data_mock.return_value = circuits
 
-    def test_list_schedules_from_storehouse(self):
+    def test_list_schedules_from_mongodb(self):
         """Test if list circuits return specific circuits stored."""
-        self._add_storehouse_schedule_data(
+        self._add_mongodb_schedule_data(
             self.napp.mongo_controller.get_circuits
         )
 
@@ -839,9 +844,9 @@ class TestMain(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(expected, json.loads(response.data))
 
-    def test_get_specific_schedule_from_storehouse(self):
+    def test_get_specific_schedule_from_mongodb(self):
         """Test get schedules from a circuit."""
-        self._add_storehouse_schedule_data(
+        self._add_mongodb_schedule_data(
             self.napp.mongo_controller.get_circuits
         )
 
@@ -863,7 +868,7 @@ class TestMain(TestCase):
             expected, json.loads(response.data)["circuit_scheduler"]
         )
 
-    def test_get_specific_schedules_from_storehouse_not_found(self):
+    def test_get_specific_schedules_from_mongodb_not_found(self):
         """Test get specific schedule ID that does not exist."""
         requested_id = "blah"
         self.napp.mongo_controller.get_circuits.return_value = {"circuits": {}}
@@ -907,7 +912,7 @@ class TestMain(TestCase):
         evc_as_dict_mock.return_value = {}
         sched_add_mock.return_value = True
 
-        self._add_storehouse_schedule_data(
+        self._add_mongodb_schedule_data(
             self.napp.mongo_controller.get_circuits
         )
 
