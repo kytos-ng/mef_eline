@@ -14,9 +14,9 @@ from kytos.core import log
 from kytos.core.events import KytosEvent
 
 
-def emit_event(controller, name, **kwargs):
+def emit_event(controller, name, context="kytos/mef_eline", **kwargs):
     """Send an event when something happens with an EVC."""
-    event_name = f"kytos/mef_eline.{name}"
+    event_name = f"{context}.{name}"
     event = KytosEvent(name=event_name, content=kwargs)
     controller.buffers.app.put(event)
 

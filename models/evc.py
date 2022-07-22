@@ -97,6 +97,7 @@ class EVCBase(GenericEntity):
         self.primary_links = Path(kwargs.get("primary_links", []))
         self.backup_links = Path(kwargs.get("backup_links", []))
         self.current_path = Path(kwargs.get("current_path", []))
+        self.next_path = Path(kwargs.get("next_path", []))
         self.primary_path = Path(kwargs.get("primary_path", []))
         self.backup_path = Path(kwargs.get("backup_path", []))
         self.dynamic_backup_path = kwargs.get("dynamic_backup_path", False)
@@ -434,6 +435,7 @@ class EVCDeploy(EVCBase):
     def remove(self):
         """Remove EVC path and disable it."""
         self.remove_current_flows()
+        self.remove_flows_path(self.next_path)
         self.disable()
         self.sync()
         emit_event(self._controller, "undeployed", evc_id=self.id)
@@ -470,6 +472,75 @@ class EVCDeploy(EVCBase):
         self.current_path = Path([])
         self.deactivate()
         self.sync()
+
+    def _remove_flows_uni(self, switch, endpoint, vlan_id, force=False):
+        """Remove flow for UNI."""
+        flow = {
+            "cookie": self.get_cookie(),
+            "match": {
+                "in_port": endpoint.port_number,
+                "dl_vlan": vlan_id,
+            },
+        }
+        try:
+            self._send_flow_mods(switch, [flow], 'delete', force=force)
+        except FlowModException:
+            log.error(
+                f"Error removing failover flows from switch {switch.id}"
+                f" for {self}"
+            )
+
+    def remove_flows_path(self, path=None, force=True, skip_nni=False):
+        """Remove all flows from next path."""
+        if path is None:
+            path = self.next_path
+
+        if not path:
+            return
+
+        for incoming, outgoing in self.links_zipped(path):
+            in_vlan = incoming.get_metadata("s_vlan").value
+            # incoming direction
+            flow_in = {
+                "cookie": self.get_cookie(),
+                "match": {
+                    "in_port": incoming.endpoint_b.port_number,
+                    "dl_vlan": incoming.get_metadata("s_vlan").value,
+                },
+            }
+            # outgoing direction
+            flow_out = {
+                "cookie": self.get_cookie(),
+                "match": {
+                    "in_port": outgoing.endpoint_a.port_number,
+                    "dl_vlan": outgoing.get_metadata("s_vlan").value,
+                },
+            }
+            try:
+                self._send_flow_mods(incoming.endpoint_b.switch, [flow_in, flow_out], 'delete', force=force)
+            except FlowModException:
+                log.error(
+                    f"Error removing failover flows from switch {switch.id}"
+                    f" for {self}"
+                )
+
+        if not skip_nni:
+            self._remove_flows_uni(
+                self.uni_a.interface.switch,
+                path[0].endpoint_a,
+                path[0].get_metadata("s_vlan").value,
+                force=force,
+            )
+            self._remove_flows_uni(
+                self.uni_z.interface.switch,
+                path[-1].endpoint_b,
+                path[-1].get_metadata("s_vlan").value,
+                force=force,
+            )
+
+        path.make_vlans_available()
+        for link in path:
+            notify_link_available_tags(self._controller, link)
 
     @staticmethod
     def links_zipped(path=None):
@@ -554,6 +625,113 @@ class EVCDeploy(EVCBase):
         log.info(f"{self} was deployed.")
         return True
 
+    def setup_next_path(self, path=None):
+        """Install the failover flows for this circuit (next path).
+
+        Procedures to deploy:
+
+        0. Remove flows currently installed for next_path (if any)
+        1. Discover a disjoint path from current_path (if dynamic)
+        2. Choose vlans
+        3. Install NNI flows
+        4. Install UNI egress flows
+        5. Update next_path
+
+        """
+        # Intra-switch EVCs have nothing to be done
+        if self.uni_a.interface.switch == self.uni_z.interface.switch:
+            return True
+
+        # For not only setup next path for totally dynamic EVCs
+        if self.primary_path or self.backup_path or not self.dynamic_backup_path:
+            return False
+
+        self.remove_flows_path(self.next_path)
+        use_path = path
+        if use_path:
+            try:
+                use_path.choose_vlans()
+                for link in use_path:
+                    notify_link_available_tags(self._controller, link)
+            except KytosNoTagAvailableError:
+                use_path = None
+        else:
+            for use_path in self.discover_disjoint_paths():
+                if use_path is None:
+                    continue
+                if use_path == self.next_path:
+                    return True
+                try:
+                    use_path.choose_vlans()
+                    for link in use_path:
+                        notify_link_available_tags(self._controller, link)
+                    break
+                except KytosNoTagAvailableError:
+                    pass
+            else:
+                use_path = None
+
+        #log.info("setup_next_path use_path=%s" % use_path)
+        try:
+            if use_path:
+                self._install_nni_flows(use_path)
+                self._install_uni_flows(use_path, skip_in=True)
+            else:
+                log.warn(
+                    f"Failover path for {self} was not deployed. "
+                    "No available path was found."
+                )
+                return False
+        except FlowModException:
+            log.error(
+                f"Error deploying failover path for {self}. "
+                "Error on flow_manager."
+            )
+            self.remove_flows_path(use_path)
+            return False
+        self.next_path = use_path
+        self.sync()
+        #log.info(f"Failover path for {self} was deployed.")
+        return True
+
+    def deploy_next_path(self, delay_sync=False):
+        """Install the flows to make the failover path as the current path.
+
+        Procedures to deploy:
+
+        1. Install UNI ingress flows
+        2. Remove flows from current_path
+        3. Update current_path with the next path
+        4. Setup a new next path (?)
+        """
+        #log.info("deploy_next_path start %s" % self.id)
+        use_path = self.next_path
+        try:
+            if use_path:
+                self._install_uni_flows(use_path, skip_out=True, using_event=True)
+            else:
+                log.warn(
+                    f"Failover path for {self} was not deployed. "
+                    "No available path was found."
+                )
+                return False
+        except FlowModException:
+            log.error(
+                f"Error deploying failover path for {self}. "
+                "Error on flow_manager."
+            )
+            self.remove_flows_path(use_path)
+            return False
+        prev_path = self.current_path
+        self.current_path = use_path
+        #self.remove_flows_path(prev_path)
+        self.next_path = Path()
+        if not delay_sync:
+            self.sync()
+        #log.info(f"{self} was deployed using next_path.")
+        #log.info("deploy_next_path end %s" % self.id)
+         return True
+
     def _install_direct_uni_flows(self):
         """Install flows connecting two UNIs.
 
@@ -625,11 +803,12 @@ class EVCDeploy(EVCBase):
             )
             self._send_flow_mods(incoming.endpoint_b.switch, flows)
 
-    def _install_uni_flows(self, path=None):
-        """Install UNI flows."""
+    def prepare_uni_flows(self, path=None, skip_in=False, skip_out=False):
+        """Prepare flows to install UNIs."""
+        uni_flows = []
         if not path:
-            log.info("install uni flows without path.")
-            return
+            #log_info("install uni flows without path.")
+            return uni_flows
 
         # Determine VLANs
         in_vlan_a = self.uni_a.user_tag.value if self.uni_a.user_tag else None
@@ -642,55 +821,81 @@ class EVCDeploy(EVCBase):
         flows_a = []
 
         # Flow for one direction, pushing the service tag
-        push_flow = self._prepare_push_flow(
-            self.uni_a.interface,
-            path[0].endpoint_a,
-            in_vlan_a,
-            out_vlan_a,
-            in_vlan_z,
-            queue_id=self.queue_id,
-        )
-        flows_a.append(push_flow)
+        if not skip_in:
+            push_flow = self._prepare_push_flow(
+                self.uni_a.interface,
+                path[0].endpoint_a,
+                in_vlan_a,
+                out_vlan_a,
+                in_vlan_z,
+                queue_id=self.queue_id,
+            )
+            flows_a.append(push_flow)
 
         # Flow for the other direction, popping the service tag
-        pop_flow = self._prepare_pop_flow(
-            path[0].endpoint_a,
-            self.uni_a.interface,
-            out_vlan_a,
-            queue_id=self.queue_id,
-        )
-        flows_a.append(pop_flow)
+        if not skip_out:
+            pop_flow = self._prepare_pop_flow(
+                path[0].endpoint_a,
+                self.uni_a.interface,
+                out_vlan_a,
+                queue_id=self.queue_id,
+            )
+            flows_a.append(pop_flow)
 
-        self._send_flow_mods(self.uni_a.interface.switch, flows_a)
+        uni_flows.append((self.uni_a.interface.switch.id, flows_a))
 
         # Flows for the second UNI
         flows_z = []
 
         # Flow for one direction, pushing the service tag
-        push_flow = self._prepare_push_flow(
-            self.uni_z.interface,
-            path[-1].endpoint_b,
-            in_vlan_z,
-            out_vlan_z,
-            in_vlan_a,
-            queue_id=self.queue_id,
-        )
-        flows_z.append(push_flow)
+        if not skip_in:
+            push_flow = self._prepare_push_flow(
+                self.uni_z.interface,
+                path[-1].endpoint_b,
+                in_vlan_z,
+                out_vlan_z,
+                in_vlan_a,
+                queue_id=self.queue_id,
+            )
+            flows_z.append(push_flow)
 
         # Flow for the other direction, popping the service tag
-        pop_flow = self._prepare_pop_flow(
-            path[-1].endpoint_b,
-            self.uni_z.interface,
-            out_vlan_z,
-            queue_id=self.queue_id,
-        )
-        flows_z.append(pop_flow)
+        if not skip_out:
+            pop_flow = self._prepare_pop_flow(
+                path[-1].endpoint_b,
+                self.uni_z.interface,
+                out_vlan_z,
+                queue_id=self.queue_id,
+            )
+            flows_z.append(pop_flow)
 
-        self._send_flow_mods(self.uni_z.interface.switch, flows_z)
+        uni_flows.append((self.uni_z.interface.switch.id, flows_z))
+
+        return uni_flows
+
+    def _install_uni_flows(self, path=None, skip_in=False, skip_out=False, using_event=False):
+        """Install UNI flows."""
+        uni_flows = self.prepare_uni_flows(path, skip_in, skip_out)
+
+        for dpid,flows in uni_flows:
+            self._send_flow_mods2(dpid, flows, using_event=using_event)
+            self._send_flow_mods2(dpid, flows, using_event=using_event)
+
+    def _send_flow_mods2(self, dpid, flow_mods, command='flows', force=False, using_event=False):
+        """Send a flow_mod list to a specific switch either via REST or KytosEvent."""
+        if using_event:
+            return self._send_flow_mods_event(dpid, flow_mods, command=command, force=force)
+        return self._send_flow_mods_rest(dpid, flow_mods, command=command, force=force)
+
+    def _send_flow_mods(self, switch, flow_mods, command='flows', force=False, using_event=False):
+        """Send a flow_mod list to a specific switch either via REST or KytosEvent."""
+        if using_event:
+            return self._send_flow_mods_event(switch.id, flow_mods, command=command, force=force)
+        return self._send_flow_mods_rest(switch.id, flow_mods, command=command, force=force)
 
     @staticmethod
-    def _send_flow_mods(switch, flow_mods, command='flows', force=False):
-        """Send a flow_mod list to a specific switch.
+    def _send_flow_mods_rest(dpid, flow_mods, command='flows', force=False):
+        """Send a flow_mod list to a specific switch via REST API.
 
         Args:
             switch(Switch): The target of flows.
@@ -699,12 +904,34 @@ class EVCDeploy(EVCBase):
             force(bool): True to send via consistency check in case of conn errors
 
         """
-        endpoint = f"{settings.MANAGER_URL}/{command}/{switch.id}"
+        endpoint = f"{settings.MANAGER_URL}/{command}/{dpid}"
 
         data = {"flows": flow_mods, "force": force}
         response = requests.post(endpoint, json=data)
         if response.status_code >= 400:
             raise FlowModException
+
+    def _send_flow_mods_event(self, dpid, flow_mods, command='flows', force=False):
+        """Send a flow_mod list to a specific switch via KytosEvent.
+
+        Args:
+            switch(Switch): The target of flows.
+            flow_mods(dict): Python dictionary with flow_mods.
+            command(str): By default is 'flows'. To remove a flow is 'remove'.
+            force(bool): True to send via consistency check in case of conn errors
+
+        """
+        if command == "flows":
+            command = "install"
+
+        emit_event(
+            self._controller,
+            command,
+            context="kytos.flow_manager.flows",
+            dpid=dpid,
+            flow_dict={"flows": flow_mods},
+            force=force,
+        )
 
     def get_cookie(self):
         """Return the cookie integer from evc id."""
@@ -828,7 +1055,7 @@ class EVCDeploy(EVCBase):
             }
         response = requests.put(endpoint, json=data_uni)
         if response.status_code >= 400:
-            log.error(f"Failed to run sdntrace-cp: {response.text}")
+            #log.error(f"Failed to run sdntrace-cp: {response.text}")
             return []
         return response.json().get('result', [])
 
@@ -836,11 +1063,11 @@ class EVCDeploy(EVCBase):
         """Check if current_path is deployed comparing with SDN traces."""
         trace_a = self.run_sdntrace(self.uni_a)
         if len(trace_a) != len(self.current_path) + 1:
-            log.warn(f"Invalid trace from uni_a: {trace_a}")
+            #log.warn(f"Invalid trace from uni_a: {trace_a} -- wrong len")
             return False
         trace_z = self.run_sdntrace(self.uni_z)
         if len(trace_z) != len(self.current_path) + 1:
-            log.warn(f"Invalid trace from uni_z: {trace_z}")
+            #log.warn(f"Invalid trace from uni_z: {trace_z} -- wrong len")
             return False
 
         for link, trace1, trace2 in zip(self.current_path,
@@ -849,15 +1076,72 @@ class EVCDeploy(EVCBase):
             if compare_endpoint_trace(
                link.endpoint_a,
                glom(link.metadata, 's_vlan.value'), trace2) is False:
-                log.warn(f"Invalid trace from uni_a: {trace_a}")
+                #log.warn(f"Invalid trace from uni_a: {trace_a} -- compare_endpoint_trace")
                 return False
             if compare_endpoint_trace(
                link.endpoint_b,
                glom(link.metadata, 's_vlan.value'), trace1) is False:
-                log.warn(f"Invalid trace from uni_z: {trace_z}")
+                #log.warn(f"Invalid trace from uni_z: {trace_z} -- compare_endpoint_trace")
                 return False
 
         return True
+
+    def flows_match_from_path(self, path):
+        """Create a list of flows match from the path."""
+        path_flows = []
+        for incoming, outgoing in zip(path[:-1], path[1:]):
+            sw = incoming.endpoint_b.switch.id
+            in_vlan = incoming.get_metadata("s_vlan").value
+            # incoming direction
+            path_flows.append({
+                "switch": sw,
+                "match": {
+                    "in_port": incoming.endpoint_b.port_number,
+                    "dl_vlan": incoming.get_metadata("s_vlan").value,
+                },
+            })
+            # outgoing direction
+            path_flows.append({
+                "switch": sw,
+                "match": {
+                    "in_port": outgoing.endpoint_a.port_number,
+                    "dl_vlan": outgoing.get_metadata("s_vlan").value,
+                },
+            })
+        return path_flows
+
+    def flows_match_from_uni(self, path, skip_in=False):
+        if not path:
+            return []
+        in_vlan_a = self.uni_a.user_tag.value if self.uni_a.user_tag else None
+        out_vlan_a = path[0].get_metadata("s_vlan").value
+        in_vlan_z = self.uni_z.user_tag.value if self.uni_z.user_tag else None
+        out_vlan_z = path[-1].get_metadata("s_vlan").value
+
+        # outgoing flows
+        uni_flows = [
+            (self.uni_a.interface.switch, path[0].endpoint_a, out_vlan_a),
+            (self.uni_z.interface.switch, path[-1].endpoint_b, out_vlan_z),
+        ]
+
+        # incoming flows
+        if not skip_in:
+            uni_flows.extend([
+                (self.uni_a.interface.switch, self.uni_a.interface, in_vlan_a),
+                (self.uni_z.interface.switch, self.uni_z.interface, in_vlan_z),
+            ])
+
+        flows_match = []
+        for uni_flow in uni_flows:
+             flow = {
+                 "switch": uni_flow[0].id,
+                 "match": {"in_port": uni_flow[1].port_number},
+             }
+             if uni_flow[2]:
+                 flow["match"]["dl_vlan"] = uni_flow[2]
+             flows_match.append(flow)
+
+        return flows_match
 
 
 class LinkProtection(EVCDeploy):
@@ -889,7 +1173,7 @@ class LinkProtection(EVCDeploy):
     def deploy_to(self, path_name=None, path=None):
         """Create a deploy to path."""
         if self.current_path == path:
-            log.debug(f"{path_name} is equal to current_path.")
+            #log.debug(f"{path_name} is equal to current_path.")
             return True
 
         if path.status is EntityStatus.UP:
@@ -934,13 +1218,14 @@ class LinkProtection(EVCDeploy):
 
         return True
 
-    def handle_link_down(self):
+    def handle_link_down(self, delay_sync=False):
         """Handle circuit when link down.
 
         Returns:
             bool: True if the re-deploy was successly otherwise False.
 
         """
+        #log_info("handle_link_down start %s" % self.id)
         success = False
         if self.is_using_primary_path():
             success = self.deploy_to_backup_path()
@@ -948,16 +1233,23 @@ class LinkProtection(EVCDeploy):
             success = self.deploy_to_primary_path()
 
         if not success and self.dynamic_backup_path:
-            success = self.deploy_to_path()
+            #if self.next_path and self.next_path.status is EntityStatus.UP:
+            if self.next_path:
+                success = self.deploy_next_path(delay_sync)
+            if not success:
+                success = self.deploy_to_path()
 
         if success:
-            log.debug(f"{self} deployed after link down.")
+            #log.debug(f"{self} deployed after link down.")
+            pass
         else:
             self.deactivate()
             self.current_path = Path([])
-            self.sync()
-            log.debug(f"Failed to re-deploy {self} after link down.")
+            if not delay_sync:
+                self.sync()
+            #log.debug(f"Failed to re-deploy {self} after link down.")
 
+        #log_info("handle_link_down end %s" % self.id)
         return success
 
 

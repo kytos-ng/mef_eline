@@ -3,6 +3,7 @@
 
 NApp to provision circuits from user request.
 """
+import requests
 from threading import Lock
 
 from flask import jsonify, request
@@ -83,23 +84,71 @@ class Main(KytosNApp):
         for circuit in tuple(self.circuits.values()):
             stored_circuits.pop(circuit.id, None)
             if (
-                circuit.is_enabled()
-                and not circuit.is_active()
-                and not circuit.lock.locked()
+                not circuit.is_enabled()
+                or circuit.lock.locked()
             ):
-                if circuit.check_traces():
+                continue
+            if circuit.check_traces():
+                if not circuit.is_active():
                     log.info(f"{circuit} enabled but inactive - activating")
                     with circuit.lock:
                         circuit.activate()
                         circuit.sync()
-                else:
-                    if self.execution_rounds > settings.WAIT_FOR_OLD_PATH:
-                        log.info(f"{circuit} enabled but inactive - redeploy")
-                        with circuit.lock:
-                            circuit.deploy()
+            else:
+                if self.execution_rounds > settings.WAIT_FOR_OLD_PATH:
+                    log.info(f"{circuit} enabled but inactive - redeploy")
+                    # TODO: check problems on sdntrace for recently modified evc
+                    #with circuit.lock:
+                    #    circuit.deploy()
         for circuit_id in stored_circuits:
             log.info(f"EVC found in mongodb but unloaded {circuit_id}")
             self._load_evc(stored_circuits[circuit_id])
+
+        try:
+            self.check_flows_consistency()
+        except Exception as e:
+            log.error("Fail to run check_flows_consistency: %s" % e)
+
+        for evc in tuple(self.circuits.values()):
+            if not evc.next_path:
+                log.info(f"Inconsistency found: no next path. Setup next path for {evc.id}.")
+                try:
+                    evc.setup_next_path()
+                except Exception as e:
+                    log.error(f"Fail to setuo next path for {evc.id} {e}")
+
+
+    def check_flows_consistency(self):
+        """Check flows consistency based on cookie prefix and remove alien flows.."""
+        log.info("start check_flows_consistency")
+        expected_flows = {}
+        for evc in self.circuits.values():
+            if not evc.is_enabled():
+                continue
+            expected_flows[evc.get_cookie()] = (
+                evc.flows_match_from_path(evc.current_path)
+                + evc.flows_match_from_path(evc.next_path)
+                + evc.flows_match_from_uni(evc.current_path)
+                + evc.flows_match_from_uni(evc.next_path, skip_in=True)
+            )
+
+        response = requests.get(settings.MANAGER_URL + "/flows")
+        if response.status_code != 200:
+            return
+        flows = response.json()
+        for dpid in flows.keys():
+            remove_flows = []
+            for flow in flows[dpid]['flows']:
+                if flow.get('cookie', 0) & 0xff00000000000000 == 0xaa << 56:
+                    if (
+                        flow['cookie'] not in expected_flows or
+                        {"match": flow['match'], "switch": dpid} not in expected_flows[flow['cookie']]
+                    ):
+                        remove_flows.append({"cookie": flow['cookie'], "cookie_mask": 18446744073709551615, "match": flow['match']})
+            if remove_flows:
+                log.info(f"Inconsistency found. Sending remove {dpid} {remove_flows}")
+                self._send_flow_mod(dpid, remove_flows, force=True, command="delete")
+        log.info("done check_flows_consistency")
 
     def shutdown(self):
         """Execute when your napp is unloaded.
@@ -644,7 +693,50 @@ class Main(KytosNApp):
     @listen_to("kytos/topology.link_down")
     def on_link_down(self, event):
         """Change circuit when link is down or under_mantenance."""
-        self.handle_link_down(event)
+        #self.handle_link_down(event)
+        self.handle_link_down_agg(event)
+
+    def handle_link_down_agg(self, event):
+        """Change circuit when link is down or under_mantenance."""
+        log.info("Event handle_link_down_agg %s" % event)
+        switch_flows = {}
+        affected_evcs = []
+        for evc in self.circuits.values():
+            if evc.is_affected_by_link(event.content["link"]):
+                # TODO: for evcs which dont have next_path, handle by traditional process
+                evc_uni_flows = evc.prepare_uni_flows(evc.next_path, skip_out=True)
+                if not evc_uni_flows:
+                    # TODO: handle in the traditional way
+                    pass
+                for dpid, flows in evc_uni_flows:
+                    switch_flows.setdefault(dpid, [])
+                    switch_flows[dpid].extend(flows)
+                affected_evcs.append(evc.id)
+                evc.current_path = evc.next_path
+                evc.next_path = []
+        # sending all
+        for dpid in switch_flows:
+            self._send_flow_mod(dpid, switch_flows[dpid])
+        ## sending 10 by 10
+        #while switch_flows:
+        #    remove_dpids = []
+        #    for dpid in switch_flows:
+        #        part_flows = switch_flows[dpid][:10]
+        #        self._send_flow_mod(dpid, part_flows)
+        #        switch_flows[dpid] = switch_flows[dpid][10:]
+        #        if len(switch_flows[dpid]) == 0:
+        #            remove_dpids.append(dpid)
+        #    for dpid in remove_dpids:
+        #        switch_flows.pop(dpid)
+        self.storehouse.save_evc()
+        log.info("Finished handle_link_down_agg %s. Save EVCs and create events" % event)
+        for evc_id in affected_evcs:
+            emit_event(
+                self.controller,
+                "redeployed_link_down",
+                evc_id=evc_id,
+            )
+            log.info(f"EVC {evc_id} was redeployed due to link down")
 
     def handle_link_down(self, event):
         """Change circuit when link is down or under_mantenance."""
@@ -861,3 +953,15 @@ class Main(KytosNApp):
             log.debug(f"{caller} result {result} 415")
             raise UnsupportedMediaType(result)
         return json_data
+
+    def _send_flow_mod(self, dpid, flows, command="install", force=False):
+        """Send flow mod to install/delete flows for switch."""
+        event = KytosEvent(
+            name=f"kytos.flow_manager.flows.{command}",
+            content = {
+                "dpid": dpid,
+                "flow_dict": {"flows": flows},
+                "force": force,
+            },
+        )
+        self.controller.buffers.app.put(event)
