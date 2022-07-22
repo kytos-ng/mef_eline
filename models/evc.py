@@ -307,6 +307,10 @@ class EVCDeploy(EVCBase):
         """Discover new paths to satisfy this circuit and deploy it."""
         return DynamicPathManager.get_best_paths(self)
 
+    def discover_disjoint_paths(self):
+        """Discover disjoint paths to satisfy this circuit."""
+        return DynamicPathManager.get_disjoint_paths(self)
+
     def change_path(self):
         """Change EVC path."""
 

@@ -111,12 +111,13 @@ class DynamicPathManager:
         cls.controller = controller
 
     @staticmethod
-    def get_paths(circuit):
+    def get_paths(circuit, max_paths=2):
         """Get a valid path for the circuit from the Pathfinder."""
         endpoint = settings.PATHFINDER_URL
         request_data = {
             "source": circuit.uni_a.interface.id,
             "destination": circuit.uni_z.interface.id,
+            "spf_max_paths": max_paths,
         }
         api_reply = requests.post(endpoint, json=request_data)
 
@@ -147,6 +148,31 @@ class DynamicPathManager:
     def get_best_paths(cls, circuit):
         """Return the best paths available for a circuit, if they exist."""
         for path in cls.get_paths(circuit):
+            yield cls.create_path(path["hops"])
+
+    @classmethod
+    def get_disjoint_paths(cls, circuit):
+        """Return the disjoint paths available for a circuit, if they exist."""
+        print("outside")
+        if not circuit.current_path:
+            print("hey")
+            return cls.get_paths(circuit)
+        paths = cls.get_paths(circuit, max_paths=20)
+        undesired_links = [
+            (l.endpoint_a.id, l.endpoint_b.id) for l in circuit.current_path
+        ]
+        for path in paths:
+            head = path["hops"][:-1]
+            tail = path["hops"][1:]
+            shared_edges = 0
+            for (endpoint_a, endpoint_b) in undesired_links:
+                if ((endpoint_a, endpoint_b) in zip(head, tail)) or (
+                    (endpoint_b, endpoint_a) in zip(head, tail)
+                ):
+                    shared_edges += 1
+            path["disjointness"] = 1 - shared_edges / len(undesired_links)
+        paths = sorted(paths, key = lambda x: (-x['disjointness'], x['cost']))
+        for path in paths:
             yield cls.create_path(path["hops"])
 
     @classmethod
