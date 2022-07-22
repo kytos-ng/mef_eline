@@ -666,6 +666,11 @@ class Main(KytosNApp):
                             evc_id=evc.id,
                         )
 
+    @listen_to("kytos/topology.topology_loaded")
+    def on_topology_loaded(self, event):  # pylint: disable=unused-argument
+        """Load EVCs once the topology is available."""
+        self.load_all_evcs()
+
     def load_all_evcs(self):
         """Try to load all EVCs on startup."""
         circuits = self.mongo_controller.get_circuits()['circuits'].items()
