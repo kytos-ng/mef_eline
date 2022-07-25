@@ -85,7 +85,7 @@ def validate(spec):
                         "error_schema": schema_errors.schema,
                         "error_schema_path": list(schema_errors.schema_path),
                     }
-                    log.warn("Invalid request (API schema): %s", error_log)
+                    log.debug("Invalid request (API schema): %s", error_log)
                     error_response += f" {schema_errors.message} for field"
                     error_response += (
                         f" {'/'.join(map(str,schema_errors.path))}."
