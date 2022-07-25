@@ -131,7 +131,7 @@ class Linter(SimpleCommand):
         """Run Yala."""
         print("Yala is running. It may take several seconds...")
         try:
-            cmd = "yala *.py tests"
+            cmd = "yala *.py tests controllers db models"
             check_call(cmd, shell=True)
             print("No linter error found.")
         except CalledProcessError:
