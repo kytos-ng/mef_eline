@@ -1,11 +1,15 @@
-from datetime import datetime
+"""ELineController."""
+# pylint: disable=unnecessary-lambda,invalid-name
 import os
 import re
+from datetime import datetime
 from typing import Dict, Optional
+
 import pymongo
 from pymongo.collection import ReturnDocument
 from pymongo.errors import AutoReconnect
 from tenacity import retry_if_exception_type, stop_after_attempt, wait_random
+
 from kytos.core import log
 from kytos.core.db import Mongo
 from kytos.core.retry import before_sleep, for_all_methods, retries
@@ -31,7 +35,7 @@ class ELineController:
         self.mongo = get_mongo()
         self.db_client = self.mongo.client
         self.db = self.db_client[self.mongo.db_name]
-    
+
     def bootstrap_indexes(self) -> None:
         """Bootstrap mef_eline relaeted indexes."""
         index_tuples = [
@@ -56,7 +60,12 @@ class ELineController:
     def upsert_evc(self, evc: Dict) -> Optional[Dict]:
         """Update or insert an EVC"""
         utc_now = datetime.utcnow()
-        model = EVCBaseDoc(**{**evc, **{"_id": evc["id"], "updated_at": utc_now}})
+        model = EVCBaseDoc(
+            **{
+                **evc,
+                **{"_id": evc["id"], "updated_at": utc_now}
+            }
+        )
         updated = self.db.evcs.find_one_and_update(
             {"_id": evc["id"]},
             {

@@ -62,7 +62,7 @@ class Path(list, GenericEntity):
             previous = link.endpoint_b.switch
         if previous == switch_z:
             return True
-        raise InvalidPath(f"Last endpoint is different from uni_z")
+        raise InvalidPath("Last endpoint is different from uni_z")
 
     @property
     def status(self):
@@ -73,7 +73,7 @@ class Path(list, GenericEntity):
         if not self:
             return EntityStatus.DISABLED
 
-        endpoint = "%s/%s" % (settings.TOPOLOGY_URL, "links")
+        endpoint = f"{settings.TOPOLOGY_URL}/links"
         api_reply = requests.get(endpoint)
         if api_reply.status_code != getattr(requests.codes, "ok"):
             log.error(

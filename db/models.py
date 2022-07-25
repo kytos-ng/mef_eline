@@ -1,8 +1,10 @@
 """Models for Mongo DB"""
+# pylint: disable=no-self-use,unused-argument,invalid-name,unused-argument
+# pylint: disable=no-self-argument,no-name-in-module
 
-from datetime import date, datetime
-from pathlib import Path
+from datetime import datetime
 from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -34,6 +36,7 @@ class CircuitScheduleDoc(BaseModel):
 
 
 class TAGDoc(BaseModel):
+    """TAG model"""
     tag_type: int
     value: int
 
@@ -44,7 +47,7 @@ class UNIDoc(BaseModel):
     tag: Optional[TAGDoc]
     interface_id: str
 
-        
+
 class EVCBaseDoc(DocumentBaseModel):
     """Base model for EVC documents"""
 
@@ -71,7 +74,7 @@ class EVCBaseDoc(DocumentBaseModel):
     metadata: Optional[Dict] = None
     active: bool
     enabled: bool
-    
+
     @staticmethod
     def projection() -> Dict:
         """Base projection of EVCBaseDoc model."""
@@ -93,24 +96,24 @@ class EVCBaseDoc(DocumentBaseModel):
             "metadata": 1,
             "active": 1,
             "enabled": 1,
-            "owner": { "$ifNull": [ "$owner", None ]},
-            "queue_id": { "$ifNull": [ "$queue_id", None ]},
-            "primary_links": { "$ifNull": [ "$primary_links", [] ]},
-            "backup_links": { "$ifNull": [ "$backup_links", [] ]},
-            "start_date": { "$dateToString": {
+            "owner": {"$ifNull": ["$owner", None]},
+            "queue_id": {"$ifNull": ["$queue_id", None]},
+            "primary_links": {"$ifNull": ["$primary_links", []]},
+            "backup_links": {"$ifNull": ["$backup_links", []]},
+            "start_date": {"$dateToString": {
                 "format": time_fmt, "date": "$start_date"
             }},
-            "creation_time": { "$dateToString": {
+            "creation_time": {"$dateToString": {
                 "format": time_fmt, "date": "$creation_time"
             }},
-            "request_time": { "$dateToString": {
+            "request_time": {"$dateToString": {
                 "format": time_fmt, "date": {
-                    "$ifNull": [ "$request_time", "$inserted_at" ]
+                    "$ifNull": ["$request_time", "$inserted_at"]
                 }
             }},
-            "end_date": { "$dateToString": {
+            "end_date": {"$dateToString": {
                 "format": time_fmt, "date": {
-                    "$ifNull": [ "$end_date", None ]
+                    "$ifNull": ["$end_date", None]
                 }
             }},
         }
