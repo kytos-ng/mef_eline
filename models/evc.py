@@ -1,4 +1,5 @@
 """Classes used in the main application."""  # pylint: disable=too-many-lines
+from collections import OrderedDict
 from datetime import datetime
 from threading import Lock
 from uuid import uuid4
@@ -451,7 +452,7 @@ class EVCDeploy(EVCBase):
 
         for switch in switches:
             try:
-                self._send_flow_mods(switch, [match], 'delete', force=force)
+                self._send_flow_mods(switch.id, [match], 'delete', force=force)
             except FlowModException:
                 log.error(
                     f"Error removing flows from switch {switch.id} for"
@@ -548,12 +549,8 @@ class EVCDeploy(EVCBase):
         log.info(f"{self} was deployed.")
         return True
 
-    def _install_direct_uni_flows(self):
-        """Install flows connecting two UNIs.
-
-        This case happens when the circuit is between UNIs in the
-        same switch.
-        """
+    def _prepare_direct_uni_flows(self):
+        """Prepare flows connecting two UNIs for intra-switch EVC."""
         vlan_a = self.uni_a.user_tag.value if self.uni_a.user_tag else None
         vlan_z = self.uni_z.user_tag.value if self.uni_z.user_tag else None
 
@@ -585,12 +582,22 @@ class EVCDeploy(EVCBase):
             flow_mod_az["actions"].insert(
                 0, {"action_type": "set_vlan", "vlan_id": vlan_z}
             )
-        self._send_flow_mods(
-            self.uni_a.interface.switch, [flow_mod_az, flow_mod_za]
+        return (
+            self.uni_a.interface.switch.id, [flow_mod_az, flow_mod_za]
         )
 
-    def _install_nni_flows(self, path=None):
-        """Install NNI flows."""
+    def _install_direct_uni_flows(self):
+        """Install flows connecting two UNIs.
+
+        This case happens when the circuit is between UNIs in the
+        same switch.
+        """
+        (dpid, flows) = self._prepare_direct_uni_flows()
+        self._send_flow_mods(dpid, flows)
+
+    def _prepare_nni_flows(self, path=None):
+        """Prepare NNI flows."""
+        nni_flows = OrderedDict()
         for incoming, outcoming in self.links_zipped(path):
             in_vlan = incoming.get_metadata("s_vlan").value
             out_vlan = outcoming.get_metadata("s_vlan").value
@@ -617,13 +624,20 @@ class EVCDeploy(EVCBase):
                     queue_id=self.queue_id,
                 )
             )
-            self._send_flow_mods(incoming.endpoint_b.switch, flows)
+            nni_flows[incoming.endpoint_b.switch.id] = flows
+        return nni_flows
 
-    def _install_uni_flows(self, path=None):
-        """Install UNI flows."""
+    def _install_nni_flows(self, path=None):
+        """Install NNI flows."""
+        for dpid, flows in self._prepare_nni_flows(path).items():
+            self._send_flow_mods(dpid, flows)
+
+    def _prepare_uni_flows(self, path=None, skip_in=False, skip_out=False):
+        """Prepare flows to install UNIs."""
+        uni_flows = {}
         if not path:
             log.info("install uni flows without path.")
-            return
+            return uni_flows
 
         # Determine VLANs
         in_vlan_a = self.uni_a.user_tag.value if self.uni_a.user_tag else None
@@ -636,64 +650,103 @@ class EVCDeploy(EVCBase):
         flows_a = []
 
         # Flow for one direction, pushing the service tag
-        push_flow = self._prepare_push_flow(
-            self.uni_a.interface,
-            path[0].endpoint_a,
-            in_vlan_a,
-            out_vlan_a,
-            in_vlan_z,
-            queue_id=self.queue_id,
-        )
-        flows_a.append(push_flow)
+        if not skip_in:
+            push_flow = self._prepare_push_flow(
+                self.uni_a.interface,
+                path[0].endpoint_a,
+                in_vlan_a,
+                out_vlan_a,
+                in_vlan_z,
+                queue_id=self.queue_id,
+            )
+            flows_a.append(push_flow)
 
         # Flow for the other direction, popping the service tag
-        pop_flow = self._prepare_pop_flow(
-            path[0].endpoint_a,
-            self.uni_a.interface,
-            out_vlan_a,
-            queue_id=self.queue_id,
-        )
-        flows_a.append(pop_flow)
+        if not skip_out:
+            pop_flow = self._prepare_pop_flow(
+                path[0].endpoint_a,
+                self.uni_a.interface,
+                out_vlan_a,
+                queue_id=self.queue_id,
+            )
+            flows_a.append(pop_flow)
 
-        self._send_flow_mods(self.uni_a.interface.switch, flows_a)
+        uni_flows[self.uni_a.interface.switch.id] = flows_a
 
         # Flows for the second UNI
         flows_z = []
 
         # Flow for one direction, pushing the service tag
-        push_flow = self._prepare_push_flow(
-            self.uni_z.interface,
-            path[-1].endpoint_b,
-            in_vlan_z,
-            out_vlan_z,
-            in_vlan_a,
-            queue_id=self.queue_id,
-        )
-        flows_z.append(push_flow)
+        if not skip_in:
+            push_flow = self._prepare_push_flow(
+                self.uni_z.interface,
+                path[-1].endpoint_b,
+                in_vlan_z,
+                out_vlan_z,
+                in_vlan_a,
+                queue_id=self.queue_id,
+            )
+            flows_z.append(push_flow)
 
         # Flow for the other direction, popping the service tag
-        pop_flow = self._prepare_pop_flow(
-            path[-1].endpoint_b,
-            self.uni_z.interface,
-            out_vlan_z,
-            queue_id=self.queue_id,
-        )
-        flows_z.append(pop_flow)
+        if not skip_out:
+            pop_flow = self._prepare_pop_flow(
+                path[-1].endpoint_b,
+                self.uni_z.interface,
+                out_vlan_z,
+                queue_id=self.queue_id,
+            )
+            flows_z.append(pop_flow)
 
-        self._send_flow_mods(self.uni_z.interface.switch, flows_z)
+        uni_flows[self.uni_z.interface.switch.id] = flows_z
+
+        return uni_flows
+
+    def _install_uni_flows(self, path=None, skip_in=False, skip_out=False):
+        """Install UNI flows."""
+        uni_flows = self._prepare_uni_flows(path, skip_in, skip_out)
+
+        for (dpid, flows) in uni_flows.items():
+            self._send_flow_mods(dpid, flows)
+
+    def get_flows_match(self):
+        """Get the list of flows for the EVC (only match fields)."""
+        evc_flows = OrderedDict()
+        if self.uni_a.interface.switch == self.uni_z.interface.switch:
+            (dpid, flows) = self._prepare_direct_uni_flows()
+            for flow in flows:
+                del flow["actions"]
+            evc_flows[dpid] = flows
+            return evc_flows
+
+        nni_flows = self._prepare_nni_flows(self.current_path)
+        for dpid, flows in nni_flows.items():
+            for flow in flows:
+                del flow["actions"]
+            evc_flows.setdefault(dpid, [])
+            evc_flows[dpid].extend(flows)
+
+        uni_flows = self._prepare_uni_flows(self.current_path)
+        for (dpid, flows) in uni_flows.items():
+            for flow in flows:
+                del flow["actions"]
+            evc_flows.setdefault(dpid, [])
+            evc_flows[dpid].extend(flows)
+
+        return evc_flows
 
     @staticmethod
-    def _send_flow_mods(switch, flow_mods, command='flows', force=False):
+    def _send_flow_mods(dpid, flow_mods, command='flows', force=False):
         """Send a flow_mod list to a specific switch.
 
         Args:
-            switch(Switch): The target of flows.
+            dpid(str): The target of flows (i.e. Switch.id).
             flow_mods(dict): Python dictionary with flow_mods.
             command(str): By default is 'flows'. To remove a flow is 'remove'.
             force(bool): True to send via consistency check in case of errors
 
         """
-        endpoint = f"{settings.MANAGER_URL}/{command}/{switch.id}"
+        endpoint = f"{settings.MANAGER_URL}/{command}/{dpid}"
 
         data = {"flows": flow_mods, "force": force}
         response = requests.post(endpoint, json=data)

@@ -5,6 +5,7 @@ NApp to provision circuits from user request.
 """
 from threading import Lock
 
+import requests
 from flask import jsonify, request
 from werkzeug.exceptions import (BadRequest, Conflict, Forbidden,
                                  MethodNotAllowed, NotFound,
@@ -100,6 +101,56 @@ class Main(KytosNApp):
         for circuit_id in stored_circuits:
             log.info(f"EVC found in mongodb but unloaded {circuit_id}")
             self._load_evc(stored_circuits[circuit_id])
+
+        if self.execution_rounds > settings.WAIT_FOR_OLD_PATH:
+            self.check_consistency_alien_flows()
+
+    def check_consistency_alien_flows(self):
+        """Check flows consistency based on mef_eline cookie prefix and remove
+        alien flows."""
+        expected_flows = {}
+        for evc in self.circuits.values():
+            if not evc.is_enabled():
+                continue
+            expected_flows[evc.get_cookie()] = evc.get_flows_match()
+
+        response = requests.get(settings.MANAGER_URL + "/flows")
+        if response.status_code != 200:
+            return
+
+        flows = response.json()
+        for dpid in flows.keys():
+            remove_flows = []
+            for flow in flows[dpid]['flows']:
+                if flow.get('cookie', 0) & 0xff00000000000000 != 0xaa << 56:
+                    continue
+                current_flow = {
+                    "match": flow["match"],
+                    "cookie": flow["cookie"],
+                }
+                if (
+                    flow['cookie'] not in expected_flows or
+                    dpid not in expected_flows[flow['cookie']] or
+                    current_flow not in expected_flows[flow['cookie']][dpid]
+                ):
+                    remove_flows.append({
+                        "cookie": flow['cookie'],
+                        "cookie_mask": 18446744073709551615,
+                        "match": flow['match'],
+                    })
+            if remove_flows:
+                log.info(
+                    f"Inconsistency found. Remove flows dpid={dpid} "
+                    f"flows={remove_flows}"
+                )
+                emit_event(
+                    self.controller,
+                    context="kytos.flow_manager",
+                    name="flows.delete",
+                    dpid=dpid,
+                    flow_dict={"flows": remove_flows},
+                    force=True,
+                )
 
     def shutdown(self):
         """Execute when your napp is unloaded.
@@ -427,7 +478,6 @@ class Main(KytosNApp):
         """
         log.debug("list_schedules /v2/evc/schedule")
         circuits = self.mongo_controller.get_circuits()['circuits'].values()
-        print(circuits)
         if not circuits:
             result = {}
             status = 200

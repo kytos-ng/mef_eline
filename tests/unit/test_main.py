@@ -128,12 +128,18 @@ class TestMain(TestCase):
         mock_execute_consistency.assert_not_called()
         mock_log.info.assert_not_called()
 
+    @patch('napps.kytos.mef_eline.main.Main.check_consistency_alien_flows')
     @patch('napps.kytos.mef_eline.main.settings')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     def test_execute_consistency(self, *args):
         """Test execute_consistency."""
-        (mongo_controller_upsert_mock, mock_load_evc, mock_settings) = args
+        (
+            mongo_controller_upsert_mock,
+            mock_load_evc,
+            mock_settings,
+            _,
+        ) = args
 
         stored_circuits = {'1': {'name': 'circuit_1'},
                            '2': {'name': 'circuit_2'},
@@ -161,9 +167,11 @@ class TestMain(TestCase):
         self.assertEqual(evc2.deploy.call_count, 1)
         mock_load_evc.assert_called_with(stored_circuits['3'])
 
+    @patch('napps.kytos.mef_eline.main.Main.check_consistency_alien_flows')
     @patch('napps.kytos.mef_eline.main.settings')
-    def test_execute_consistency_wait_for(self, mock_settings):
+    def test_execute_consistency_wait_for(self, mock_settings, _):
         """Test execute and wait for setting."""
+        self.napp.check_consistency_alien_flows.return_value = None
         evc1 = MagicMock()
         evc1.is_enabled.return_value = True
         evc1.is_active.return_value = False
@@ -178,6 +186,134 @@ class TestMain(TestCase):
         self.assertEqual(evc1.deploy.call_count, 0)
         self.napp.execute_consistency()
         self.assertEqual(evc1.deploy.call_count, 1)
+
+    @patch("requests.get")
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    def test_check_consistency_alien_flows(self, *args):
+        """"Test method check_consistency_alien_flows."""
+        (
+            mock_emit_event,
+            mock_requests_get,
+        ) = args
+
+        evc_flows = {
+            "1": [
+                {
+                    "match": {"in_port": 1, "dl_vlan": 100},
+                    "cookie": 0xaa00000000000001,
+                },
+                {
+                    "match": {"in_port": 2, "dl_vlan": 1001},
+                    "cookie": 0xaa00000000000001,
+                },
+            ],
+            "2": [
+                {
+                    "match": {"in_port": 1, "dl_vlan": 100},
+                    "cookie": 0xaa00000000000001,
+                },
+                {
+                    "match": {"in_port": 2, "dl_vlan": 1001},
+                    "cookie": 0xaa00000000000001,
+                }
+            ],
+        }
+        switch_flows = {
+            "1": {
+                "flows": [
+                    {
+                        "match": {"in_port": 1, "dl_vlan": 100},
+                        "actions": ["action1", "action2"],
+                        "cookie": 0xaa00000000000001,
+                        "xpto": "foobar",
+                    },
+                    {
+                        "match": {"in_port": 2, "dl_vlan": 1001},
+                        "actions": ["action1", "action2"],
+                        "cookie": 0xaa00000000000001,
+                        "xpto": "foobar",
+                    },
+                ],
+            },
+            "2": {
+                "flows": [
+                    {
+                        "match": {"in_port": 1, "dl_vlan": 100},
+                        "actions": ["action1", "action2"],
+                        "cookie": 0xaa00000000000001,
+                        "xpto": "foobar",
+                    },
+                    {
+                        "match": {"in_port": 2, "dl_vlan": 1001},
+                        "actions": ["action1", "action2"],
+                        "cookie": 0xaa00000000000001,
+                        "xpto": "foobar",
+                    },
+                ],
+            },
+            "3": {
+                "flows": [
+                    {
+                        "match": {"in_port": 1, "dl_vlan": 999},
+                        "actions": ["a3"],
+                        "cookie": 0xaa00000000000001,
+                    },
+                    {
+                        "match": {"in_port": 2, "dl_vlan": 999},
+                        "actions": ["a3"],
+                        "cookie": 0xaa00000000000001,
+                    },
+                ],
+            },
+            "4": {
+                "flows": [
+                    {
+                        "match": {"in_port": 1, "dl_vlan": 100},
+                        "actions": ["a4"],
+                        "cookie": 0xbbbbbbbbbbbbbb01,
+                    },
+                ],
+            },
+        }
+
+        evc1 = MagicMock()
+        evc1.is_enabled.return_value = True
+        evc1.get_cookie.return_value = 0xaa00000000000001
+        evc1.get_flows_match.return_value = evc_flows
+        evc2 = MagicMock()
+        evc2.is_enabled.return_value = False
+        self.napp.circuits = {'1': evc1, '2': evc2}
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = switch_flows
+        mock_requests_get.return_value = mock_response
+
+        self.napp.check_consistency_alien_flows()
+
+        expected_remove_flows = switch_flows["3"]
+        for flow in expected_remove_flows["flows"]:
+            flow["cookie_mask"] = 18446744073709551615
+            del flow["actions"]
+
+        self.assertEqual(mock_emit_event.call_count, 1)
+        mock_emit_event.assert_called_with(
+            self.napp.controller,
+            context="kytos.flow_manager",
+            name="flows.delete",
+            dpid="3",
+            flow_dict=expected_remove_flows,
+            force=True,
+        )
+
+        mock_response.status_code = 400
+        mock_requests_get.return_value = mock_response
+        mock_response.json.call_count = 0
+
+        self.napp.check_consistency_alien_flows()
+
+        self.assertEqual(mock_response.json.call_count, 0)
+        self.assertEqual(mock_emit_event.call_count, 1)
 
     @patch('napps.kytos.mef_eline.main.Main._uni_from_dict')
     @patch('napps.kytos.mef_eline.models.evc.EVCBase._validate')
