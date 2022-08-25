@@ -849,7 +849,8 @@ class EVCDeploy(EVCBase):
             self._send_flow_mods(dpid, flows)
 
     @staticmethod
-    def _send_flow_mods(dpid, flow_mods, command='flows', force=False):
+    def _send_flow_mods(dpid, flow_mods, command='flows',
+                        force=False, table_id=settings.TABLE_ID):
         """Send a flow_mod list to a specific switch.
 
         Args:
@@ -862,6 +863,8 @@ class EVCDeploy(EVCBase):
 
         endpoint = f"{settings.MANAGER_URL}/{command}/{dpid}"
 
+        for flow_mod in flow_mods:
+            flow_mod["table_id"] = table_id
         data = {"flows": flow_mods, "force": force}
         response = requests.post(endpoint, json=data)
         if response.status_code >= 400:

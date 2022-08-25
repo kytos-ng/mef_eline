@@ -36,3 +36,5 @@ BATCH_INTERVAL = 0.5
 # number of FlowMod requests. Use 0 (zero) to disable BATCH mode, i.e. sends
 # everything at a glance
 BATCH_SIZE = 50
+
+TABLE_ID = 0
