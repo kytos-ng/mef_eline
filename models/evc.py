@@ -465,7 +465,7 @@ class EVCDeploy(EVCBase):
     def remove(self):
         """Remove EVC path and disable it."""
         self.remove_current_flows()
-        self.remove_path_flows(self.failover_path)
+        self.remove_failover_flows()
         self.disable()
         self.sync()
         emit_event(self._controller, "undeployed", evc_id=self.id)
