@@ -1379,8 +1379,8 @@ class TestEVC(TestCase):
         self.assertEqual(result, [])
 
     @patch("napps.kytos.mef_eline.models.evc.log")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.run_sdntrace")
-    def test_check_traces(self, run_sdntrace_mock, _):
+    @patch("napps.kytos.mef_eline.models.evc.EVC.run_sdntraces")
+    def test_check_traces(self, run_sdntraces_mock, _):
         """Test check_traces method."""
         evc = self.create_evc_inter_switch()
         for link in evc.primary_links:
@@ -1397,27 +1397,42 @@ class TestEVC(TestCase):
             {"dpid": 2, "port": 11, "time": "t2", "type": "trace", "vlan": 6},
             {"dpid": 1, "port": 9, "time": "t3", "type": "trace", "vlan": 5},
         ]
-        run_sdntrace_mock.side_effect = [trace_a, trace_z]
+        run_sdntraces_mock.return_value = {
+                                                1: [trace_a],
+                                                3: [trace_z]
+                                        }
 
         self.assertTrue(evc.check_traces())
 
         # case2: fail incomplete trace from uni_a
-        run_sdntrace_mock.side_effect = [trace_a[:2], trace_z]
+        run_sdntraces_mock.return_value = {
+                                            1: [trace_a[:2]],
+                                            3: [trace_z]
+                                        }
         self.assertFalse(evc.check_traces())
 
         # case3: fail incomplete trace from uni_z
-        run_sdntrace_mock.side_effect = [trace_a, trace_z[:2]]
+        run_sdntraces_mock.return_value = {
+                                            1: [trace_a],
+                                            3: [trace_z[:2]]
+                                        }
         self.assertFalse(evc.check_traces())
 
         # case4: fail wrong vlan id in trace from uni_a
         trace_a[1]["vlan"] = 5
         trace_z[1]["vlan"] = 99
-        run_sdntrace_mock.side_effect = [trace_a, trace_z]
+        run_sdntraces_mock.return_value = {
+                                            1: [trace_a],
+                                            3: [trace_z]
+                                        }
         self.assertFalse(evc.check_traces())
 
         # case5: fail wrong vlan id in trace from uni_z
         trace_a[1]["vlan"] = 99
-        run_sdntrace_mock.side_effect = [trace_a, trace_z]
+        run_sdntraces_mock.return_value = {
+                                            1: [trace_a],
+                                            3: [trace_z]
+                                        }
         self.assertFalse(evc.check_traces())
 
     @patch(

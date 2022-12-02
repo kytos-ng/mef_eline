@@ -86,4 +86,14 @@ class ELineController:
             return_document=ReturnDocument.AFTER,
             upsert=True,
         )
+        if updated is not None:
+            return utc_now
         return updated
+
+    def get_circuits_by_update_date(self, dt: datetime) -> Optional[Dict]:
+        """Filter for EVCs where updated_at is lte to a given datetime"""
+        return self.db.evcs.find(
+            {
+                "updated_at": {"$lte": dt}
+            }
+        )

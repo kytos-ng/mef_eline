@@ -36,7 +36,8 @@ class TestEVC(TestCase):  # pylint: disable=too-many-public-methods
             "queue_id",
             "sb_priority",
             "primary_constraints",
-            "secondary_constraints"
+            "secondary_constraints",
+            "updated_at"
         ]
         assert EVC.attributes_requiring_redeploy == expected
 

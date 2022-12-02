@@ -41,3 +41,7 @@ BATCH_SIZE = 50
 # is not set in a request
 EVPL_SB_PRIORITY = 20000
 EPL_SB_PRIORITY = 10000
+
+# Time interval to check if flows have been recently modified
+# in the consistency routine
+CONSISTENCY_MIN_VERDICT_INTERVAL = 60 * 2

@@ -38,7 +38,8 @@ class EVCBase(GenericEntity):
         "queue_id",
         "sb_priority",
         "primary_constraints",
-        "secondary_constraints"
+        "secondary_constraints",
+        "updated_at"
     ]
     required_attributes = ["name", "uni_a", "uni_z"]
 
@@ -111,6 +112,7 @@ class EVCBase(GenericEntity):
         self.primary_constraints = kwargs.get("primary_constraints", {})
         self.secondary_constraints = kwargs.get("secondary_constraints", {})
         self.creation_time = get_time(kwargs.get("creation_time")) or now()
+        self.updated_at = get_time(kwargs.get("updated_at")) or now()
         self.owner = kwargs.get("owner", None)
         self.sb_priority = kwargs.get("sb_priority", None) or kwargs.get(
             "priority", None
@@ -149,7 +151,19 @@ class EVCBase(GenericEntity):
 
     def sync(self):
         """Sync this EVC in the MongoDB."""
-        self._mongo_controller.upsert_evc(self.as_dict())
+        updated = self._mongo_controller.upsert_evc(self.as_dict())
+        setattr(self, "updated_at", updated)
+
+    def recent_updated(self):
+        """check if the evc was updated recently"""
+        evcs = self._mongo_controller. \
+            get_circuits_by_update_date(
+                settings.CONSISTENCY_MIN_VERDICT_INTERVAL
+                )
+        for evc in evcs:
+            if self == evc:
+                return True
+        return False
 
     def update(self, **kwargs):
         """Update evc attributes.
@@ -262,6 +276,10 @@ class EVCBase(GenericEntity):
         evc_dict["end_date"] = self.end_date
         if isinstance(self.end_date, datetime):
             evc_dict["end_date"] = self.end_date.strftime(time_fmt)
+
+        evc_dict["updated_at"] = self.updated_at
+        if isinstance(self.updated_at, datetime):
+            evc_dict["updated_at"] = self.updated_at.strftime(time_fmt)
 
         evc_dict["queue_id"] = self.queue_id
         evc_dict["bandwidth"] = self.bandwidth
@@ -517,6 +535,10 @@ class EVCDeploy(EVCBase):
         self.failover_path = Path([])
         if sync:
             self.sync()
+
+    def removed_flow(self):
+        """Records the deletion of flows"""
+        self.sync()
 
     def remove_current_flows(self, current_path=None, force=True):
         """Remove all flows from current path."""
@@ -1058,13 +1080,56 @@ class EVCDeploy(EVCBase):
             return []
         return response.json().get('result', [])
 
+    @staticmethod
+    def run_sdntraces(uni_list):
+        """Run SDN traces on control plane starting from EVC UNIs."""
+        endpoint = f"{settings.SDN_TRACE_CP_URL}/traces"
+        data = []
+        for uni in uni_list:
+            data_uni = {
+                "trace": {
+                            "switch": {
+                                "dpid": uni.interface.switch.dpid,
+                                "in_port": uni.interface.port_number,
+                            }
+                        }
+                }
+            if uni.user_tag:
+                data_uni["trace"]["eth"] = {
+                                            "dl_type": 0x8100,
+                                            "dl_vlan": uni.user_tag.value,
+                                            }
+            data.append(data_uni)
+        response = requests.put(endpoint, json=data)
+        if response.status_code >= 400:
+            log.error(f"Failed to run sdntrace-cp: {response.text}")
+            return []
+        return response.json()
+
     def check_traces(self):
         """Check if current_path is deployed comparing with SDN traces."""
-        trace_a = self.run_sdntrace(self.uni_a)
+        dpid_a = self.uni_a.interface.switch.dpid
+        port_a = self.uni_a.interface.port_number
+        dpid_z = self.uni_z.interface.switch.dpid
+        port_z = self.uni_z.interface.port_number
+
+        traces = self.run_sdntraces([self.uni_a, self.uni_z])
+        if dpid_a != dpid_z:
+            traces = traces[dpid_a] + traces[dpid_z]
+        else:
+            traces = traces[dpid_a]
+        trace_a = None
+        trace_z = None
+        for trace in traces:
+            if (trace[0]['dpid'] == dpid_a) and (trace[0]['port'] == port_a):
+                trace_a = trace
+            elif (trace[0]['dpid'] == dpid_z) and (trace[0]['port'] == port_z):
+                trace_z = trace
+            if (trace_a is not None) and (trace_z is not None):
+                break
         if len(trace_a) != len(self.current_path) + 1:
             log.warning(f"Invalid trace from uni_a: {trace_a}")
             return False
-        trace_z = self.run_sdntrace(self.uni_z)
         if len(trace_z) != len(self.current_path) + 1:
             log.warning(f"Invalid trace from uni_z: {trace_z}")
             return False

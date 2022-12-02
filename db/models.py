@@ -145,4 +145,9 @@ class EVCBaseDoc(DocumentBaseModel):
                     "$ifNull": ["$end_date", None]
                 }
             }},
+            "updated_at": {"$dateToString": {
+                "format": time_fmt, "date": {
+                    "$ifNull": ["$updated_at", "$inserted_at"]
+                }
+            }},
         }

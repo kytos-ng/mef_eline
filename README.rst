@@ -45,6 +45,7 @@ Subscribed
 - ``kytos/topology.link_up``
 - ``kytos/topology.link_down``
 - ``kytos/flow_manager.flow.error``
+- ``kytos/flow_manager.flow.removed``
 
 Published
 ---------

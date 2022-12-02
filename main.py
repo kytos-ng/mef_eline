@@ -95,6 +95,7 @@ class Main(KytosNApp):
                 circuit.is_enabled()
                 and not circuit.is_active()
                 and not circuit.lock.locked()
+                and not circuit.recent_updated()
             ):
                 if circuit.check_traces():
                     log.info(f"{circuit} enabled but inactive - activating")
@@ -109,6 +110,18 @@ class Main(KytosNApp):
         for circuit_id in stored_circuits:
             log.info(f"EVC found in mongodb but unloaded {circuit_id}")
             self._load_evc(stored_circuits[circuit_id])
+
+    @listen_to('kytos/flow_manager.flow.removed')
+    def on_flow_mod_delete(self, event):
+        """Capture delete messages to keep track when flows got removed."""
+        self.handle_flow_mod_delete(event)
+
+    def handle_flow_mod_delete(self, event):
+        """Keep track when the EVC got flows removed by deriving its cookie."""
+        flow = event.content["flow"]
+        evc = self.circuits.get(EVC.get_id_from_cookie(flow.cookie))
+        if evc:
+            evc.sync()
 
     def shutdown(self):
         """Execute when your napp is unloaded.
