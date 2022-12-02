@@ -26,6 +26,16 @@ Features
 - the NApp will move circuits to another path in case of a link down;
 - web UI for circuits management.
 
+Installing
+==========
+
+To install this NApp, first, make sure to have the same venv activated as you have ``kytos`` installed on:
+
+.. code:: shell
+
+   $ git clone https://github.com/kytos-ng/mef_eline.git
+   $ cd mef_eline
+   $ python3 setup.py develop
 
 Requirements
 ============
