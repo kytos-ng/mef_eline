@@ -32,7 +32,8 @@ class TestControllers(TestCase):
             "priority": 100,
             "active": False,
             "enabled": True,
-            "circuit_scheduler": []
+            "circuit_scheduler": [],
+            "updated_at": 1
         }
 
     def test_bootstrap_indexes(self):
@@ -67,3 +68,8 @@ class TestControllers(TestCase):
 
         self.eline.upsert_evc(self.evc_dict)
         assert self.eline.db.evcs.find_one_and_update.call_count == 1
+
+    def test_get_circuits_by_update_date(self):
+        """Test get_circuits_by_update_date"""
+        self.eline.get_circuits_by_update_date(1)
+        assert self.eline.db.evcs.find.call_count == 1

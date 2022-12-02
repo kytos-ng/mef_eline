@@ -112,11 +112,11 @@ class Main(KytosNApp):
             self._load_evc(stored_circuits[circuit_id])
 
     @listen_to('kytos/flow_manager.flow.removed')
-    def on_flow_mod_delete(self, event):
+    def on_flow_delete(self, event):
         """Capture delete messages to keep track when flows got removed."""
-        self.handle_flow_mod_delete(event)
+        self.handle_flow_delete(event)
 
-    def handle_flow_mod_delete(self, event):
+    def handle_flow_delete(self, event):
         """Keep track when the EVC got flows removed by deriving its cookie."""
         flow = event.content["flow"]
         evc = self.circuits.get(EVC.get_id_from_cookie(flow.cookie))

@@ -161,6 +161,17 @@ class TestMain(TestCase):
         self.assertEqual(evc2.deploy.call_count, 1)
         mock_load_evc.assert_called_with(stored_circuits['3'])
 
+    def test_handle_flow_delete(self):
+        """Test the tracking of flows removed."""
+        flow = MagicMock()
+        flow.cookie = 0xaa00000000000011
+        event = MagicMock()
+        event.content = {'flow': flow}
+        evc = create_autospec(EVC)
+        self.napp.circuits = {"00000000000011": evc}
+        self.napp.handle_flow_delete(event)
+        evc.sync.assert_called_once()
+
     @patch('napps.kytos.mef_eline.main.settings')
     def test_execute_consistency_wait_for(self, mock_settings):
         """Test execute and wait for setting."""

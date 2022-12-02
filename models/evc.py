@@ -536,10 +536,6 @@ class EVCDeploy(EVCBase):
         if sync:
             self.sync()
 
-    def removed_flow(self):
-        """Records the deletion of flows"""
-        self.sync()
-
     def remove_current_flows(self, current_path=None, force=True):
         """Remove all flows from current path."""
         switches = set()
