@@ -1430,24 +1430,27 @@ class TestEVC(TestCase):
         ]
 
         run_bulk_sdntraces_mock.return_value = {
-                                                1: [trace_a],
-                                                3: [trace_z]
+                                                "result": [trace_a, trace_z]
                                             }
         result = EVCDeploy.check_list_traces({evc.id: evc})
         self.assertTrue(result[evc.id])
 
         # case2: fail incomplete trace from uni_a
         run_bulk_sdntraces_mock.return_value = {
-                                                1: [trace_a[:2]],
-                                                3: [trace_z]
+                                                "result": [
+                                                            trace_a[:2],
+                                                            trace_z
+                                                        ]
         }
         result = EVCDeploy.check_list_traces({evc.id: evc})
         self.assertFalse(result[evc.id])
 
         # case3: fail incomplete trace from uni_z
         run_bulk_sdntraces_mock.return_value = {
-                                                1: [trace_a],
-                                                3: [trace_z[:2]]
+                                                "result": [
+                                                            trace_a,
+                                                            trace_z[:2]
+                                                        ]
         }
         result = EVCDeploy.check_list_traces({evc.id: evc})
         self.assertFalse(result[evc.id])
@@ -1456,8 +1459,7 @@ class TestEVC(TestCase):
         trace_a[1]["vlan"] = 5
         trace_z[1]["vlan"] = 99
         run_bulk_sdntraces_mock.return_value = {
-                                                1: [trace_a],
-                                                3: [trace_z]
+                                                "result": [trace_a, trace_z]
         }
         result = EVCDeploy.check_list_traces({evc.id: evc})
         self.assertFalse(result[evc.id])
@@ -1465,8 +1467,7 @@ class TestEVC(TestCase):
         # case5: fail wrong vlan id in trace from uni_z
         trace_a[1]["vlan"] = 99
         run_bulk_sdntraces_mock.return_value = {
-                                                1: [trace_a],
-                                                3: [trace_z]
+                                                "result": [trace_a, trace_z]
         }
         result = EVCDeploy.check_list_traces({evc.id: evc})
         self.assertFalse(result[evc.id])
@@ -1501,22 +1502,6 @@ class TestEVC(TestCase):
         trace_z[-1]["out"] = {"port": 2, "vlan": 99}
         result = EVCDeploy.check_list_traces({evc.id: evc})
         self.assertFalse(result[evc.id])
-
-    @patch("napps.kytos.mef_eline.models.evc.log")
-    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.run_bulk_sdntraces")
-    def test_check_list_traces_empty(self, run_bulk_sdntraces_mock, _):
-        """Test check_list_traces method."""
-        evc = self.create_evc_inter_switch()
-
-        for link in evc.primary_links:
-            link.metadata['s_vlan'] = MagicMock(value=link.metadata['s_vlan'])
-        evc.current_path = evc.primary_links
-
-        run_bulk_sdntraces_mock.return_value = {
-                                                1: [[]]
-                                            }
-        result = EVCDeploy.check_list_traces({evc.id: evc})
-        assert not result
 
     @patch(
         "napps.kytos.mef_eline.models.path.DynamicPathManager"

@@ -1223,28 +1223,27 @@ class EVCDeploy(EVCBase):
         circuit_by_traces = {}
         circuits_checked = {}
 
-        for trace_switch in traces:
-            for trace in traces[trace_switch]:
-                if not trace:
-                    continue
-                id_trace = str(trace[0]['dpid']) + ':' + str(trace[0]['port'])
-                if 'vlan' in trace[0]:
-                    id_trace += ':' + str(trace[0]['vlan'])
-                circuit_from_data = circuit_data.get(id_trace)
-                if circuit_from_data is None:
-                    continue
-                circuit_id = circuit_from_data['circuit_id']
-                trace_name = circuit_from_data['trace_name']
-                circuit = list_circuits[circuit_id]
-                if circuit_id not in circuit_by_traces:
-                    circuit_by_traces[circuit_id] = {}
-                circuit_by_traces[circuit_id][trace_name] = trace
+        for trace in traces["result"]:
+            if not trace:
+                continue
+            id_trace = str(trace[0]['dpid']) + ':' + str(trace[0]['port'])
+            if 'vlan' in trace[0]:
+                id_trace += ':' + str(trace[0]['vlan'])
+            circuit_from_data = circuit_data.get(id_trace)
+            if circuit_from_data is None:
+                continue
+            circuit_id = circuit_from_data['circuit_id']
+            trace_name = circuit_from_data['trace_name']
+            circuit = list_circuits[circuit_id]
+            if circuit_id not in circuit_by_traces:
+                circuit_by_traces[circuit_id] = {}
+            circuit_by_traces[circuit_id][trace_name] = trace
 
-                if 'trace_a' in circuit_by_traces[circuit_id] \
-                        and 'trace_z' in circuit_by_traces[circuit_id]:
-                    circuits_checked[circuit_id] = EVCDeploy.check_trace(
-                        circuit, circuit_by_traces
-                    )
+            if 'trace_a' in circuit_by_traces[circuit_id] \
+                    and 'trace_z' in circuit_by_traces[circuit_id]:
+                circuits_checked[circuit_id] = EVCDeploy.check_trace(
+                    circuit, circuit_by_traces
+                )
 
         return circuits_checked
 
