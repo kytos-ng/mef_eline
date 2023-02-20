@@ -1225,6 +1225,8 @@ class EVCDeploy(EVCBase):
 
         for trace_switch in traces:
             for trace in traces[trace_switch]:
+                if not trace:
+                    continue
                 id_trace = str(trace[0]['dpid']) + ':' + str(trace[0]['port'])
                 if 'vlan' in trace[0]:
                     id_trace += ':' + str(trace[0]['vlan'])
