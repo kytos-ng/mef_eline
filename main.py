@@ -82,19 +82,30 @@ class Main(KytosNApp):
             self.execute_consistency()
         log.debug("Finished consistency routine")
 
+    @staticmethod
+    def should_be_checked(circuit):
+        "Verify if the circuit meets the necessary conditions to be checked"
+        # pylint: disable=too-many-boolean-expressions
+        if (
+                circuit.is_enabled()
+                and not circuit.is_active()
+                and not circuit.lock.locked()
+                and not circuit.has_recent_removed_flow()
+                and not circuit.is_recent_updated()
+                # if a inter-switch EVC does not have current_path, it does not
+                # make sense to run sdntrace on it
+                and (circuit.is_intra_switch() or circuit.current_path)
+                ):
+            return True
+        return False
+
     def execute_consistency(self):
         """Execute consistency routine."""
         circuits_to_check = []
         stored_circuits = self.mongo_controller.get_circuits()['circuits']
         for circuit in self.get_evcs_by_svc_level():
             stored_circuits.pop(circuit.id, None)
-            if (
-                circuit.is_enabled()
-                and not circuit.is_active()
-                and not circuit.lock.locked()
-                and not circuit.has_recent_removed_flow()
-                and not circuit.is_recent_updated()
-            ):
+            if self.should_be_checked(circuit):
                 circuits_to_check.append(circuit)
         circuits_checked = EVCDeploy.check_list_traces(circuits_to_check)
         for circuit in circuits_to_check:

@@ -1153,6 +1153,8 @@ class EVCDeploy(EVCBase):
     @staticmethod
     def check_trace(circuit, trace_a, trace_z):
         """Auxiliar function to check an individual trace"""
+        if not trace_a or not trace_z:
+            return False
         if (
             len(trace_a) != len(circuit.current_path) + 1
             or not compare_uni_out_trace(circuit.uni_z, trace_a[-1])
@@ -1196,11 +1198,6 @@ class EVCDeploy(EVCBase):
             return {}
         uni_list = []
         for circuit in list_circuits:
-            # if a inter-switch EVC does not have current_path, it does not
-            # make sense to run sdntrace on it
-            if not circuit.is_intra_switch() and not circuit.current_path:
-                list_circuits.remove(circuit)
-                continue
             uni_list.append(circuit.uni_a)
             uni_list.append(circuit.uni_z)
 
@@ -1213,8 +1210,6 @@ class EVCDeploy(EVCBase):
             for i, circuit in enumerate(list_circuits):
                 trace_a = traces[2*i]
                 trace_z = traces[2*i+1]
-                if not (trace_a and trace_z):
-                    continue
                 circuits_checked[circuit.id] = EVCDeploy.check_trace(
                         circuit, trace_a, trace_z
                     )
