@@ -50,7 +50,11 @@ class Path(list, GenericEntity):
             return True
         previous = switch_a
         for link in self:
-            if link.endpoint_a.switch != previous:
+            if link.endpoint_a.switch == previous:
+                previous = link.endpoint_b.switch
+            elif link.endpoint_b.switch == previous:
+                previous = link.endpoint_a.switch
+            else:
                 raise InvalidPath(
                     f"{link.endpoint_a} switch is different" f" from previous."
                 )
@@ -61,7 +65,6 @@ class Path(list, GenericEntity):
                 or link.endpoint_b.link != link
             ):
                 raise InvalidPath(f"Link {link} is not available.")
-            previous = link.endpoint_b.switch
         if previous == switch_z:
             return True
         raise InvalidPath("Last endpoint is different from uni_z")
