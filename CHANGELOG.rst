@@ -32,6 +32,11 @@ Fixed
 - fixed attribute list for path constraints to include ``reliability``
 - fixed unnecessary redeploy of an intra-switch EVC on link up events
 
+Changed
+=======
+- Hid ui primary and secondary constraints on ``k-toolbar`` in the meantime
+- Moved request circuit ``k-button`` out of k-accordion-item since it's mandatory
+
 
 [2022.3.0] - 2023-01-23
 ***********************
