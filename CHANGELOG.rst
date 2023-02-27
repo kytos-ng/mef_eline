@@ -31,6 +31,7 @@ Fixed
 - fixed ``minimum_flexible_hits`` EVC attribute to be persistent
 - fixed attribute list for path constraints to include ``reliability``
 - fixed unnecessary redeploy of an intra-switch EVC on link up events
+- fixed ``check_list_traces`` to work with the new version of SDN traces
 
 Changed
 =======
