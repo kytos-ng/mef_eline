@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 
 from napps.kytos.mef_eline.utils import (
-    compare_endpoint_trace, uni_to_str, compare_uni_out_trace
+    compare_endpoint_trace, compare_uni_out_trace
 )
 
 
@@ -34,18 +34,6 @@ class TestUtils(TestCase):
                 self.assertEqual(
                     compare_endpoint_trace(endpoint, None, trace), expected
                 )
-
-    def test_uni_to_str(self):
-        """Test uni_to_str method"""
-        uni = MagicMock()
-        uni.interface.switch.dpid = "00:00:00:00:00:00:00:01"
-        uni.interface.port_number = 1
-        uni.user_tag.value = 2
-        self.assertEqual(uni_to_str(uni), "00:00:00:00:00:00:00:01:1:2")
-
-        # without user_tag
-        uni.user_tag = None
-        self.assertEqual(uni_to_str(uni), "00:00:00:00:00:00:00:01:1")
 
     def test_compare_uni_out_trace(self):
         """Test compare_uni_out_trace method."""
