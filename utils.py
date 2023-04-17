@@ -70,3 +70,23 @@ def compare_uni_out_trace(uni, trace):
         uni.interface.port_number == trace["out"].get("port")
         and uni_vlan == trace["out"].get("vlan")
     )
+
+
+def max_power2_divisor(number: int, limit: int = 4096) -> int:
+    """Get the max power of 2 that is divisor of number"""
+    while number % limit > 0:
+        limit //= 2
+    return limit
+
+
+def get_vlan_tags_and_masks(start: int, end: int) -> list[tuple[int, int]]:
+    """Get the minimum number of vlan/mask pairs for a given range."""
+    limit = end + 1
+    tags_and_masks = []
+    while start < limit:
+        divisor = max_power2_divisor(start)
+        while divisor > limit - start:
+            divisor //= 2
+        tags_and_masks.append((start, 4096-divisor))
+        start += divisor
+    return tags_and_masks

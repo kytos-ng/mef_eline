@@ -3,7 +3,10 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 
 from napps.kytos.mef_eline.utils import (
-    compare_endpoint_trace, compare_uni_out_trace, map_dl_vlan
+    compare_endpoint_trace,
+    compare_uni_out_trace,
+    get_vlan_tags_and_masks,
+    map_dl_vlan,
 )
 
 
@@ -61,7 +64,20 @@ class TestUtils(TestCase):
 
     def test_map_dl_vlan(self):
         """Test map_dl_vlan"""
-        cases = {0: None, 'untagged': None, 'any': 1, '4096/4096': 1, 10: 10}
+        cases = {0: None, "untagged": None, "any": 1, "4096/4096": 1, 10: 10}
         for value, mapped in cases.items():
             result = map_dl_vlan(value)
             assert result == mapped
+
+    def test_get_vlan_tags_and_masks(self):
+        """Test get_vlan_tags_and_masks"""
+        expected = [
+            (101, 4095),
+            (102, 4094),
+            (104, 4088),
+            (112, 4080),
+            (128, 4032),
+            (192, 4088),
+            (200, 4095),
+        ]
+        assert get_vlan_tags_and_masks(101, 200) == expected
