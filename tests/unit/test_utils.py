@@ -71,13 +71,20 @@ class TestUtils(TestCase):
 
     def test_get_vlan_tags_and_masks(self):
         """Test get_vlan_tags_and_masks"""
-        expected = [
-            (101, 4095),
-            (102, 4094),
-            (104, 4088),
-            (112, 4080),
-            (128, 4032),
-            (192, 4088),
-            (200, 4095),
+        vlan_ranges = [[101, 200], [101, 90], [34, 34]]
+        expecteds = [
+            [
+                (101, 4095),
+                (102, 4094),
+                (104, 4088),
+                (112, 4080),
+                (128, 4032),
+                (192, 4088),
+                (200, 4095),
+            ],
+            [],
+            [(34, 4095)],
         ]
-        assert get_vlan_tags_and_masks(101, 200) == expected
+        for vlan_range, expected in zip(vlan_ranges, expecteds):
+            with self.subTest(range=vlan_range, expected=expected):
+                assert get_vlan_tags_and_masks(*vlan_range) == expected
