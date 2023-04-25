@@ -47,8 +47,17 @@ class TAGDoc(BaseModel):
             return value
         if isinstance(value, str) and value in ("any", "untagged"):
             return value
+        if isinstance(value, str):
+            tags = value.split("-")
+            try:
+                values = list(map(int, tags))
+                if len(tags) == 2 and values[1] >= values[0]:
+                    return value
+            except ValueError:
+                pass
         raise ValueError(f"{value} is not allowed as {type(value)}. " +
-                         "Allowed strings are 'any' and 'untagged'.")
+                         "Allowed strings are 'any' and 'untagged' " +
+                         "or '<int>-<int>'.")
 
 
 class UNIDoc(BaseModel):
