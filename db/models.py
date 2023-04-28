@@ -2,6 +2,7 @@
 # pylint: disable=unused-argument,invalid-name,unused-argument
 # pylint: disable=no-self-argument,no-name-in-module
 
+import re
 from datetime import datetime
 from typing import Dict, List, Literal, Optional, Union
 
@@ -47,14 +48,9 @@ class TAGDoc(BaseModel):
             return value
         if isinstance(value, str) and value in ("any", "untagged"):
             return value
-        if isinstance(value, str):
-            tags = value.split("-")
-            try:
-                values = list(map(int, tags))
-                if len(tags) == 2 and values[1] >= values[0]:
-                    return value
-            except ValueError:
-                pass
+        if (isinstance(value, str) and
+                re.match(r"^\d+(-\d+)?(,\d+(-\d+)?)*$", value)):
+            return value
         raise ValueError(f"{value} is not allowed as {type(value)}. " +
                          "Allowed strings are 'any' and 'untagged' " +
                          "or '<int>-<int>'.")

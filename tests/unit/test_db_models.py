@@ -80,6 +80,10 @@ class TestDBModels(TestCase):
         tag = TAGDoc(**tag_range)
         assert tag.value == "23-45"
 
+        tag_range = {"tag_type": 1, "value": "43-54,98,101-200"}
+        tag = TAGDoc(**tag_range)
+        assert tag.value == "43-54,98,101-200"
+
     def test_tagdoc_fail(self):
         """Test TAGDoc value fail case"""
         tag_fail = {"tag_type": 1, "value": "test_fail"}
@@ -88,7 +92,7 @@ class TestDBModels(TestCase):
 
     def test_tagdoc_fail_range(self):
         """Test TAGDoc ranges fail cases"""
-        tag_fail = {"tag_type": 1, "value": "67-54"}
+        tag_fail = {"tag_type": 1, "value": "43,32-67-54"}
         with self.assertRaises(ValueError):
             TAGDoc(**tag_fail)
 
