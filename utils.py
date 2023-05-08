@@ -20,12 +20,6 @@ def emit_event(controller, name, context="kytos/mef_eline", content=None):
     controller.buffers.app.put(event)
 
 
-async def aemit_event(controller, name, content):
-    """Send an asynchronous event"""
-    event = KytosEvent(name=name, content=content)
-    await controller.buffers.app.aput(event)
-
-
 def notify_link_available_tags(controller, link, src_func=None):
     """Notify link available tags."""
     emit_event(controller, "link_available_tags", content={
