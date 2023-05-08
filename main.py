@@ -10,6 +10,7 @@ from threading import Lock
 from pydantic import ValidationError
 
 from kytos.core import KytosNApp, log, rest
+from kytos.core.events import KytosEvent
 from kytos.core.helpers import (alisten_to, listen_to, load_spec,
                                 validate_openapi)
 from kytos.core.interface import TAG, UNI
@@ -21,8 +22,7 @@ from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
-from napps.kytos.mef_eline.utils import (aemit_event, emit_event,
-                                         map_evc_event_content)
+from napps.kytos.mef_eline.utils import emit_event, map_evc_event_content
 
 
 # pylint: disable=too-many-public-methods
@@ -999,4 +999,6 @@ class Main(KytosNApp):
         self.table_group.update(table_group)
         content = {"group_table": self.table_group}
         name = "kytos/mef_eline.enable_table"
-        await aemit_event(self.controller, name, content)
+        event_out = KytosEvent(name=name,
+                               content=content)
+        await self.controller.buffers.app.aput(event_out)
