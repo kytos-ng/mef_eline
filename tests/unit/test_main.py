@@ -423,8 +423,12 @@ class TestMain:
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
         uni2.interface = create_autospec(Interface)
-        uni1.interface.switch = "00:00:00:00:00:00:00:01"
-        uni2.interface.switch = "00:00:00:00:00:00:00:02"
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = True
         uni_from_dict_mock.side_effect = [uni1, uni2]
         evc_as_dict_mock.return_value = {}
         sched_add_mock.return_value = True
@@ -602,8 +606,12 @@ class TestMain:
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
         uni2.interface = create_autospec(Interface)
-        uni1.interface.switch = "00:00:00:00:00:00:00:01"
-        uni2.interface.switch = "00:00:00:00:00:00:00:02"
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = True
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload = {
@@ -644,8 +652,12 @@ class TestMain:
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
         uni2.interface = create_autospec(Interface)
-        uni1.interface.switch = "00:00:00:00:00:00:00:01"
-        uni2.interface.switch = "00:00:00:00:00:00:00:02"
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = True
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload = {
@@ -667,6 +679,94 @@ class TestMain:
         expected_data += "or allow dynamic paths."
         assert 400 == response.status_code, response.data
         assert current_data["description"] == expected_data
+
+    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
+    async def test_create_circuit_case_6(
+        self,
+        uni_from_dict_mock,
+        event_loop
+    ):
+        """Test create a circuit with a disabled switch."""
+        # pylint: disable=too-many-locals
+        self.napp.controller.loop = event_loop
+        uni1 = create_autospec(UNI)
+        uni2 = create_autospec(UNI)
+        uni1.interface = create_autospec(Interface)
+        uni2.interface = create_autospec(Interface)
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = False
+        uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
+
+        payload = {
+            "name": "my evc1",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+                "tag": {"tag_type": 1, "value": 80},
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:02:2",
+                "tag": {"tag_type": 1, "value": 1},
+            },
+            "dynamic_backup_path": True,
+        }
+
+        response = await self.api_client.post(
+            f"{self.base_endpoint}/v2/evc/",
+            json=payload
+        )
+        assert 409 == response.status_code
+
+    @patch("napps.kytos.mef_eline.main.Main._link_from_dict")
+    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
+    async def test_create_circuit_case_7(
+        self,
+        uni_from_dict_mock,
+        link_from_dict_mock,
+        event_loop
+    ):
+        """Test create a circuit with a disabled switch in static path."""
+        # pylint: disable=too-many-locals
+        self.napp.controller.loop = event_loop
+        link_from_dict_mock.return_value = 1
+        uni1 = create_autospec(UNI)
+        uni2 = create_autospec(UNI)
+        uni1.interface = create_autospec(Interface)
+        uni2.interface = create_autospec(Interface)
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = False
+        uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
+
+        payload = {
+            "name": "my evc1",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+                "tag": {"tag_type": 1, "value": 80},
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:03:2",
+                "tag": {"tag_type": 1, "value": 1},
+            },
+            "primary_path": [
+                {"endpoint_a": {"id": "00:00:00:00:00:00:00:01:3"},
+                 "endpoint_b": {"id": "00:00:00:00:00:00:00:02:2"}},
+                {"endpoint_a": {"id": "00:00:00:00:00:00:00:02:3"},
+                 "endpoint_b": {"id": "00:00:00:00:00:00:00:03:2"}}
+            ],
+        }
+
+        response = await self.api_client.post(
+            f"{self.base_endpoint}/v2/evc/",
+            json=payload
+        )
+        assert 409 == response.status_code
 
     async def test_redeploy_evc(self):
         """Test endpoint to redeploy an EVC."""
@@ -1421,8 +1521,12 @@ class TestMain:
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
         uni2.interface = create_autospec(Interface)
-        uni1.interface.switch = "00:00:00:00:00:00:00:01"
-        uni2.interface.switch = "00:00:00:00:00:00:00:02"
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = True
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload1 = {
@@ -1492,8 +1596,12 @@ class TestMain:
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
         uni2.interface = create_autospec(Interface)
-        uni1.interface.switch = "00:00:00:00:00:00:00:01"
-        uni2.interface.switch = "00:00:00:00:00:00:00:02"
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = True
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload1 = {
@@ -1579,8 +1687,12 @@ class TestMain:
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
         uni2.interface = create_autospec(Interface)
-        uni1.interface.switch = "00:00:00:00:00:00:00:01"
-        uni2.interface.switch = "00:00:00:00:00:00:00:02"
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = True
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
         mongo_controller_upsert_mock.return_value = True
 
@@ -1652,8 +1764,12 @@ class TestMain:
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
         uni2.interface = create_autospec(Interface)
-        uni1.interface.switch = "00:00:00:00:00:00:00:01"
-        uni2.interface.switch = "00:00:00:00:00:00:00:02"
+        uni1.interface.switch = MagicMock()
+        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch = MagicMock()
+        uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
+        uni2.interface.switch.is_enabled.return_value = True
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload1 = {

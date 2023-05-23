@@ -17,7 +17,7 @@ from kytos.core.link import Link
 from kytos.core.rest_api import (HTTPException, JSONResponse, Request,
                                  get_json_or_400)
 from napps.kytos.mef_eline import controllers, settings
-from napps.kytos.mef_eline.exceptions import InvalidPath
+from napps.kytos.mef_eline.exceptions import DisabledSwitch, InvalidPath
 from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
@@ -61,6 +61,7 @@ class Main(KytosNApp):
         self.execute_as_loop(settings.DEPLOY_EVCS_INTERVAL)
 
         self.load_all_evcs()
+        self.mine = None
 
     def get_evcs_by_svc_level(self) -> list:
         """Get circuits sorted by desc service level and asc creation_time.
@@ -196,6 +197,7 @@ class Main(KytosNApp):
         log.debug("get_circuit result %s %s", circuit, status)
         return JSONResponse(circuit, status_code=status)
 
+    # pylint: disable=too-many-branches, too-many-statements
     @rest("/v2/evc/", methods=["POST"])
     @validate_openapi(spec)
     def create_circuit(self, request: Request) -> JSONResponse:
@@ -232,6 +234,19 @@ class Main(KytosNApp):
             log.debug("create_circuit result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
 
+        if not evc.uni_a.interface.switch.is_enabled():
+            switch = evc.uni_a.interface.switch.dpid
+            raise HTTPException(
+                409,
+                detail=f"Path is not valid: {switch} is disabled"
+            )
+        if not evc.uni_z.interface.switch.is_enabled():
+            switch = evc.uni_z.interface.switch.dpid
+            raise HTTPException(
+                409,
+                detail=f"Path is not valid: {switch} is disabled"
+            )
+
         if evc.primary_path:
             try:
                 evc.primary_path.is_valid(
@@ -244,6 +259,11 @@ class Main(KytosNApp):
                     400,
                     detail=f"primary_path is not valid: {exception}"
                 ) from exception
+            except DisabledSwitch as exception:
+                raise HTTPException(
+                    409,
+                    detail=f"primary path is not valid: {exception}"
+                ) from exception
         if evc.backup_path:
             try:
                 evc.backup_path.is_valid(
@@ -255,6 +275,11 @@ class Main(KytosNApp):
                 raise HTTPException(
                     400,
                     detail=f"backup_path is not valid: {exception}"
+                ) from exception
+            except DisabledSwitch as exception:
+                raise HTTPException(
+                    409,
+                    detail=f"primary path is not valid: {exception}"
                 ) from exception
 
         # verify duplicated evc
@@ -339,6 +364,11 @@ class Main(KytosNApp):
             log.error(exception)
             log.debug("update result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
+        except DisabledSwitch as exception:
+            raise HTTPException(
+                409,
+                detail=f"Path is not valid: {exception}"
+            ) from exception
 
         if evc.is_active():
             if enable is False:  # disable if active

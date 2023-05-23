@@ -5,7 +5,7 @@ from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
 from kytos.core.link import Link
 from napps.kytos.mef_eline import settings
-from napps.kytos.mef_eline.exceptions import InvalidPath
+from napps.kytos.mef_eline.exceptions import DisabledSwitch, InvalidPath
 
 
 class Path(list, GenericEntity):
@@ -50,6 +50,12 @@ class Path(list, GenericEntity):
             return True
         previous = switch_a
         for link in self:
+            if not link.endpoint_a.switch.is_enabled():
+                switch = link.endpoint_a.switch.dpid
+                raise DisabledSwitch(f"{switch} is disabled")
+            if not link.endpoint_b.switch.is_enabled():
+                switch = link.endpoint_b.switch.dpid
+                raise DisabledSwitch(f"{switch} is disabled")
             if link.endpoint_a.switch != previous:
                 raise InvalidPath(
                     f"{link.endpoint_a} switch is different" f" from previous."

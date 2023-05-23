@@ -19,3 +19,7 @@ class FlowModException(MEFELineException):
 
 class InvalidPath(MEFELineException):
     """Exception for invalid path."""
+
+
+class DisabledSwitch(MEFELineException):
+    """Exception for disabled switch in path"""

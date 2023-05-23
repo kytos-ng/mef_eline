@@ -11,7 +11,7 @@ from kytos.core.switch import Switch
 
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
-from napps.kytos.mef_eline.exceptions import InvalidPath  # NOQA pycodestyle
+from napps.kytos.mef_eline.exceptions import DisabledSwitch, InvalidPath  # NOQA pycodestyle
 from napps.kytos.mef_eline.models import Path, DynamicPathManager  # NOQA pycodestyle
 from napps.kytos.mef_eline.tests.helpers import (
     MockResponse,
@@ -208,6 +208,12 @@ class TestPath(TestCase):
         switch4 = Switch("00:00:00:00:00:00:00:04")
         switch5 = Switch("00:00:00:00:00:00:00:05")
         switch6 = Switch("00:00:00:00:00:00:00:06")
+        switch1.enable()
+        switch2.enable()
+        switch3.enable()
+        switch4.enable()
+        switch5.enable()
+        switch6.enable()
 
         links1 = [
             get_link_mocked(switch_a=switch1, switch_b=switch2),
@@ -242,6 +248,20 @@ class TestPath(TestCase):
                 else:
                     with self.assertRaises(InvalidPath):
                         path.is_valid(switch_a, switch_z)
+
+    def test_is_valid_disabled_switch(self):
+        """Test is_valid method with DisabledSwitch."""
+        switch1 = Switch("00:00:00:00:00:00:00:01")
+        switch2 = Switch("00:00:00:00:00:00:00:02")
+        switch1.enable()
+
+        links1 = [
+            get_link_mocked(switch_a=switch1, switch_b=switch2),
+        ]
+
+        path = Path(links1)
+        with self.assertRaises(DisabledSwitch):
+            path.is_valid(switch1, switch2)
 
 
 class TestDynamicPathManager(TestCase):
