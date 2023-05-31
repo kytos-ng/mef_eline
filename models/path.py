@@ -50,10 +50,10 @@ class Path(list, GenericEntity):
             return True
         previous = switch_a
         for link in self:
-            if not link.endpoint_a.switch.is_enabled():
+            if link.endpoint_a.switch.status == EntityStatus.DISABLED:
                 switch = link.endpoint_a.switch.dpid
                 raise DisabledSwitch(f"{switch} is disabled")
-            if not link.endpoint_b.switch.is_enabled():
+            if link.endpoint_b.switch.status == EntityStatus.DISABLED:
                 switch = link.endpoint_b.switch.dpid
                 raise DisabledSwitch(f"{switch} is disabled")
             if link.endpoint_a.switch != previous:

@@ -10,6 +10,7 @@ from threading import Lock
 from pydantic import ValidationError
 
 from kytos.core import KytosNApp, log, rest
+from kytos.core.common import EntityStatus
 from kytos.core.helpers import (alisten_to, listen_to, load_spec,
                                 validate_openapi)
 from kytos.core.interface import TAG, UNI
@@ -61,7 +62,6 @@ class Main(KytosNApp):
         self.execute_as_loop(settings.DEPLOY_EVCS_INTERVAL)
 
         self.load_all_evcs()
-        self.mine = None
 
     def get_evcs_by_svc_level(self) -> list:
         """Get circuits sorted by desc service level and asc creation_time.
@@ -234,13 +234,13 @@ class Main(KytosNApp):
             log.debug("create_circuit result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
 
-        if not evc.uni_a.interface.switch.is_enabled():
+        if evc.uni_a.interface.switch.status == EntityStatus.DISABLED:
             switch = evc.uni_a.interface.switch.dpid
             raise HTTPException(
                 409,
                 detail=f"Path is not valid: {switch} is disabled"
             )
-        if not evc.uni_z.interface.switch.is_enabled():
+        if evc.uni_z.interface.switch.status == EntityStatus.DISABLED:
             switch = evc.uni_z.interface.switch.dpid
             raise HTTPException(
                 409,

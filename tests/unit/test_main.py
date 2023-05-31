@@ -4,7 +4,7 @@ from unittest.mock import (AsyncMock, MagicMock, PropertyMock, call,
 
 import pytest
 from kytos.lib.helpers import get_controller_mock, get_test_client
-
+from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
 from kytos.core.interface import UNI, Interface
 from napps.kytos.mef_eline.exceptions import InvalidPath
@@ -425,10 +425,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch.status = EntityStatus.UP
         uni_from_dict_mock.side_effect = [uni1, uni2]
         evc_as_dict_mock.return_value = {}
         sched_add_mock.return_value = True
@@ -608,10 +608,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch.status = EntityStatus.UP
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload = {
@@ -654,10 +654,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch.status = EntityStatus.UP
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload = {
@@ -695,10 +695,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = False
+        uni2.interface.switch.status = EntityStatus.DISABLED
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload = {
@@ -738,10 +738,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = False
+        uni2.interface.switch.status = EntityStatus.DISABLED
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload = {
@@ -1523,10 +1523,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch.status = EntityStatus.UP
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload1 = {
@@ -1598,10 +1598,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch.status = EntityStatus.UP
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload1 = {
@@ -1689,10 +1689,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch.status = EntityStatus.UP
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
         mongo_controller_upsert_mock.return_value = True
 
@@ -1766,10 +1766,10 @@ class TestMain:
         uni2.interface = create_autospec(Interface)
         uni1.interface.switch = MagicMock()
         uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.is_enabled.return_value = True
+        uni1.interface.switch.status = EntityStatus.UP
         uni2.interface.switch = MagicMock()
         uni2.interface.switch.return_value = "00:00:00:00:00:00:00:02"
-        uni2.interface.switch.is_enabled.return_value = True
+        uni2.interface.switch.status = EntityStatus.UP
         uni_from_dict_mock.side_effect = [uni1, uni2, uni1, uni2]
 
         payload1 = {
