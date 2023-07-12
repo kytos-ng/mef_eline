@@ -46,3 +46,6 @@ EPL_SB_PRIORITY = 10000
 #  or flows have been deleted.
 TIME_RECENT_DELETED_FLOWS = 60
 TIME_RECENT_UPDATED = 60
+
+# Default spf_attribute. Allowed values: "hop", "priority", and "delay"
+SPF_ATTRIBUTE = "hop"
