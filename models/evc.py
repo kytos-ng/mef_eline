@@ -51,6 +51,7 @@ class EVCBase(GenericEntity):
     ]
     required_attributes = ["name", "uni_a", "uni_z"]
 
+    # pylint: disable=too-many-statements
     def __init__(self, controller, **kwargs):
         """Create an EVC instance with the provided parameters.
 
