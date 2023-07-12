@@ -113,7 +113,12 @@ class EVCBase(GenericEntity):
         self.backup_path = Path(kwargs.get("backup_path", []))
         self.dynamic_backup_path = kwargs.get("dynamic_backup_path", False)
         self.primary_constraints = kwargs.get("primary_constraints", {})
+        spf_attribute = settings.SPF_ATTRIBUTE
+        if not self.primary_constraints.get("spf_attribute"):
+            self.primary_constraints["spf_attribute"] = spf_attribute
         self.secondary_constraints = kwargs.get("secondary_constraints", {})
+        if not self.secondary_constraints.get("spf_attribute"):
+            self.secondary_constraints["spf_attribute"] = spf_attribute
         self.creation_time = get_time(kwargs.get("creation_time")) or now()
         self.owner = kwargs.get("owner", None)
         self.sb_priority = kwargs.get("sb_priority", None) or kwargs.get(
