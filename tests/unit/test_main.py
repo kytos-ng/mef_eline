@@ -10,6 +10,7 @@ from kytos.core.interface import UNI, Interface
 from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC
 from napps.kytos.mef_eline.tests.helpers import get_uni_mocked
+from napps.kytos.mef_eline import settings
 
 
 async def test_on_table_enabled():
@@ -477,8 +478,14 @@ class TestMain:
             uni_a=uni1,
             uni_z=uni2,
             dynamic_backup_path=True,
-            primary_constraints=payload["primary_constraints"],
-            secondary_constraints=payload["secondary_constraints"],
+            primary_constraints={
+                **{"spf_attribute": settings.SPF_ATTRIBUTE},
+                **payload["primary_constraints"]
+            },
+            secondary_constraints={
+                **{"spf_attribute": settings.SPF_ATTRIBUTE},
+                **payload["secondary_constraints"]
+            },
         )
         # verify save method is called
         mongo_controller_upsert_mock.assert_called_once()
