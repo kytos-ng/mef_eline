@@ -69,7 +69,7 @@ class LinkConstraints(BaseModel):
 
 class PathConstraints(BaseModel):
     """Pathfinder Constraints."""
-    spf_attribute: Literal["hop", "delay", "priority"] = "hop"
+    spf_attribute: Optional[Literal["hop", "delay", "priority"]]
     spf_max_path_cost: Optional[float]
     mandatory_metrics: Optional[LinkConstraints]
     flexible_metrics: Optional[LinkConstraints]

@@ -50,3 +50,6 @@ TIME_RECENT_DELETED_FLOWS = 60
 TIME_RECENT_UPDATED = 60
 
 TABLE_GROUP_ALLOWED = {'evpl', 'epl'}
+
+# Default spf_attribute. Allowed values: "hop", "priority", and "delay"
+SPF_ATTRIBUTE = "hop"
