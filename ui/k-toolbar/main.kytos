@@ -298,7 +298,8 @@ module.exports = {
        * Method to build option items for spf attribute.
        */
       let _result = [
-        {value: "hop", description: "hop", selected: true},
+        {value: null, description: "default", selected: true},
+        {value: "hop", description: "hop"},
         {value: "delay", description: "delay"},
         {value: "priority", description: "priority"},
       ];
