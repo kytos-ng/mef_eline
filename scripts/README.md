@@ -51,3 +51,17 @@ And then, to insert (or update) the EVCs:
 ```
 CMD=insert_evcs python3 scripts/storehouse_to_mongo.py
 ```
+
+### Reset default spf_attribute value
+
+[`002_reset_spf_attribute.py`](./002_reset_spf_attribute.py) is a script to reset both `primary_constraints.spf_attribute` and `secondary_constraints.spf_attribute` from `"hop"` to any of the supported values `"priority"` or `"delay"`. You should only use this script, if you wish to change the default values of EVCs that were created on version 2022.3 and you'd like to change the value without having to call `PATCH /v2/evc/{circuit_id}` for each EVC.
+
+#### How to use
+
+- Here's an example, trying to reset any `primary_constraints.spf_attribute` or  `secondary_constraints.spf_attribute` to `"priority"`, this script is idempotent:
+
+```
+SPF_ATTRIBUTE=priority python3 scripts/002_reset_spf_attribute.py
+```
+
+- After that, `kytosd` should be restarted just so `mef_eline` EVCs can get fully reloaded in memory, this would be the safest route.
