@@ -9,6 +9,7 @@ from kytos.lib.helpers import get_controller_mock
 from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC
 from napps.kytos.mef_eline.tests.helpers import get_uni_mocked
+from napps.kytos.mef_eline import settings
 
 
 # pylint: disable=too-many-public-methods, too-many-lines
@@ -521,8 +522,14 @@ class TestMain(TestCase):
             uni_a=uni1,
             uni_z=uni2,
             dynamic_backup_path=True,
-            primary_constraints=payload["primary_constraints"],
-            secondary_constraints=payload["secondary_constraints"],
+            primary_constraints={
+                **{"spf_attribute": settings.SPF_ATTRIBUTE},
+                **payload["primary_constraints"]
+            },
+            secondary_constraints={
+                **{"spf_attribute": settings.SPF_ATTRIBUTE},
+                **payload["secondary_constraints"]
+            },
         )
         # verify save method is called
         mongo_controller_upsert_mock.assert_called_once()
