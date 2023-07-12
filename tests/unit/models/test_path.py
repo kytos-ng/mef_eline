@@ -8,7 +8,7 @@ from kytos.core.common import EntityStatus
 from kytos.core.link import Link
 from kytos.core.switch import Switch
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,ungrouped-imports
 
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
