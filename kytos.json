@@ -3,7 +3,7 @@
   "username": "kytos",
   "name": "mef_eline",
   "description": "NApp to provision circuits from user request",
-  "version": "2022.3.1",
+  "version": "2022.3.2",
   "napp_dependencies": ["kytos/flow_manager", "kytos/pathfinder", "amlight/sndtrace_cp"],
   "license": "MIT",
   "tags": [],
