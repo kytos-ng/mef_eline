@@ -17,6 +17,7 @@ Added
 - Subscribed to new event ``kytos/of_multi_table.enable_table`` as well as publishing ``kytos/mef_eline.enable_table`` required to set a different ``table_id`` to flows.
 - Added ``settings.TABLE_GROUP_ALLOWED`` set containning the allowed table groups, for now ``'evpl', 'epl'`` are supported.
 - Added ui support for primary and secondary constraints
+- Exposed default ``SPF_ATTRIBUTE`` on settings.py, by default it still uses ``"hop"`` to not break compatibility, when creating an EVC if ``primary_constraint.spf_attribute``  or ``secondary_constraints.spf_attribute`` isn't present, then it'll use this value as default.
 
 Changed
 =======
