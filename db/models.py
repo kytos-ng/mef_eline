@@ -7,6 +7,8 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from napps.kytos.mef_eline import settings
+
 
 class DocumentBaseModel(BaseModel):
     """Base model for Mongo documents"""
@@ -59,7 +61,7 @@ class LinkConstraints(BaseModel):
 
 class PathConstraints(BaseModel):
     """Pathfinder Constraints."""
-    spf_attribute: Optional[Literal["hop", "delay", "priority"]]
+    spf_attribute: Literal["hop", "delay", "priority"] = settings.SPF_ATTRIBUTE
     spf_max_path_cost: Optional[float]
     mandatory_metrics: Optional[LinkConstraints]
     flexible_metrics: Optional[LinkConstraints]
