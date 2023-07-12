@@ -18,6 +18,12 @@ Removed
 Fixed
 =====
 
+[2022.3.2] - 2023-07-12
+***********************
+
+Added
+=====
+- Exposed default ``SPF_ATTRIBUTE`` on settings.py, by default it still uses ``"hop"`` to not break compatibility, when creating an EVC if ``primary_constraint.spf_attribute`` or ``secondary_constraints.spf_attribute`` isn't set, then it'll use this value as default.
 
 [2022.3.1] - 2023-02-14
 ***********************
