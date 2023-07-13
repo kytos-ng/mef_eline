@@ -1,24 +1,22 @@
 """Module to test the Path class."""
 import sys
 from unittest import TestCase
-from unittest.mock import call, patch, Mock, MagicMock
+from unittest.mock import MagicMock, Mock, call, patch
+from napps.kytos.mef_eline import settings
 
 from kytos.core.common import EntityStatus
 from kytos.core.link import Link
 from kytos.core.switch import Switch
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,ungrouped-imports
 
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
 from napps.kytos.mef_eline.exceptions import InvalidPath  # NOQA pycodestyle
-from napps.kytos.mef_eline.models import Path, DynamicPathManager  # NOQA pycodestyle
-from napps.kytos.mef_eline.tests.helpers import (
-    MockResponse,
-    id_to_interface_mock,
-    get_link_mocked,
-    get_mocked_requests,
-)  # NOQA pycodestyle
+from napps.kytos.mef_eline.models import (  # NOQA pycodestyle
+    DynamicPathManager, Path)
+from napps.kytos.mef_eline.tests.helpers import (  # NOQA pycodestyle
+    MockResponse, get_link_mocked, get_mocked_requests, id_to_interface_mock)
 
 
 class TestPath(TestCase):
@@ -406,6 +404,7 @@ class TestDynamicPathManager(TestCase):
         mock_response.json.return_value = paths1
         mock_requests_post.return_value = mock_response
         kwargs = {
+            "spf_attribute": settings.SPF_ATTRIBUTE,
             "spf_max_path_cost": 8,
             "mandatory_metrics": {
                 "ownership": "red"
@@ -448,6 +447,7 @@ class TestDynamicPathManager(TestCase):
 
         evc = MagicMock()
         evc.secondary_constraints = {
+            "spf_attribute": "hop",
             "spf_max_path_cost": 20,
             "mandatory_metrics": {
                 "ownership": "red"

@@ -493,6 +493,7 @@ class TestMain(TestCase):
                 }
             },
             "secondary_constraints": {
+                "spf_attribute": "priority",
                 "mandatory_metrics": {
                     "ownership": "blue"
                 }

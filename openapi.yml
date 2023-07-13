@@ -437,7 +437,7 @@ components:
             - "ee8d9017-1efd-49ac-9149-4cbeea86f751"
         spf_attribute:
           type: string
-          description: Link metadata attribute that will be used as link cost by SPF.
+          description: Link metadata attribute that will be used as link cost by SPF. If it's not set, the default value will be settings.SPF_ATTRIBUTE, which defaults to "hop"
           default: "hop"
           enum: 
             - "hop"

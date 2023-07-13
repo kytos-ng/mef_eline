@@ -18,6 +18,17 @@ Removed
 Fixed
 =====
 
+[2022.3.2] - 2023-07-12
+***********************
+
+Added
+=====
+- Exposed default ``SPF_ATTRIBUTE`` on settings.py, the default value is still `"hop"`. This value will be parametrized whenever ``primary_constraints.spf_attribute`` or ``secondary_constraints.spf_attribute`` isn't set
+
+Changed
+=======
+- ``primary_constraints.spf_attribute`` and ``secondary_constraints.spf_attribute`` will only be set in the database if they've been set in the request.
+
 
 [2022.3.1] - 2023-02-14
 ***********************
