@@ -1887,10 +1887,18 @@ class TestMain(TestCase):
             "4": ["flow7", "flow8"],
             "5": ["flow9", "flow10"],
         }
+        evc6 = MagicMock(id="6", service_level=8, creation_time=1,
+                         metadata="mock", _active="true", _enabled="true",
+                         uni_a=uni, uni_z=uni)
+        evc6.name = "name"
+        evc6.is_affected_by_link.return_value = True
+        evc6.is_failover_path_affected_by_link.return_value = False
+        evc6.failover_path = ["3"]
+        evc6.get_failover_flows.side_effect = AttributeError("err")
         link = MagicMock(id="123")
         event = KytosEvent(name="test", content={"link": link})
         self.napp.circuits = {"1": evc1, "2": evc2, "3": evc3, "4": evc4,
-                              "5": evc5}
+                              "5": evc5, "6": evc6}
         settings_mock.BATCH_SIZE = 2
         self.napp.handle_link_down(event)
 
@@ -1937,6 +1945,7 @@ class TestMain(TestCase):
         assert evc3.service_level > evc1.service_level
         # evc3 should be handled before evc1
         emit_event_mock.assert_has_calls([
+            call(self.napp.controller, event_name, evc_id="6", link_id="123"),
             call(self.napp.controller, event_name, evc_id="3", link_id="123"),
             call(self.napp.controller, event_name, evc_id="1", link_id="123"),
         ])
@@ -2153,6 +2162,7 @@ class TestMain(TestCase):
         event.content = {'flow': flow, 'error_command': 'add'}
         evc = create_autospec(EVC)
         evc.remove_current_flows = MagicMock()
+        evc.lock = MagicMock()
         self.napp.circuits = {"00000000000011": evc}
         self.napp.handle_flow_mod_error(event)
         evc.remove_current_flows.assert_called_once()
