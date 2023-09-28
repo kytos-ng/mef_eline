@@ -6,6 +6,14 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.1.1] - 2023-09-28
+***********************
+
+Fixed
+=====
+- fixed race condition in ``failover_path`` when handling simulataneous Link Down events leading to inconsistencies on some EVC
+
+
 [2023.1.0] - 2023-06-27
 ***********************
 
