@@ -1,4 +1,5 @@
 """Classes used in the main application."""  # pylint: disable=too-many-lines
+import traceback
 from collections import OrderedDict
 from datetime import datetime
 from threading import Lock
@@ -619,7 +620,16 @@ class EVCDeploy(EVCBase):
             return
 
         dpid_flows_match = {}
-        for dpid, flows in self._prepare_nni_flows(path).items():
+
+        try:
+            nni_flows = self._prepare_nni_flows(path)
+        # pylint: disable=broad-except
+        except Exception:
+            err = traceback.format_exc().replace("\n", ", ")
+            log.error(f"Fail to remove NNI failover flows for {self}: {err}")
+            nni_flows = {}
+
+        for dpid, flows in nni_flows.items():
             dpid_flows_match.setdefault(dpid, [])
             for flow in flows:
                 dpid_flows_match[dpid].append({
@@ -627,7 +637,16 @@ class EVCDeploy(EVCBase):
                     "match": flow["match"],
                     "cookie_mask": int(0xffffffffffffffff)
                 })
-        for dpid, flows in self._prepare_uni_flows(path, skip_in=True).items():
+
+        try:
+            uni_flows = self._prepare_uni_flows(path, skip_in=True)
+        # pylint: disable=broad-except
+        except Exception:
+            err = traceback.format_exc().replace("\n", ", ")
+            log.error(f"Fail to remove UNI failover flows for {self}: {err}")
+            uni_flows = {}
+
+        for dpid, flows in uni_flows.items():
             dpid_flows_match.setdefault(dpid, [])
             for flow in flows:
                 dpid_flows_match[dpid].append({
@@ -756,6 +775,7 @@ class EVCDeploy(EVCBase):
 
         reason = ""
         self.remove_path_flows(self.failover_path)
+        self.failover_path = Path([])
         for use_path in self.get_failover_path_candidates():
             if not use_path:
                 continue

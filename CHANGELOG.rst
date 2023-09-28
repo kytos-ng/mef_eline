@@ -18,6 +18,14 @@ Removed
 Fixed
 =====
 
+[2022.3.3] - 2023-09-28
+***********************
+
+Fixed
+=====
+- fixed race condition in ``failover_path`` when handling simulataneous Link Down events leading to inconsistencies on some EVC
+
+
 [2022.3.2] - 2023-07-12
 ***********************
 
