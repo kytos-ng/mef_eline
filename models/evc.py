@@ -463,7 +463,7 @@ class EVCBase(GenericEntity):
             success = uni.interface.make_tag_available(uni.user_tag)
             if not success:
                 intf = uni.interface.id
-                log.warning(f"Tag {tag} was already available in {intf}")
+                log.error(f"Tag {tag} was already available in {intf}")
             else:
                 notify_uni_available_tags(self._controller, {"uni": uni})
 
