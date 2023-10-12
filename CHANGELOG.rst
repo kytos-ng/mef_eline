@@ -6,6 +6,17 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.1.2] - 2023-10-12
+***********************
+
+Added
+=====
+- Added published event ``kytos/mef_eline.uni_available_tags`` which is used when UNI tag allocation changes.
+
+Changed
+=======
+- UNIs from created circuits allocate/deallocate TAGs from interfaces when neccessary.
+
 [2023.1.1] - 2023-09-28
 ***********************
 

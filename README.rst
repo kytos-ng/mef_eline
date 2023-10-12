@@ -77,6 +77,17 @@ A response from the ``kytos/of_multi_table.enable_table`` event to confirm table
     'table_group': <object>
   }
 
+kytos/mef_eline.uni_available_tags
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Event reporting that a UNI started to use a TAG and ``Interface.available_tags`` in the DB needs to updated
+
+.. code-block:: python3
+
+  {
+    'uni': <object>
+  }
+
 .. TAGs
 
 .. |Stable| image:: https://img.shields.io/badge/stability-stable-green.svg
