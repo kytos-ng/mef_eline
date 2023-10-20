@@ -74,30 +74,30 @@ class TestUtils():
         "vlan_range,expected",
         [
             (
-                [101, 200],
+                [[101, 200]],
                 [
-                    (101, 4095),
-                    (102, 4094),
-                    (104, 4088),
-                    (112, 4080),
-                    (128, 4032),
-                    (192, 4088),
-                    (200, 4095),
+                    "101/4095",
+                    "102/4094",
+                    "104/4088",
+                    "112/4080",
+                    "128/4032",
+                    "192/4088",
+                    "200/4095",
                 ]
             ),
             (
-                [101, 90],
+                [[101, 90]],
                 []
             ),
             (
-                [34, 34],
-                [(34, 4095)]
+                [[34, 34]],
+                ["34/4095"]
             )
         ]
     )
     def test_get_vlan_tags_and_masks(self, vlan_range, expected):
         """Test get_vlan_tags_and_masks"""
-        assert get_vlan_tags_and_masks(*vlan_range) == expected
+        assert get_vlan_tags_and_masks(vlan_range) == expected
 
     def test_check_disabled_component(self):
         """Test check disabled component"""

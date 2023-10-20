@@ -80,17 +80,18 @@ def max_power2_divisor(number: int, limit: int = 4096) -> int:
     return limit
 
 
-def get_vlan_tags_and_masks(start: int, end: int) -> list[tuple[int, int]]:
+def get_vlan_tags_and_masks(tag_ranges: list[list[int]]) -> list[str]:
     """Get the minimum number of vlan/mask pairs for a given range."""
-    limit = end + 1
-    tags_and_masks = []
-    while start < limit:
-        divisor = max_power2_divisor(start)
-        while divisor > limit - start:
-            divisor //= 2
-        tags_and_masks.append((start, 4096-divisor))
-        start += divisor
-    return tags_and_masks
+    masks_list = []
+    for start, end in tag_ranges:
+        limit = end + 1
+        while start < limit:
+            divisor = max_power2_divisor(start)
+            while divisor > limit - start:
+                divisor //= 2
+            masks_list.append(f"{start}/{4096-divisor}")
+            start += divisor
+    return masks_list
 
 
 def check_disabled_component(uni_a: UNI, uni_z: UNI):
