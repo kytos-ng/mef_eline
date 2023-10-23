@@ -65,18 +65,6 @@ class TestEVC():  # pylint: disable=too-many-public-methods
             EVC(**attributes)
         assert error_message in str(handle_error)
 
-    def test_with_invalid_uni_a(self):
-        """Test if the EVC raises and error with invalid UNI A."""
-        attributes = {
-            "controller": get_controller_mock(),
-            "name": "circuit_name",
-            "uni_a": get_uni_mocked(tag_value=82),
-        }
-        error_message = "VLAN tag 82 is not available in uni_a"
-        with pytest.raises(ValueError) as handle_error:
-            EVC(**attributes)
-        assert error_message in str(handle_error)
-
     def test_without_uni_z(self):
         """Test if the EVC raises and error with UNI Z is required."""
         attributes = {
@@ -85,19 +73,6 @@ class TestEVC():  # pylint: disable=too-many-public-methods
             "uni_a": get_uni_mocked(is_valid=True),
         }
         error_message = "uni_z is required."
-        with pytest.raises(ValueError) as handle_error:
-            EVC(**attributes)
-        assert error_message in str(handle_error)
-
-    def test_with_invalid_uni_z(self):
-        """Test if the EVC raises and error with UNI Z is required."""
-        attributes = {
-            "controller": get_controller_mock(),
-            "name": "circuit_name",
-            "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(tag_value=83),
-        }
-        error_message = "VLAN tag 83 is not available in uni_z"
         with pytest.raises(ValueError) as handle_error:
             EVC(**attributes)
         assert error_message in str(handle_error)

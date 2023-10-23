@@ -278,6 +278,11 @@ class Main(KytosNApp):
         except ValueError as exception:
             raise HTTPException(400, detail=str(exception)) from exception
 
+        try:
+            evc.use_available_uni_tags()
+        except ValueError as err:
+            raise HTTPException(400, detail=str(err)) from err
+
         # save circuit
         try:
             evc.sync()
@@ -405,6 +410,7 @@ class Main(KytosNApp):
             evc.disable()
             self.sched.remove(evc)
             evc.archive()
+            evc.remove_uni_tags()
             evc.sync()
         log.info("EVC removed. %s", evc)
         result = {"response": f"Circuit {circuit_id} removed"}

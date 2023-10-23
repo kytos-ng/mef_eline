@@ -37,6 +37,11 @@ def notify_link_available_tags(controller, link, src_func=None):
     })
 
 
+def notify_uni_available_tags(controller, uni):
+    """Notify uni available tags."""
+    emit_event(controller, "uni_available_tags", content=uni)
+
+
 def compare_endpoint_trace(endpoint, vlan, trace):
     """Compare and endpoint with a trace step."""
     if vlan and "vlan" in trace:

@@ -397,6 +397,7 @@ class TestMain:
         expected_result = "circuit_id 3 not found"
         assert response.json()["description"] == expected_result
 
+    @patch("napps.kytos.mef_eline.models.evc.EVC.use_available_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -411,6 +412,7 @@ class TestMain:
         uni_from_dict_mock,
         sched_add_mock,
         evc_deploy_mock,
+        mock_use_uni_tags,
         event_loop
     ):
         """Test create a new circuit."""
@@ -419,6 +421,7 @@ class TestMain:
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
         evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -610,6 +613,7 @@ class TestMain:
         assert response.status_code == 400
         assert expected_data in current_data["description"]
 
+    @patch("napps.kytos.mef_eline.models.evc.EVC.use_available_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -624,6 +628,7 @@ class TestMain:
         uni_from_dict_mock,
         sched_add_mock,
         evc_deploy_mock,
+        mock_use_uni_tags,
         event_loop
     ):
         """Test create an already created circuit."""
@@ -633,6 +638,7 @@ class TestMain:
         mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -1432,6 +1438,7 @@ class TestMain:
         assert 409 == response.status_code
         assert "Can't update archived EVC" in response.json()["description"]
 
+    @patch("napps.kytos.mef_eline.models.evc.EVC.use_available_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -1446,6 +1453,7 @@ class TestMain:
         uni_from_dict_mock,
         sched_add_mock,
         evc_deploy_mock,
+        mock_use_uni_tags,
         event_loop
     ):
         """Test update a circuit circuit."""
@@ -1454,6 +1462,7 @@ class TestMain:
         mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -1497,6 +1506,7 @@ class TestMain:
         assert 400 == response.status_code
         assert "must have a primary path or" in current_data["description"]
 
+    @patch("napps.kytos.mef_eline.models.evc.EVC.use_available_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -1515,6 +1525,7 @@ class TestMain:
         uni_from_dict_mock,
         sched_add_mock,
         evc_deploy_mock,
+        mock_use_uni_tags,
         event_loop
     ):
         """Test update a circuit circuit."""
@@ -1524,6 +1535,7 @@ class TestMain:
         mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
         link_from_dict_mock.return_value = 1
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
@@ -1574,6 +1586,8 @@ class TestMain:
         assert 400 == response.status_code
         assert current_data["description"] == expected_data
 
+    @patch("napps.kytos.mef_eline.models.evc.EVC.update_unis")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.use_available_uni_tags")
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch('napps.kytos.mef_eline.models.evc.EVC._validate')
     @patch('napps.kytos.mef_eline.models.evc.EVCDeploy.deploy')
@@ -1584,6 +1598,8 @@ class TestMain:
         evc_deploy,
         _mock_validate,
         _mongo_controller_upsert_mock,
+        mock_use_uni_tags,
+        mock_update_unis,
         event_loop,
     ):
         """Test update a circuit that result in an intra-switch EVC
@@ -1591,18 +1607,18 @@ class TestMain:
         evc_deploy.return_value = True
         _mock_validate.return_value = True
         _mongo_controller_upsert_mock.return_value = True
+        mock_use_uni_tags.return_value = True
         self.napp.controller.loop = event_loop
         # Interfaces from get_uni_mocked() are disabled
-        unis = [
-            get_uni_mocked(
-                switch_dpid="00:00:00:00:00:00:00:01",
-                switch_id="00:00:00:00:00:00:00:01"
-            ),
-            get_uni_mocked(
-                switch_dpid="00:00:00:00:00:00:00:02",
-                switch_id="00:00:00:00:00:00:00:02"
-            ),
-        ]
+        uni_a = get_uni_mocked(
+            switch_dpid="00:00:00:00:00:00:00:01",
+            switch_id="00:00:00:00:00:00:00:01"
+        )
+        uni_z = get_uni_mocked(
+            switch_dpid="00:00:00:00:00:00:00:02",
+            switch_id="00:00:00:00:00:00:00:02"
+        )
+        unis = [uni_a, uni_z]
         uni_from_dict_mock.side_effect = 2 * unis
 
         evc_payload = {
@@ -1625,6 +1641,7 @@ class TestMain:
                 "interface_id": "00:00:00:00:00:00:00:02:1"
             }
         }
+        mock_update_unis.return_value = [uni_z, uni_z]
         response = await self.api_client.post(
             f"{self.base_endpoint}/v2/evc/",
             json=evc_payload,
@@ -1638,7 +1655,7 @@ class TestMain:
             json=update_payload,
         )
         assert 409 == response.status_code
-        description = "00:00:00:00:00:00:00:01:1 is disabled"
+        description = "00:00:00:00:00:00:00:02:1 is disabled"
         assert description in response.json()["description"]
 
     def test_link_from_dict_non_existent_intf(self):
@@ -1660,6 +1677,7 @@ class TestMain:
         with pytest.raises(ValueError):
             self.napp._uni_from_dict(uni_dict)
 
+    @patch("napps.kytos.mef_eline.models.evc.EVC.use_available_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -1672,6 +1690,7 @@ class TestMain:
         uni_from_dict_mock,
         sched_add_mock,
         evc_deploy_mock,
+        mock_use_uni_tags,
         event_loop
     ):
         """Test update a circuit with wrong mimetype."""
@@ -1679,6 +1698,7 @@ class TestMain:
         validate_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -1727,6 +1747,8 @@ class TestMain:
         assert current_data["description"] == expected_data
         assert 404 == response.status_code
 
+    @patch("napps.kytos.mef_eline.models.evc.EVC.remove_uni_tags")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.use_available_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.remove_current_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -1743,6 +1765,8 @@ class TestMain:
         sched_add_mock,
         evc_deploy_mock,
         remove_current_flows_mock,
+        mock_use_uni_tags,
+        mock_remove_tags,
         event_loop
     ):
         """Try to delete an archived EVC"""
@@ -1752,6 +1776,7 @@ class TestMain:
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         remove_current_flows_mock.return_value = True
+        mock_use_uni_tags.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -1786,6 +1811,7 @@ class TestMain:
             f"{self.base_endpoint}/v2/evc/{circuit_id}"
         )
         assert 200 == response.status_code
+        assert mock_remove_tags.call_count == 1
 
         response = await self.api_client.delete(
             f"{self.base_endpoint}/v2/evc/{circuit_id}"

@@ -23,7 +23,8 @@ from napps.kytos.mef_eline.utils import (check_disabled_component,
                                          compare_endpoint_trace,
                                          compare_uni_out_trace, emit_event,
                                          map_dl_vlan, map_evc_event_content,
-                                         notify_link_available_tags)
+                                         notify_link_available_tags,
+                                         notify_uni_available_tags)
 
 from .path import DynamicPathManager, Path
 
@@ -172,6 +173,36 @@ class EVCBase(GenericEntity):
             return
         self._mongo_controller.upsert_evc(self.as_dict())
 
+    def update_unis(self, **kwargs) -> tuple[UNI, UNI]:
+        """Update UNIs if neccessary. Allocate and de-allocate
+        UNI tags. Return UNIs (uni_a, uni_z)"""
+        uni_a = kwargs.get("uni_a", None)
+        uni_a_update = False
+        if uni_a and uni_a != self.uni_a:
+            uni_a_update = True
+            try:
+                self._use_uni_vlan(uni_a)
+            except ValueError as err:
+                raise err
+
+        uni_z = kwargs.get("uni_z", None)
+        if uni_z and uni_z != self.uni_z:
+            try:
+                self._use_uni_vlan(uni_z)
+                self.make_uni_vlan_available(self.uni_z)
+            except ValueError as err:
+                if uni_a_update:
+                    self.make_uni_vlan_available(uni_a)
+                raise err
+        else:
+            uni_z = self.uni_z
+
+        if uni_a_update:
+            self.make_uni_vlan_available(self.uni_a)
+        else:
+            uni_a = self.uni_a
+        return uni_a, uni_z
+
     def update(self, **kwargs):
         """Update evc attributes.
 
@@ -188,8 +219,7 @@ class EVCBase(GenericEntity):
 
         """
         enable, redeploy = (None, None)
-        uni_a = kwargs.get("uni_a") or self.uni_a
-        uni_z = kwargs.get("uni_z") or self.uni_z
+        uni_a, uni_z = self.update_unis(**kwargs)
         check_disabled_component(uni_a, uni_z)
         self._validate_has_primary_or_dynamic(
             primary_path=kwargs.get("primary_path"),
@@ -264,14 +294,6 @@ class EVCBase(GenericEntity):
                 uni = kwargs.get(attribute)
                 if not isinstance(uni, UNI):
                     raise ValueError(f"{attribute} is an invalid UNI.")
-
-                if not uni.is_valid():
-                    try:
-                        tag = uni.user_tag.value
-                    except AttributeError:
-                        tag = None
-                    message = f"VLAN tag {tag} is not available in {attribute}"
-                    raise ValueError(message)
 
     def _validate_has_primary_or_dynamic(
         self,
@@ -399,6 +421,56 @@ class EVCBase(GenericEntity):
     def archive(self):
         """Archive this EVC on deletion."""
         self.archived = True
+
+    def use_available_uni_tags(self):
+        """Use UNI tags if available, raise ValueError otherwise
+        This method is used when creating an EVC
+
+        Note:
+            ValueError is not expected to hit because self._validate()
+            ensures uni.tag availability already.
+        """
+        uni_a = self.uni_a
+        try:
+            self._use_uni_vlan(uni_a)
+        except ValueError as err:
+            raise err
+        uni_z = self.uni_z
+        try:
+            self._use_uni_vlan(uni_z)
+        except ValueError as err:
+            self.make_uni_vlan_available(uni_a)
+            raise err
+
+    def _use_uni_vlan(self, uni: UNI):
+        """Use vlan from uni"""
+        if uni.user_tag is None:
+            return
+        tag = uni.user_tag.value
+        if isinstance(tag, int):
+            success = uni.interface.use_tag(uni.user_tag)
+            if not success:
+                intf = uni.interface.id
+                raise ValueError(f"TAG {tag} is not available in {intf}")
+            notify_uni_available_tags(self._controller, {"uni": uni})
+
+    def make_uni_vlan_available(self, uni: UNI):
+        """Make UNI vlan available"""
+        if uni.user_tag is None:
+            return
+        tag = uni.user_tag.value
+        if isinstance(tag, int):
+            success = uni.interface.make_tag_available(uni.user_tag)
+            if not success:
+                intf = uni.interface.id
+                log.error(f"Tag {tag} was already available in {intf}")
+            else:
+                notify_uni_available_tags(self._controller, {"uni": uni})
+
+    def remove_uni_tags(self):
+        """Remove both UNI use of a tag"""
+        self.make_uni_vlan_available(self.uni_a)
+        self.make_uni_vlan_available(self.uni_z)
 
 
 # pylint: disable=fixme, too-many-public-methods
