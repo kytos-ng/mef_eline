@@ -81,7 +81,7 @@ def max_power2_divisor(number: int, limit: int = 4096) -> int:
 
 
 def get_vlan_tags_and_masks(tag_ranges: list[list[int]]) -> list[str]:
-    """Get the minimum number of vlan/mask pairs for a given range."""
+    """Get a list of vlan/mask pairs for a given list of ranges."""
     masks_list = []
     for start, end in tag_ranges:
         limit = end + 1
