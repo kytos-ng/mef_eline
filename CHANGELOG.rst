@@ -17,6 +17,7 @@ Changed
 - EVCs will try to maintain their current_path on link status changes
 - UNIs now will use and free tags from ``Interface.available_tags``.
 - UNI tag_type is changed to string from 1, 2 and 3 values to ``"vlan"``, ``"vlan_qinq"`` and ``"mpls"`` respectively.
+- Add ``set_vlan`` only if UNI A vlan and UNI z vlan are different.
 
 Deprecated
 ==========
