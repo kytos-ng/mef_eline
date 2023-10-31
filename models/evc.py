@@ -1209,7 +1209,7 @@ class EVCDeploy(EVCBase):
             # if in_vlan is set, it must be included in the match
             flow_mod["match"]["dl_vlan"] = in_vlan
 
-        if new_c_vlan not in self.special_cases:
+        if new_c_vlan not in self.special_cases and in_vlan != new_c_vlan:
             # new_in_vlan is an integer but zero, action to set is required
             new_action = {"action_type": "set_vlan", "vlan_id": new_c_vlan}
             flow_mod["actions"].insert(0, new_action)
