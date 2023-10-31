@@ -232,6 +232,7 @@ class TestEVC():
         "in_vlan_a,in_vlan_z",
         [
             (100, 50),
+            (100, 100),
             (100, "4096/4096"),
             (100, 0),
             (100, None),
@@ -286,7 +287,7 @@ class TestEVC():
         expected_flow_mod["priority"] = evc.get_priority(in_vlan_a)
         if in_vlan_a is not None:
             expected_flow_mod['match']['dl_vlan'] = in_vlan_a
-        if in_vlan_z not in evc.special_cases:
+        if in_vlan_z not in evc.special_cases and in_vlan_a != in_vlan_z:
             new_action = {"action_type": "set_vlan",
                           "vlan_id": in_vlan_z}
             expected_flow_mod["actions"].insert(0, new_action)
