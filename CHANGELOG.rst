@@ -26,6 +26,7 @@ Deprecated
 General Information
 ===================
 - ``scripts/vlan_type_string.py`` can be used to update the collection ``evcs`` by changing ``tag_type`` from integer to string.
+- ``scripts/redeploy_evpls_same_vlans.py`` can be used to redeploy symmetric (same UNI vlans) EVPLs in batch.
 
 Fixed
 =====

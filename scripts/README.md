@@ -175,7 +175,7 @@ python scripts/redeploy_evpls_same_vlans.py update --batch_size 10 --batch_sleep
 2023-11-01 16:29:46,143 - INFO - Redeployed evc_id eab1fedf3d654f
 ```
 
-- If you want to redeploy all symmetric EVPLs by redeploying 10 EVCs concurrently and waiting for 5 seconds:
+- If you want to redeploy all symmetric EVPLs batching 10 EVCs concurrently and waiting for 5 seconds per batch:
 
 ```
 python scripts/redeploy_evpls_same_vlans.py update --batch_size 10 --batch_sleep_secs 5
