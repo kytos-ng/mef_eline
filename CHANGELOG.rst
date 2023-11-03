@@ -6,6 +6,17 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.1.3] - 2023-11-01
+***********************
+
+Changed
+=======
+- Add ``set_vlan`` only if UNI A vlan and UNI z vlan are different.
+
+General Information
+===================
+- ``scripts/redeploy_evpls_same_vlans.py`` can be used to redeploy symmetric (same UNI vlans) EVPLs in batch.
+
 [2023.1.2] - 2023-10-12
 ***********************
 
