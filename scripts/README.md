@@ -80,6 +80,7 @@ You should use this script if you want to avoid a redundant `set_vlan` instructi
 
 #### Pre-requisites
 
+- `kytosd` must be running
 - There's no additional dependency other than the existing core ones
 
 #### How to use
