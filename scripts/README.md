@@ -112,7 +112,7 @@ CMD=update_database python3 scripts/003_vlan_type_string.py
 
 [`redeploy_evpls_same_vlans.py`](./redeploy_evpls_same_vlans.py) is a CLI script to list and redeploy symmetric (same vlan on both UNIs) EVPLs.
 
-You should use this script if you want to avoid a redundant `set_vlan` instruction that used to be present in the instruction set. This script by triggering an EVC redeploy will force that all flows get pushed and overwritten again, it'll temporarily create traffic disruption. The redeploy in this case is just to force that the flows are pushed right away instead of waiting for a network convergence that might result in the flows getting pushed again.
+You should use this script if you want to avoid a redundant `set_vlan` instruction that used to be present in the instruction set and if you are upgrading from `2023.1.0`. This script by triggering an EVC redeploy will force that all flows get pushed and overwritten again, it'll temporarily create traffic disruption. The redeploy in this case is just to force that the flows are pushed right away instead of waiting for a network convergence that might result in the flows getting pushed again.
 
 #### Pre-requisites
 
