@@ -12,19 +12,22 @@ from pydantic import ValidationError
 
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
+from kytos.core.exceptions import KytosInvalidRanges, KytosTagsAreNotAvailable
 from kytos.core.helpers import (alisten_to, listen_to, load_spec,
                                 validate_openapi)
-from kytos.core.interface import TAG, UNI
+from kytos.core.interface import TAG, UNI, TAGRange
 from kytos.core.link import Link
 from kytos.core.rest_api import (HTTPException, JSONResponse, Request,
                                  get_json_or_400)
+from kytos.core.tag_ranges import get_tag_ranges
 from napps.kytos.mef_eline import controllers, settings
 from napps.kytos.mef_eline.exceptions import DisabledSwitch, InvalidPath
 from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
 from napps.kytos.mef_eline.utils import (aemit_event, check_disabled_component,
-                                         emit_event, map_evc_event_content)
+                                         emit_event, get_vlan_tags_and_masks,
+                                         map_evc_event_content)
 
 
 # pylint: disable=too-many-public-methods
@@ -269,11 +272,9 @@ class Main(KytosNApp):
                     detail=f"backup_path is not valid: {exception}"
                 ) from exception
 
-        # verify duplicated evc
-        if self._is_duplicated_evc(evc):
-            result = "The EVC already exists."
-            log.debug("create_circuit result %s %s", result, 409)
-            raise HTTPException(409, detail=result)
+        if not evc._tag_lists_equal():
+            detail = "UNI_A and UNI_Z tag lists should be the same."
+            raise HTTPException(400, detail=detail)
 
         try:
             evc._validate_has_primary_or_dynamic()
@@ -282,7 +283,7 @@ class Main(KytosNApp):
 
         try:
             self._use_uni_tags(evc)
-        except ValueError as exception:
+        except KytosTagsAreNotAvailable as exception:
             raise HTTPException(400, detail=str(exception)) from exception
 
         # save circuit
@@ -315,12 +316,12 @@ class Main(KytosNApp):
         uni_a = evc.uni_a
         try:
             evc._use_uni_vlan(uni_a)
-        except ValueError as err:
+        except KytosTagsAreNotAvailable as err:
             raise err
         try:
             uni_z = evc.uni_z
             evc._use_uni_vlan(uni_z)
-        except ValueError as err:
+        except KytosTagsAreNotAvailable as err:
             evc.make_uni_vlan_available(uni_a)
             raise err
 
@@ -367,6 +368,10 @@ class Main(KytosNApp):
         except ValidationError as exception:
             raise HTTPException(400, detail=str(exception)) from exception
         except ValueError as exception:
+            log.error(exception)
+            log.debug("update result %s %s", exception, 400)
+            raise HTTPException(400, detail=str(exception)) from exception
+        except KytosTagsAreNotAvailable as exception:
             log.error(exception)
             log.debug("update result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
@@ -705,21 +710,6 @@ class Main(KytosNApp):
         log.debug("delete_schedule result %s %s", result, status)
         return JSONResponse(result, status_code=status)
 
-    def _is_duplicated_evc(self, evc):
-        """Verify if the circuit given is duplicated with the stored evcs.
-
-        Args:
-            evc (EVC): circuit to be analysed.
-
-        Returns:
-            boolean: True if the circuit is duplicated, otherwise False.
-
-        """
-        for circuit in tuple(self.circuits.values()):
-            if not circuit.archived and circuit.shares_uni(evc):
-                return True
-        return False
-
     @listen_to("kytos/topology.link_up")
     def on_link_up(self, event):
         """Change circuit when link is up or end_maintenance."""
@@ -1001,7 +991,15 @@ class Main(KytosNApp):
             tag_type = tag_dict.get("tag_type")
             tag_type = tag_convert.get(tag_type, tag_type)
             tag_value = tag_dict.get("value")
-            tag = TAG(tag_type, tag_value)
+            if isinstance(tag_value, list):
+                try:
+                    tag_value = get_tag_ranges(tag_value)
+                except KytosInvalidRanges as err:
+                    raise err
+                mask_list = get_vlan_tags_and_masks(tag_value)
+                tag = TAGRange(tag_type, tag_value, mask_list)
+            else:
+                tag = TAG(tag_type, tag_value)
         else:
             tag = None
         uni = UNI(interface, tag)
