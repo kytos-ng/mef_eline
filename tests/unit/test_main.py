@@ -397,6 +397,7 @@ class TestMain:
         expected_result = "circuit_id 3 not found"
         assert response.json()["description"] == expected_result
 
+    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -413,6 +414,7 @@ class TestMain:
         sched_add_mock,
         evc_deploy_mock,
         mock_use_uni_tags,
+        mock_tags_equal,
         event_loop
     ):
         """Test create a new circuit."""
@@ -422,6 +424,7 @@ class TestMain:
         mongo_controller_upsert_mock.return_value = True
         evc_deploy_mock.return_value = True
         mock_use_uni_tags.return_value = True
+        mock_tags_equal.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -613,6 +616,7 @@ class TestMain:
         assert response.status_code == 400
         assert expected_data in current_data["description"]
 
+    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -629,6 +633,7 @@ class TestMain:
         sched_add_mock,
         evc_deploy_mock,
         mock_use_uni_tags,
+        mock_tags_equal,
         event_loop
     ):
         """Test create an already created circuit."""
@@ -639,6 +644,7 @@ class TestMain:
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         mock_use_uni_tags.return_value = True
+        mock_tags_equal.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -676,10 +682,17 @@ class TestMain:
         assert current_data["description"] == expected_data
         assert 409 == response.status_code
 
+    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    async def test_create_circuit_case_5(self, uni_from_dict_mock, event_loop):
+    async def test_create_circuit_case_5(
+        self,
+        uni_from_dict_mock,
+        mock_tags_equal,
+        event_loop
+    ):
         """Test when neither primary path nor dynamic_backup_path is set."""
         self.napp.controller.loop = event_loop
+        mock_tags_equal.return_value = True
         url = f"{self.base_endpoint}/v2/evc/"
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
@@ -1441,6 +1454,7 @@ class TestMain:
         assert 409 == response.status_code
         assert "Can't update archived EVC" in response.json()["description"]
 
+    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -1457,6 +1471,7 @@ class TestMain:
         sched_add_mock,
         evc_deploy_mock,
         mock_use_uni_tags,
+        mock_tags_equal,
         event_loop
     ):
         """Test update a circuit circuit."""
@@ -1466,6 +1481,7 @@ class TestMain:
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         mock_use_uni_tags.return_value = True
+        mock_tags_equal.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -1509,6 +1525,7 @@ class TestMain:
         assert 400 == response.status_code
         assert "must have a primary path or" in current_data["description"]
 
+    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -1529,6 +1546,7 @@ class TestMain:
         sched_add_mock,
         evc_deploy_mock,
         mock_use_uni_tags,
+        mock_tags_equal,
         event_loop
     ):
         """Test update a circuit circuit."""
@@ -1540,6 +1558,7 @@ class TestMain:
         evc_deploy_mock.return_value = True
         mock_use_uni_tags.return_value = True
         link_from_dict_mock.return_value = 1
+        mock_tags_equal.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -1681,6 +1700,7 @@ class TestMain:
         with pytest.raises(ValueError):
             self.napp._uni_from_dict(uni_dict)
 
+    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -1695,6 +1715,7 @@ class TestMain:
         sched_add_mock,
         evc_deploy_mock,
         mock_use_uni_tags,
+        mock_tags_equal,
         event_loop
     ):
         """Test update a circuit with wrong mimetype."""
@@ -1703,6 +1724,7 @@ class TestMain:
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
         mock_use_uni_tags.return_value = True
+        mock_tags_equal.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -1751,6 +1773,7 @@ class TestMain:
         assert current_data["description"] == expected_data
         assert 404 == response.status_code
 
+    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
     @patch("napps.kytos.mef_eline.models.evc.EVC.remove_uni_tags")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.remove_current_flows")
@@ -1771,6 +1794,7 @@ class TestMain:
         remove_current_flows_mock,
         mock_remove_tags,
         mock_use_uni,
+        mock_tags_equal,
         event_loop
     ):
         """Try to delete an archived EVC"""
@@ -1781,6 +1805,7 @@ class TestMain:
         evc_deploy_mock.return_value = True
         remove_current_flows_mock.return_value = True
         mock_use_uni.return_value = True
+        mock_tags_equal.return_value = True
         uni1 = create_autospec(UNI)
         uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
