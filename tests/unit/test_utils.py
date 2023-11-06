@@ -42,26 +42,25 @@ class TestUtils():
     def test_compare_uni_out_trace(self):
         """Test compare_uni_out_trace method."""
         # case1: trace without 'out' info, should return True
-        uni = MagicMock()
-        assert compare_uni_out_trace(uni, {})
+        interface = MagicMock()
+        assert compare_uni_out_trace(None, interface, {})
 
         # case2: trace with valid port and VLAN, should return True
-        uni.interface.port_number = 1
-        uni.user_tag.value = 123
+        interface.port_number = 1
+        tag_value = 123
         trace = {"out": {"port": 1, "vlan": 123}}
-        assert compare_uni_out_trace(uni, trace)
+        assert compare_uni_out_trace(tag_value, interface, trace)
 
         # case3: UNI has VLAN but trace dont have, should return False
         trace = {"out": {"port": 1}}
-        assert compare_uni_out_trace(uni, trace) is False
+        assert compare_uni_out_trace(tag_value, interface, trace) is False
 
         # case4: UNI and trace dont have VLAN should return True
-        uni.user_tag = None
-        assert compare_uni_out_trace(uni, trace)
+        assert compare_uni_out_trace(None, interface, trace)
 
         # case5: UNI dont have VLAN but trace has, should return False
         trace = {"out": {"port": 1, "vlan": 123}}
-        assert compare_uni_out_trace(uni, trace) is False
+        assert compare_uni_out_trace(None, interface, trace) is False
 
     def test_map_dl_vlan(self):
         """Test map_dl_vlan"""
@@ -76,13 +75,13 @@ class TestUtils():
             (
                 [[101, 200]],
                 [
-                    "101/4095",
+                    101,
                     "102/4094",
                     "104/4088",
                     "112/4080",
                     "128/4032",
                     "192/4088",
-                    "200/4095",
+                    200,
                 ]
             ),
             (
@@ -91,7 +90,7 @@ class TestUtils():
             ),
             (
                 [[34, 34]],
-                ["34/4095"]
+                [34]
             ),
             (
                 [
@@ -100,8 +99,8 @@ class TestUtils():
                     [130, 135]
                 ],
                 [
-                    "34/4095",
-                    "128/4095",
+                    34,
+                    128,
                     "130/4094",
                     "132/4092"
                 ]

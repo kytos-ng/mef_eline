@@ -695,9 +695,13 @@ components:
             - type: integer
               format: int32
             - type: string
-              enum:
-                - any
-                - untagged
+            - type: array
+              minItems: 1
+              items:
+                anyOf:
+                  - type: array
+                  - type: integer
+              example: [[1, 500], 2096, [3001]]
 
     CircuitSchedule: # Can be referenced via '#/components/schemas/CircuitSchedule'
       type: object
