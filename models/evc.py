@@ -183,11 +183,7 @@ class EVCBase(GenericEntity):
         uni_a_flag = False
         if uni_a and uni_a != self.uni_a:
             uni_a_flag = True
-            try:
-                # uni_a - self.uni_a
-                self._use_uni_vlan(uni_a, uni_dif=self.uni_a)
-            except KytosTagsAreNotAvailable as err:
-                raise err
+            self._use_uni_vlan(uni_a, uni_dif=self.uni_a)
 
         uni_z = kwargs.get("uni_z", None)
         if uni_z and uni_z != self.uni_z:
@@ -314,12 +310,8 @@ class EVCBase(GenericEntity):
         if (uni_z.user_tag and isinstance(uni_z.user_tag, TAGRange)):
             uni_z_list = True
         if uni_a_list and uni_z_list:
-            if uni_a.user_tag.value == uni_z.user_tag.value:
-                return True
-            return False
-        if uni_a_list == uni_z_list:
-            return True
-        return False
+            return uni_a.user_tag.value == uni_z.user_tag.value
+        return uni_a_list == uni_z_list
 
     def _validate_has_primary_or_dynamic(
         self,
@@ -460,15 +452,14 @@ class EVCBase(GenericEntity):
         if not tag or isinstance(tag, str):
             return
         tag_type = uni.user_tag.tag_type
-        if isinstance(tag, list) and uni_dif:
-            if isinstance(uni_dif.user_tag, list):
-                tag = range_difference(tag, uni_dif.user_tag.value)
-        try:
-            uni.interface.use_tags(
-                self._controller, tag, tag_type
-            )
-        except KytosTagsAreNotAvailable as err:
-            raise err
+        if (uni_dif and isinstance(tag, list) and 
+                isinstance(uni_dif.user_tag, list)):
+            tag = range_difference(tag, uni_dif.user_tag.value)
+            if not tag:
+                return
+        uni.interface.use_tags(
+            self._controller, tag, tag_type
+        )
 
     def make_uni_vlan_available(
         self,
@@ -482,9 +473,11 @@ class EVCBase(GenericEntity):
         if not tag or isinstance(tag, str):
             return
         tag_type = uni.user_tag.tag_type
-        if isinstance(tag, list) and uni_dif:
-            if isinstance(uni_dif.user_tag, list):
-                tag = range_difference(tag, uni_dif.user_tag.value)
+        if (uni_dif and isinstance(tag, list) and
+                isinstance(uni_dif.user_tag, list)):
+            tag = range_difference(tag, uni_dif.user_tag.value)
+            if not tag:
+                return
         try:
             conflict = uni.interface.make_tags_available(
                 self._controller, tag, tag_type
@@ -1463,7 +1456,7 @@ class EVCDeploy(EVCBase):
                 if isinstance(circuit.uni_a.user_tag, TAGRange):
                     length = len(circuit.uni_a.user_tag.mask_list)
                     circuits_checked[circuit.id] = EVCDeploy.check_range(
-                        circuit, traces[0:length*2]
+                        circuit, traces[i:i+length*2]
                     )
                     i += length*2
                 else:
