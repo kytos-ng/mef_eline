@@ -15,8 +15,7 @@ from requests.exceptions import Timeout
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
 from kytos.core.exceptions import (KytosNoTagAvailableError,
-                                   KytosTagsAreNotAvailable,
-                                   KytosTagsNotInTagRanges)
+                                   KytosTagError)
 from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI, Interface, TAGRange
 from kytos.core.link import Link
@@ -190,16 +189,14 @@ class EVCBase(GenericEntity):
             try:
                 self._use_uni_vlan(uni_z, uni_dif=self.uni_z)
                 self.make_uni_vlan_available(self.uni_z, uni_dif=uni_z)
-            except KytosTagsAreNotAvailable as err:
+            except KytosTagError as err:
                 if uni_a_flag:
-                    # self.uni_a - uni_a
                     self.make_uni_vlan_available(uni_a, uni_dif=self.uni_a)
                 raise err
         else:
             uni_z = self.uni_z
 
         if uni_a_flag:
-            # self.uni_a - uni_a
             self.make_uni_vlan_available(self.uni_a, uni_dif=uni_a)
         else:
             uni_a = self.uni_a
@@ -482,7 +479,7 @@ class EVCBase(GenericEntity):
             conflict = uni.interface.make_tags_available(
                 self._controller, tag, tag_type
             )
-        except KytosTagsNotInTagRanges as err:
+        except KytosTagError as err:
             log.error(f"Error in circuit {self._id}: {err}")
         if conflict:
             intf = uni.interface.id
@@ -699,7 +696,7 @@ class EVCDeploy(EVCBase):
                 )
         try:
             self.failover_path.make_vlans_available(self._controller)
-        except KytosTagsNotInTagRanges as err:
+        except KytosTagError as err:
             log.error(f"Error when removing failover flows: {err}")
         self.failover_path = Path([])
         if sync:
@@ -732,7 +729,7 @@ class EVCDeploy(EVCBase):
                 )
         try:
             current_path.make_vlans_available(self._controller)
-        except KytosTagsNotInTagRanges as err:
+        except KytosTagError as err:
             log.error(f"Error when removing current path flows: {err}")
         self.current_path = Path([])
         self.deactivate()
@@ -789,7 +786,7 @@ class EVCDeploy(EVCBase):
                 )
         try:
             path.make_vlans_available(self._controller)
-        except KytosTagsNotInTagRanges as err:
+        except KytosTagError as err:
             log.error(f"Error when removing path flows: {err}")
 
     @staticmethod
