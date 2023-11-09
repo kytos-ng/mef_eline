@@ -45,12 +45,9 @@ class Path(list, GenericEntity):
         """Make the VLANs used in a path available when undeployed."""
         for link in self:
             tag = link.get_metadata("s_vlan")
-            try:
-                conflict_a, conflict_b = link.make_tags_available(
-                    controller, tag.value, link.id, tag.tag_type
-                )
-            except KytosTagsNotInTagRanges as err:
-                raise err
+            conflict_a, conflict_b = link.make_tags_available(
+                controller, tag.value, link.id, tag.tag_type
+            )
             if conflict_a:
                 log.error(f"Tags {conflict_a} was already available in"
                           f"{link.endpoint_a.id}")
