@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
-from kytos.core.exceptions import KytosInvalidRanges, KytosTagsAreNotAvailable, KytosTagError
+from kytos.core.exceptions import KytosTagError
 from kytos.core.helpers import (alisten_to, listen_to, load_spec,
                                 validate_openapi)
 from kytos.core.interface import TAG, UNI, TAGRange
@@ -274,6 +274,11 @@ class Main(KytosNApp):
                     detail=f"backup_path is not valid: {exception}"
                 ) from exception
 
+        if self._is_duplicated_evc(evc):
+            result = "The EVC already exists."
+            log.debug("create_circuit result %s %s", result, 409)
+            raise HTTPException(409, detail=result)
+
         if not evc._tag_lists_equal():
             detail = "UNI_A and UNI_Z tag lists should be the same."
             raise HTTPException(400, detail=detail)
@@ -285,7 +290,7 @@ class Main(KytosNApp):
 
         try:
             self._use_uni_tags(evc)
-        except KytosTagsAreNotAvailable as exception:
+        except KytosTagError as exception:
             raise HTTPException(400, detail=str(exception)) from exception
 
         # save circuit
@@ -320,7 +325,7 @@ class Main(KytosNApp):
         try:
             uni_z = evc.uni_z
             evc._use_uni_vlan(uni_z)
-        except KytosTagsAreNotAvailable as err:
+        except KytosTagError as err:
             evc.make_uni_vlan_available(uni_a)
             raise err
 
@@ -369,9 +374,6 @@ class Main(KytosNApp):
         except ValidationError as exception:
             raise HTTPException(400, detail=str(exception)) from exception
         except ValueError as exception:
-            log.debug("update result %s %s", exception, 400)
-            raise HTTPException(400, detail=str(exception)) from exception
-        except KytosTagsAreNotAvailable as exception:
             log.debug("update result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
         except DisabledSwitch as exception:
@@ -709,6 +711,21 @@ class Main(KytosNApp):
         log.debug("delete_schedule result %s %s", result, status)
         return JSONResponse(result, status_code=status)
 
+    def _is_duplicated_evc(self, evc):
+        """Verify if the circuit given is duplicated with the stored evcs.
+
+        Args:
+            evc (EVC): circuit to be analysed.
+
+        Returns:
+            boolean: True if the circuit is duplicated, otherwise False.
+
+        """
+        for circuit in tuple(self.circuits.values()):
+            if not circuit.archived and circuit.shares_uni(evc):
+                return True
+        return False
+
     @listen_to("kytos/topology.link_up")
     def on_link_up(self, event):
         """Change circuit when link is up or end_maintenance."""
@@ -1003,7 +1020,6 @@ class Main(KytosNApp):
         else:
             tag = None
         uni = UNI(interface, tag)
-
         return uni
 
     def _link_from_dict(self, link_dict):
