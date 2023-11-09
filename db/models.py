@@ -38,7 +38,7 @@ class CircuitScheduleDoc(BaseModel):
 class TAGDoc(BaseModel):
     """TAG model"""
     tag_type: str
-    value: Union[int, str, list]
+    value: Union[int, str, list[list[int]]]
 
     @validator('value')
     def validate_value(cls, value):
