@@ -9,7 +9,7 @@ from kytos.core.common import EntityStatus
 from kytos.core.exceptions import KytosNoTagAvailableError
 from kytos.core.interface import Interface
 from kytos.core.switch import Switch
-
+from requests.exceptions import Timeout
 # pylint: disable=wrong-import-position
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
@@ -192,6 +192,12 @@ class TestEVC():
             "table_id": 0,
         }
         assert expected_flow_mod == flow_mod
+
+        evc.sb_priority = 1234
+        flow_mod = evc._prepare_flow_mod(interface_a, interface_z, 3)
+        assert flow_mod["priority"] == 1234
+        assert flow_mod["actions"][1]["action_type"] == "set_queue"
+        assert flow_mod["actions"][1]["queue_id"] == 3
 
     def test_prepare_pop_flow(self):
         """Test prepare pop flow  method."""
@@ -1385,7 +1391,8 @@ class TestEVC():
                                 }
                             }
                         ]
-        result = EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        arg_tuple = [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        result = EVCDeploy.run_bulk_sdntraces(arg_tuple)
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1394,7 +1401,12 @@ class TestEVC():
         assert result['result'] == "ok"
 
         response.status_code = 400
-        result = EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        result = EVCDeploy.run_bulk_sdntraces(arg_tuple)
+        assert result == {"result": []}
+
+        put_mock.side_effect = Timeout
+        response.status_code = 200
+        result = EVCDeploy.run_bulk_sdntraces(arg_tuple)
         assert result == {"result": []}
 
     @patch("requests.put")
@@ -1413,9 +1425,10 @@ class TestEVC():
                                 }
                             }
                         ]
-
         evc.uni_a.user_tag.value = 'untagged'
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1425,7 +1438,9 @@ class TestEVC():
         assert 'eth' not in args
 
         evc.uni_a.user_tag.value = 0
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1435,7 +1450,9 @@ class TestEVC():
         assert 'eth' not in args
 
         evc.uni_a.user_tag.value = '5/2'
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1446,7 +1463,9 @@ class TestEVC():
 
         expected_payload[0]['trace']['eth'] = {'dl_type': 0x8100, 'dl_vlan': 1}
         evc.uni_a.user_tag.value = 'any'
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1456,7 +1475,9 @@ class TestEVC():
         assert args['eth'] == {'dl_type': 33024, 'dl_vlan': 1}
 
         evc.uni_a.user_tag.value = '4096/4096'
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1470,7 +1491,9 @@ class TestEVC():
             'dl_vlan': 10
             }
         evc.uni_a.user_tag.value = '10/10'
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1484,7 +1507,9 @@ class TestEVC():
             'dl_vlan': 1
             }
         evc.uni_a.user_tag.value = '5/3'
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1498,7 +1523,9 @@ class TestEVC():
             'dl_vlan': 10
             }
         evc.uni_a.user_tag.value = 10
-        EVCDeploy.run_bulk_sdntraces([evc.uni_a])
+        EVCDeploy.run_bulk_sdntraces(
+            [(evc.uni_a.interface, evc.uni_a.user_tag.value)]
+        )
         put_mock.assert_called_with(
                                     expected_endpoint,
                                     json=expected_payload,
@@ -1836,6 +1863,45 @@ class TestEVC():
         # type loop
         assert result[evc.id] is False
 
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_trace")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_range")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.run_bulk_sdntraces")
+    def test_check_list_traces_vlan_list(self, *args):
+        """Test check_list_traces with vlan list"""
+        mock_bulk, mock_range, mock_trace = args
+        mask_list = [1, '2/4094', '4/4094']
+        evc = self.create_evc_inter_switch([[1, 5]], [[1, 5]])
+        evc.uni_a.user_tag.mask_list = mask_list
+        evc.uni_z.user_tag.mask_list = mask_list
+        mock_bulk.return_value = {"result": ["mock"] * 6}
+        mock_range.return_value = True
+        actual_return = EVC.check_list_traces([evc])
+        assert actual_return == {evc._id: True}
+        assert mock_trace.call_count == 0
+        assert mock_range.call_count == 1
+        args = mock_range.call_args[0]
+        assert args[0] == evc
+        assert args[1] == ["mock"] * 6
+
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_trace")
+    @patch("napps.kytos.mef_eline.models.evc.log")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.run_bulk_sdntraces")
+    def test_check_list_traces_empty(self, mock_bulk, mock_log, mock_trace):
+        """Test check_list_traces with empty return"""
+        evc = self.create_evc_inter_switch(1, 1)
+        actual_return = EVC.check_list_traces([])
+        assert not actual_return
+
+        mock_bulk.return_value = {"result": []}
+        actual_return = EVC.check_list_traces([evc])
+        assert not actual_return
+
+        mock_bulk.return_value = {"result": ["mock"]}
+        mock_trace.return_value = True
+        actual_return = EVC.check_list_traces([evc])
+        assert mock_log.error.call_count == 1
+        assert not actual_return
+
     @patch(
         "napps.kytos.mef_eline.models.path.DynamicPathManager"
         ".get_disjoint_paths"
@@ -1865,21 +1931,27 @@ class TestEVC():
 
     def test_get_value_from_uni_tag(self):
         """Test _get_value_from_uni_tag"""
-        uni = get_uni_mocked(tag_value=None)
-        value = EVC._get_value_from_uni_tag(uni)
-        assert value is None
-
         uni = get_uni_mocked(tag_value="any")
         value = EVC._get_value_from_uni_tag(uni)
         assert value == "4096/4096"
 
-        uni = get_uni_mocked(tag_value="untagged")
+        uni.user_tag.value = "untagged"
         value = EVC._get_value_from_uni_tag(uni)
         assert value == 0
 
-        uni = get_uni_mocked(tag_value=100)
+        uni.user_tag.value = 100
         value = EVC._get_value_from_uni_tag(uni)
         assert value == 100
+
+        uni.user_tag = None
+        value = EVC._get_value_from_uni_tag(uni)
+        assert value is None
+
+        uni = get_uni_mocked(tag_value=[[12, 20]])
+        uni.user_tag.mask_list = ['12/4092', '16/4092', '20/4094']
+
+        value = EVC._get_value_from_uni_tag(uni)
+        assert value == ['12/4092', '16/4092', '20/4094']
 
     def test_get_priority(self):
         """Test get_priority_from_vlan"""
@@ -1894,6 +1966,9 @@ class TestEVC():
 
         epl_value = EVC.get_priority(None)
         assert epl_value == EPL_SB_PRIORITY
+
+        epl_value = EVC.get_priority([[1, 5]])
+        assert epl_value == EVPL_SB_PRIORITY
 
     def test_set_flow_table_group_id(self):
         """Test set_flow_table_group_id"""
@@ -1915,3 +1990,106 @@ class TestEVC():
         assert result == link.endpoint_a
         result = self.evc_deploy.get_endpoint_by_id(link, "01", operator.ne)
         assert result == link.endpoint_b
+
+    @patch("napps.kytos.mef_eline.models.evc.EVC._prepare_pop_flow")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.get_endpoint_by_id")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._prepare_push_flow")
+    def test_prepare_uni_flows(self, mock_push, mock_endpoint, _):
+        """Test _prepare_uni_flows"""
+        mask_list = [1, '2/4094', '4/4094']
+        uni_a = get_uni_mocked(interface_port=1, tag_value=[[1, 5]])
+        uni_a.user_tag.mask_list = mask_list
+        uni_z = get_uni_mocked(interface_port=2, tag_value=[[1, 5]])
+        uni_z.user_tag.mask_list = mask_list
+        mock_endpoint.return_value = "mock_endpoint"
+        attributes = {
+            "table_group": {"evpl": 3, "epl": 4},
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+        }
+        evc = EVC(**attributes)
+        link = get_link_mocked()
+        evc._prepare_uni_flows(Path([link]))
+        call_list = []
+        for i in range(0, 3):
+            call_list.append(call(
+                uni_a.interface,
+                "mock_endpoint",
+                mask_list[i],
+                None,
+                mask_list,
+                queue_id=-1
+            ))
+        for i in range(0, 3):
+            call_list.append(call(
+                uni_z.interface,
+                "mock_endpoint",
+                mask_list[i],
+                None,
+                mask_list,
+                queue_id=-1
+            ))
+        mock_push.assert_has_calls(call_list)
+
+    def test_prepare_direct_uni_flows(self):
+        """Test _prepare_direct_uni_flows"""
+        mask_list = [1, '2/4094', '4/4094']
+        uni_a = get_uni_mocked(interface_port=1, tag_value=[[1, 5]])
+        uni_a.user_tag.mask_list = mask_list
+        uni_z = get_uni_mocked(interface_port=2, tag_value=[[1, 5]])
+        uni_z.user_tag.mask_list = mask_list
+        attributes = {
+            "table_group": {"evpl": 3, "epl": 4},
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+        }
+        evc = EVC(**attributes)
+        flows = evc._prepare_direct_uni_flows()[1]
+        assert len(flows) == 6
+        for i in range(0, 3):
+            assert flows[i]["match"]["in_port"] == 1
+            assert flows[i]["match"]["dl_vlan"] == mask_list[i]
+            assert flows[i]["priority"] == EVPL_SB_PRIORITY
+        for i in range(3, 6):
+            assert flows[i]["match"]["in_port"] == 2
+            assert flows[i]["match"]["dl_vlan"] == mask_list[i-3]
+            assert flows[i]["priority"] == EVPL_SB_PRIORITY
+
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_trace")
+    def test_check_range(self, mock_check_range):
+        """Test check_range"""
+        mask_list = [1, '2/4094', '4/4094']
+        uni_a = get_uni_mocked(interface_port=1, tag_value=[[1, 5]])
+        uni_a.user_tag.mask_list = mask_list
+        uni_z = get_uni_mocked(interface_port=2, tag_value=[[1, 5]])
+        uni_z.user_tag.mask_list = mask_list
+        attributes = {
+            "table_group": {"evpl": 3, "epl": 4},
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+        }
+        circuit = EVC(**attributes)
+        traces = list(range(0, 6))
+        mock_check_range.return_value = True
+        check = EVC.check_range(circuit, traces)
+        call_list = []
+        for i in range(0, 3):
+            call_list.append(call(
+                mask_list[i], mask_list[i],
+                uni_a.interface,
+                uni_z.interface,
+                circuit.current_path,
+                i*2, i*2+1
+            ))
+        mock_check_range.assert_has_calls(call_list)
+        assert check
+
+        mock_check_range.side_effect = [True, False, True]
+        check = EVC.check_range(circuit, traces)
+        assert check is False

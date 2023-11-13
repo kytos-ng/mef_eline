@@ -6,7 +6,8 @@ import pytest
 from kytos.lib.helpers import get_controller_mock, get_test_client
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
-from kytos.core.interface import UNI, Interface
+from kytos.core.exceptions import KytosTagError
+from kytos.core.interface import TAGRange, UNI, Interface
 from napps.kytos.mef_eline.exceptions import InvalidPath
 from napps.kytos.mef_eline.models import EVC
 from napps.kytos.mef_eline.tests.helpers import get_uni_mocked
@@ -32,6 +33,13 @@ async def test_on_table_enabled():
 
     # Failure at setting table groups
     content = {"mef_eline": {"unknown": 123}}
+    event = KytosEvent(name="kytos/of_multi_table.enable_table",
+                       content=content)
+    await napp.on_table_enabled(event)
+    assert controller.buffers.app.aput.call_count == 1
+
+    # Failure with early return
+    content = {}
     event = KytosEvent(name="kytos/of_multi_table.enable_table",
                        content=content)
     await napp.on_table_enabled(event)
@@ -397,7 +405,7 @@ class TestMain:
         expected_result = "circuit_id 3 not found"
         assert response.json()["description"] == expected_result
 
-    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -616,7 +624,7 @@ class TestMain:
         assert response.status_code == 400
         assert expected_data in current_data["description"]
 
-    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -682,7 +690,7 @@ class TestMain:
         assert current_data["description"] == expected_data
         assert 409 == response.status_code
 
-    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
     async def test_create_circuit_case_5(
         self,
@@ -721,6 +729,98 @@ class TestMain:
         expected_data += "or allow dynamic paths."
         assert 400 == response.status_code, response.data
         assert current_data["description"] == expected_data
+
+    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
+    async def test_create_circuit_case_6(self, mock_evc, event_loop):
+        """Test create_circuit with KytosTagError"""
+        self.napp.controller.loop = event_loop
+        url = f"{self.base_endpoint}/v2/evc/"
+        mock_evc.side_effect = KytosTagError("")
+        payload = {
+            "name": "my evc1",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:02:2",
+            },
+        }
+        response = await self.api_client.post(url, json=payload)
+        assert response.status_code == 400, response.data
+
+    @patch("napps.kytos.mef_eline.main.check_disabled_component")
+    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
+    async def test_create_circuit_case_7(
+        self,
+        mock_evc,
+        mock_check_disabled_component,
+        event_loop
+    ):
+        """Test create_circuit with InvalidPath"""
+        self.napp.controller.loop = event_loop
+        mock_check_disabled_component.return_value = True
+        url = f"{self.base_endpoint}/v2/evc/"
+        uni1 = get_uni_mocked()
+        uni2 = get_uni_mocked()
+        evc = MagicMock(uni_a=uni1, uni_z=uni2)
+        evc.primary_path = MagicMock()
+        evc.backup_path = MagicMock()
+
+        # Backup_path invalid
+        evc.backup_path.is_valid = MagicMock(side_effect=InvalidPath)
+        mock_evc.return_value = evc
+        payload = {
+            "name": "my evc1",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:02:2",
+            },
+        }
+        response = await self.api_client.post(url, json=payload)
+        assert response.status_code == 400, response.data
+
+        # Backup_path invalid
+        evc.primary_path.is_valid = MagicMock(side_effect=InvalidPath)
+        mock_evc.return_value = evc
+
+        response = await self.api_client.post(url, json=payload)
+        assert response.status_code == 400, response.data
+
+    @patch("napps.kytos.mef_eline.main.Main._is_duplicated_evc")
+    @patch("napps.kytos.mef_eline.main.check_disabled_component")
+    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
+    async def test_create_circuit_case_8(
+        self,
+        mock_evc,
+        mock_check_disabled_component,
+        mock_duplicated,
+        event_loop
+    ):
+        """Test create_circuit wit no equal tag lists"""
+        self.napp.controller.loop = event_loop
+        mock_check_disabled_component.return_value = True
+        mock_duplicated.return_value = False
+        url = f"{self.base_endpoint}/v2/evc/"
+        uni1 = get_uni_mocked()
+        uni2 = get_uni_mocked()
+        evc = MagicMock(uni_a=uni1, uni_z=uni2)
+        evc._tag_lists_equal = MagicMock(return_value=False)
+        mock_evc.return_value = evc
+        payload = {
+            "name": "my evc1",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+                "tag": {"tag_type": 'vlan', "value": [[50, 100]]},
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:02:2",
+                "tag": {"tag_type": 'vlan', "value": [[1, 10]]},
+            },
+        }
+        response = await self.api_client.post(url, json=payload)
+        assert response.status_code == 400, response.data
 
     async def test_redeploy_evc(self):
         """Test endpoint to redeploy an EVC."""
@@ -1454,7 +1554,7 @@ class TestMain:
         assert 409 == response.status_code
         assert "Can't update archived EVC" in response.json()["description"]
 
-    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -1525,7 +1625,7 @@ class TestMain:
         assert 400 == response.status_code
         assert "must have a primary path or" in current_data["description"]
 
-    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -1700,7 +1800,7 @@ class TestMain:
         with pytest.raises(ValueError):
             self.napp._uni_from_dict(uni_dict)
 
-    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
     @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
@@ -1773,7 +1873,7 @@ class TestMain:
         assert current_data["description"] == expected_data
         assert 404 == response.status_code
 
-    @patch("napps.kytos.mef_eline.main.Main._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.models.evc.EVC.remove_uni_tags")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch("napps.kytos.mef_eline.models.evc.EVC.remove_current_flows")
@@ -2216,14 +2316,18 @@ class TestMain:
         evc_dict = MagicMock()
         assert not self.napp._load_evc(evc_dict)
 
-        # case2: archived evc
+        # case 2: early return with KytosTagError exception
+        evc_from_dict_mock.side_effect = KytosTagError("")
+        assert not self.napp._load_evc(evc_dict)
+
+        # case 3: archived evc
         evc = MagicMock()
         evc.archived = True
         evc_from_dict_mock.side_effect = None
         evc_from_dict_mock.return_value = evc
         assert not self.napp._load_evc(evc_dict)
 
-        # case3: success creating
+        # case 4: success creating
         evc.archived = False
         evc.id = 1
         self.napp.sched = MagicMock()
@@ -2268,7 +2372,12 @@ class TestMain:
         uni = self.napp._uni_from_dict(uni_dict)
         assert uni == uni_mock
 
-        # case4: success creation without tag
+        # case4: success creation of tag list
+        uni_dict["tag"]["value"] = [[1, 10]]
+        uni = self.napp._uni_from_dict(uni_dict)
+        assert isinstance(uni.user_tag, TAGRange)
+
+        # case5: success creation without tag
         uni_mock.user_tag = None
         del uni_dict["tag"]
         uni = self.napp._uni_from_dict(uni_dict)
@@ -2364,6 +2473,21 @@ class TestMain:
         assert calls == 1
         assert evc_mock.remove_metadata.call_count == 1
 
+    async def test_delete_bulk_metadata_error(self, event_loop):
+        """Test bulk_delete_metadata with ciruit erroring"""
+        self.napp.controller.loop = event_loop
+        evc_mock = create_autospec(EVC)
+        evcs = [evc_mock, evc_mock]
+        self.napp.circuits = dict(zip(["1", "2"], evcs))
+        payload = {"circuit_ids": ["1", "2", "3"]}
+        response = await self.api_client.request(
+            "DELETE",
+            f"{self.base_endpoint}/v2/evc/metadata/metadata1",
+            json=payload
+        )
+        assert response.status_code == 404, response.data
+        assert response.json()["description"] == ["3"]
+
     async def test_use_uni_tags(self, event_loop):
         """Test _use_uni_tags"""
         self.napp.controller.loop = event_loop
@@ -2375,14 +2499,14 @@ class TestMain:
         assert evc_mock._use_uni_vlan.call_args[0][0] == evc_mock.uni_z
 
         # One UNI tag is not available
-        evc_mock._use_uni_vlan.side_effect = [ValueError(), None]
-        with pytest.raises(ValueError):
+        evc_mock._use_uni_vlan.side_effect = [KytosTagError(""), None]
+        with pytest.raises(KytosTagError):
             self.napp._use_uni_tags(evc_mock)
         assert evc_mock._use_uni_vlan.call_count == 3
         assert evc_mock.make_uni_vlan_available.call_count == 0
 
-        evc_mock._use_uni_vlan.side_effect = [None, ValueError()]
-        with pytest.raises(ValueError):
+        evc_mock._use_uni_vlan.side_effect = [None, KytosTagError("")]
+        with pytest.raises(KytosTagError):
             self.napp._use_uni_tags(evc_mock)
         assert evc_mock._use_uni_vlan.call_count == 5
         assert evc_mock.make_uni_vlan_available.call_count == 1

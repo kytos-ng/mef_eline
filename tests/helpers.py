@@ -4,7 +4,7 @@ from unittest.mock import Mock
 from kytos.core import Controller
 from kytos.core.common import EntityStatus
 from kytos.core.config import KytosConfig
-from kytos.core.interface import TAG, UNI, Interface
+from kytos.core.interface import TAG, TAGRange, UNI, Interface
 from kytos.core.link import Link
 from kytos.core.switch import Switch
 from kytos.lib.helpers import get_interface_mock, get_switch_mock
@@ -101,7 +101,10 @@ def get_uni_mocked(**kwargs):
     switch.id = kwargs.get("switch_id", "custom_switch_id")
     switch.dpid = kwargs.get("switch_dpid", "custom_switch_dpid")
     interface = Interface(interface_name, interface_port, switch)
-    tag = TAG(tag_type, tag_value)
+    if isinstance(tag_value, list):
+        tag = TAGRange(tag_type, tag_value)
+    else:
+        tag = TAG(tag_type, tag_value)
     uni = Mock(spec=UNI, interface=interface, user_tag=tag)
     uni.is_valid.return_value = is_valid
     uni.as_dict.return_value = {

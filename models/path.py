@@ -3,7 +3,6 @@ import requests
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
-from kytos.core.exceptions import KytosTagsNotInTagRanges
 from kytos.core.interface import TAG
 from kytos.core.link import Link
 from napps.kytos.mef_eline import settings

@@ -202,6 +202,7 @@ class Main(KytosNApp):
         log.debug("get_circuit result %s %s", circuit, status)
         return JSONResponse(circuit, status_code=status)
 
+    # pylint: disable=too-many-branches, too-many-statements
     @rest("/v2/evc/", methods=["POST"])
     @validate_openapi(spec)
     def create_circuit(self, request: Request) -> JSONResponse:
@@ -921,7 +922,7 @@ class Main(KytosNApp):
             log.error(
                 f"Could not load EVC: dict={circuit_dict} error={exception}"
             )
-
+            return None
         if evc.archived:
             return None
 

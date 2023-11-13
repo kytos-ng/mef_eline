@@ -14,8 +14,7 @@ from requests.exceptions import Timeout
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
-from kytos.core.exceptions import (KytosNoTagAvailableError,
-                                   KytosTagError)
+from kytos.core.exceptions import KytosNoTagAvailableError, KytosTagError
 from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI, Interface, TAGRange
 from kytos.core.link import Link
@@ -449,8 +448,8 @@ class EVCBase(GenericEntity):
         if not tag or isinstance(tag, str):
             return
         tag_type = uni.user_tag.tag_type
-        if (uni_dif and isinstance(tag, list) and 
-                isinstance(uni_dif.user_tag, list)):
+        if (uni_dif and isinstance(tag, list) and
+                isinstance(uni_dif.user_tag.value, list)):
             tag = range_difference(tag, uni_dif.user_tag.value)
             if not tag:
                 return
@@ -471,7 +470,7 @@ class EVCBase(GenericEntity):
             return
         tag_type = uni.user_tag.tag_type
         if (uni_dif and isinstance(tag, list) and
-                isinstance(uni_dif.user_tag, list)):
+                isinstance(uni_dif.user_tag.value, list)):
             tag = range_difference(tag, uni_dif.user_tag.value)
             if not tag:
                 return
@@ -481,6 +480,7 @@ class EVCBase(GenericEntity):
             )
         except KytosTagError as err:
             log.error(f"Error in circuit {self._id}: {err}")
+            return
         if conflict:
             intf = uni.interface.id
             log.warning(f"Tags {conflict} was already available in {intf}")
@@ -1219,7 +1219,7 @@ class EVCDeploy(EVCBase):
     def get_priority(vlan):
         """Return priority value depending on vlan value"""
         if isinstance(vlan, list):
-            return settings.EPL_SB_PRIORITY
+            return settings.EVPL_SB_PRIORITY
         if vlan not in {None, "4096/4096", 0}:
             return settings.EVPL_SB_PRIORITY
         if vlan == 0:
