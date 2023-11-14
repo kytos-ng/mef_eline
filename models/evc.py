@@ -1219,7 +1219,7 @@ class EVCDeploy(EVCBase):
     def get_priority(vlan):
         """Return priority value depending on vlan value"""
         if isinstance(vlan, list):
-            return settings.EVPL_SB_PRIORITY
+            return settings.RANGE_SB_PRIORITY
         if vlan not in {None, "4096/4096", 0}:
             return settings.EVPL_SB_PRIORITY
         if vlan == 0:
@@ -1272,9 +1272,9 @@ class EVCDeploy(EVCBase):
         Arguments:
             in_interface(str): Interface input.
             out_interface(str): Interface output.
-            in_vlan(int,str,list,None): Vlan input.
+            in_vlan(int,str,None): Vlan input.
             out_vlan(str): Vlan output.
-            new_c_vlan(str): New client vlan.
+            new_c_vlan(int,str,list,None): New client vlan.
 
         Return:
             dict: An python dictionary representing a FlowMod
@@ -1282,8 +1282,9 @@ class EVCDeploy(EVCBase):
         """
         # assign all arguments
         in_interface, out_interface, in_vlan, out_vlan, new_c_vlan = args
+        vlan_pri = in_vlan if not isinstance(new_c_vlan, list) else new_c_vlan
         flow_mod = self._prepare_flow_mod(
-            in_interface, out_interface, queue_id, in_vlan
+            in_interface, out_interface, queue_id, vlan_pri
         )
         # the service tag must be always pushed
         new_action = {"action_type": "set_vlan", "vlan_id": out_vlan}
