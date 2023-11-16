@@ -108,6 +108,11 @@ class TestDBModels():
         assert tag.tag_type == 'vlan'
         assert tag.value == "any"
 
+        tag_list = {"tag_type": 'vlan', "value": [[1, 10]]}
+        tag = TAGDoc(**tag_list)
+        assert tag.tag_type == 'vlan'
+        assert tag.value == [[1, 10]]
+
     def test_tagdoc_fail(self):
         """Test TAGDoc value fail case"""
         tag_fail = {"tag_type": 'vlan', "value": "test_fail"}

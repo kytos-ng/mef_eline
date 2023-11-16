@@ -12,19 +12,22 @@ from pydantic import ValidationError
 
 from kytos.core import KytosNApp, log, rest
 from kytos.core.events import KytosEvent
+from kytos.core.exceptions import KytosTagError
 from kytos.core.helpers import (alisten_to, listen_to, load_spec,
                                 validate_openapi)
-from kytos.core.interface import TAG, UNI
+from kytos.core.interface import TAG, UNI, TAGRange
 from kytos.core.link import Link
 from kytos.core.rest_api import (HTTPException, JSONResponse, Request,
                                  get_json_or_400)
+from kytos.core.tag_ranges import get_tag_ranges
 from napps.kytos.mef_eline import controllers, settings
 from napps.kytos.mef_eline.exceptions import DisabledSwitch, InvalidPath
 from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
 from napps.kytos.mef_eline.utils import (aemit_event, check_disabled_component,
-                                         emit_event, map_evc_event_content)
+                                         emit_event, get_vlan_tags_and_masks,
+                                         map_evc_event_content)
 
 
 # pylint: disable=too-many-public-methods
@@ -199,6 +202,7 @@ class Main(KytosNApp):
         log.debug("get_circuit result %s %s", circuit, status)
         return JSONResponse(circuit, status_code=status)
 
+    # pylint: disable=too-many-branches, too-many-statements
     @rest("/v2/evc/", methods=["POST"])
     @validate_openapi(spec)
     def create_circuit(self, request: Request) -> JSONResponse:
@@ -234,7 +238,9 @@ class Main(KytosNApp):
         except ValueError as exception:
             log.debug("create_circuit result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
-
+        except KytosTagError as exception:
+            log.debug("create_circuit result %s %s", exception, 400)
+            raise HTTPException(400, detail=str(exception)) from exception
         try:
             check_disabled_component(evc.uni_a, evc.uni_z)
         except DisabledSwitch as exception:
@@ -269,11 +275,14 @@ class Main(KytosNApp):
                     detail=f"backup_path is not valid: {exception}"
                 ) from exception
 
-        # verify duplicated evc
         if self._is_duplicated_evc(evc):
             result = "The EVC already exists."
             log.debug("create_circuit result %s %s", result, 409)
             raise HTTPException(409, detail=result)
+
+        if not evc._tag_lists_equal():
+            detail = "UNI_A and UNI_Z tag lists should be the same."
+            raise HTTPException(400, detail=detail)
 
         try:
             evc._validate_has_primary_or_dynamic()
@@ -282,7 +291,7 @@ class Main(KytosNApp):
 
         try:
             self._use_uni_tags(evc)
-        except ValueError as exception:
+        except KytosTagError as exception:
             raise HTTPException(400, detail=str(exception)) from exception
 
         # save circuit
@@ -313,14 +322,11 @@ class Main(KytosNApp):
     @staticmethod
     def _use_uni_tags(evc):
         uni_a = evc.uni_a
-        try:
-            evc._use_uni_vlan(uni_a)
-        except ValueError as err:
-            raise err
+        evc._use_uni_vlan(uni_a)
         try:
             uni_z = evc.uni_z
             evc._use_uni_vlan(uni_z)
-        except ValueError as err:
+        except KytosTagError as err:
             evc.make_uni_vlan_available(uni_a)
             raise err
 
@@ -364,10 +370,11 @@ class Main(KytosNApp):
             enable, redeploy = evc.update(
                 **self._evc_dict_with_instances(data)
             )
+        except KytosTagError as exception:
+            raise HTTPException(400, detail=str(exception)) from exception
         except ValidationError as exception:
             raise HTTPException(400, detail=str(exception)) from exception
         except ValueError as exception:
-            log.error(exception)
             log.debug("update result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
         except DisabledSwitch as exception:
@@ -911,7 +918,11 @@ class Main(KytosNApp):
                 f"Could not load EVC: dict={circuit_dict} error={exception}"
             )
             return None
-
+        except KytosTagError as exception:
+            log.error(
+                f"Could not load EVC: dict={circuit_dict} error={exception}"
+            )
+            return None
         if evc.archived:
             return None
 
@@ -1001,11 +1012,15 @@ class Main(KytosNApp):
             tag_type = tag_dict.get("tag_type")
             tag_type = tag_convert.get(tag_type, tag_type)
             tag_value = tag_dict.get("value")
-            tag = TAG(tag_type, tag_value)
+            if isinstance(tag_value, list):
+                tag_value = get_tag_ranges(tag_value)
+                mask_list = get_vlan_tags_and_masks(tag_value)
+                tag = TAGRange(tag_type, tag_value, mask_list)
+            else:
+                tag = TAG(tag_type, tag_value)
         else:
             tag = None
         uni = UNI(interface, tag)
-
         return uni
 
     def _link_from_dict(self, link_dict):

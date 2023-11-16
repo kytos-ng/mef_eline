@@ -44,14 +44,14 @@ class Path(list, GenericEntity):
         """Make the VLANs used in a path available when undeployed."""
         for link in self:
             tag = link.get_metadata("s_vlan")
-            result_a, result_b = link.make_tags_available(
+            conflict_a, conflict_b = link.make_tags_available(
                 controller, tag.value, link.id, tag.tag_type
             )
-            if result_a is False:
-                log.error(f"Tag {tag} was already available in"
+            if conflict_a:
+                log.error(f"Tags {conflict_a} was already available in"
                           f"{link.endpoint_a.id}")
-            if result_b is False:
-                log.error(f"Tag {tag} was already available in"
+            if conflict_b:
+                log.error(f"Tags {conflict_b} was already available in"
                           f"{link.endpoint_b.id}")
             link.remove_metadata("s_vlan")
 

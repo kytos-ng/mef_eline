@@ -1,6 +1,8 @@
 """Module to test the EVCBase class."""
 import sys
 from unittest.mock import MagicMock, patch, call
+from kytos.core.exceptions import KytosTagError
+from kytos.core.interface import TAGRange
 from napps.kytos.mef_eline.models import Path
 import pytest
 # pylint: disable=wrong-import-position
@@ -253,6 +255,22 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         _, redeploy = evc.update(**update_dict)
         assert redeploy
 
+    def test_update_different_tag_lists(self):
+        """Test update when tag lists are different."""
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "enable": True,
+            "dynamic_backup_path": True,
+            "uni_a": get_uni_mocked(is_valid=True),
+            "uni_z": get_uni_mocked(is_valid=True),
+        }
+        uni = MagicMock(user_tag=TAGRange("vlan", [[1, 10]]))
+        update_dict = {"uni_a": uni}
+        evc = EVC(**attributes)
+        with pytest.raises(ValueError):
+            evc.update(**update_dict)
+
     def test_circuit_representation(self):
         """Test the method __repr__."""
         attributes = {
@@ -488,13 +506,19 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         unis = {"uni_a": new_uni_a, "uni_z": new_uni_z}
         evc._get_unis_use_tags(**unis)
 
-        expected = [call(new_uni_a), call(new_uni_z)]
+        expected = [
+            call(new_uni_a, uni_dif=old_uni_a),
+            call(new_uni_z, uni_dif=old_uni_z)
+        ]
         evc._use_uni_vlan.assert_has_calls(expected)
-        expected = [call(old_uni_z), call(old_uni_a)]
+        expected = [
+            call(old_uni_z, uni_dif=new_uni_z),
+            call(old_uni_a, uni_dif=new_uni_a)
+        ]
         evc.make_uni_vlan_available.assert_has_calls(expected)
 
     def test_get_unis_use_tags_error(self):
-        """Test _get_unis_use_tags with ValueError"""
+        """Test _get_unis_use_tags with KytosTagError"""
         old_uni_a = get_uni_mocked(
             interface_port=2,
             is_valid=True
@@ -513,34 +537,38 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         evc = EVC(**attributes)
         evc._use_uni_vlan = MagicMock()
 
-        # UNI Z ValueError
-        evc._use_uni_vlan.side_effect = [None, ValueError()]
+        # UNI Z KytosTagError
+        evc._use_uni_vlan.side_effect = [None, KytosTagError("")]
         evc.make_uni_vlan_available = MagicMock()
         new_uni_a = get_uni_mocked(tag_value=200, is_valid=True)
         new_uni_z = get_uni_mocked(tag_value=200, is_valid=True)
         unis = {"uni_a": new_uni_a, "uni_z": new_uni_z}
-        with pytest.raises(ValueError):
+        with pytest.raises(KytosTagError):
             evc._get_unis_use_tags(**unis)
-        expected = [call(new_uni_a), call(new_uni_z)]
+        expected = [
+            call(new_uni_a, uni_dif=old_uni_a),
+            call(new_uni_z, uni_dif=old_uni_z)
+        ]
         evc._use_uni_vlan.assert_has_calls(expected)
         assert evc.make_uni_vlan_available.call_count == 1
         assert evc.make_uni_vlan_available.call_args[0][0] == new_uni_a
 
-        # UNI A ValueError
+        # UNI A KytosTagError
         evc = EVC(**attributes)
         evc._use_uni_vlan = MagicMock()
-        evc._use_uni_vlan.side_effect = [ValueError(), None]
+        evc._use_uni_vlan.side_effect = [KytosTagError(""), None]
         evc.make_uni_vlan_available = MagicMock()
         new_uni_a = get_uni_mocked(tag_value=200, is_valid=True)
         new_uni_z = get_uni_mocked(tag_value=200, is_valid=True)
         unis = {"uni_a": new_uni_a, "uni_z": new_uni_z}
-        with pytest.raises(ValueError):
+        with pytest.raises(KytosTagError):
             evc._get_unis_use_tags(**unis)
         assert evc._use_uni_vlan.call_count == 1
         assert evc._use_uni_vlan.call_args[0][0] == new_uni_a
         assert evc.make_uni_vlan_available.call_count == 0
 
-    def test_use_uni_vlan(self):
+    @patch("napps.kytos.mef_eline.models.evc.range_difference")
+    def test_use_uni_vlan(self, mock_difference):
         """Test _use_uni_vlan"""
         attributes = {
             "controller": get_controller_mock(),
@@ -558,16 +586,31 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         assert args[2] == uni.user_tag.tag_type
         assert uni.interface.use_tags.call_count == 1
 
-        uni.interface.use_tags.return_value = False
-        with pytest.raises(ValueError):
-            evc._use_uni_vlan(uni)
+        uni.user_tag.value = "any"
+        evc._use_uni_vlan(uni)
+        assert uni.interface.use_tags.call_count == 1
+
+        uni.user_tag.value = [[1, 10]]
+        uni_dif = get_uni_mocked(tag_value=[[1, 2]])
+        mock_difference.return_value = [[3, 10]]
+        evc._use_uni_vlan(uni, uni_dif)
         assert uni.interface.use_tags.call_count == 2
+
+        mock_difference.return_value = []
+        evc._use_uni_vlan(uni, uni_dif)
+        assert uni.interface.use_tags.call_count == 2
+
+        uni.interface.use_tags.side_effect = KytosTagError("")
+        with pytest.raises(KytosTagError):
+            evc._use_uni_vlan(uni)
+        assert uni.interface.use_tags.call_count == 3
 
         uni.user_tag = None
         evc._use_uni_vlan(uni)
-        assert uni.interface.use_tags.call_count == 2
+        assert uni.interface.use_tags.call_count == 3
 
-    def test_make_uni_vlan_available(self):
+    @patch("napps.kytos.mef_eline.models.evc.log")
+    def test_make_uni_vlan_available(self, mock_log):
         """Test make_uni_vlan_available"""
         attributes = {
             "controller": get_controller_mock(),
@@ -586,13 +629,22 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         assert args[2] == uni.user_tag.tag_type
         assert uni.interface.make_tags_available.call_count == 1
 
-        uni.interface.make_tags_available.return_value = False
+        uni.user_tag.value = None
         evc.make_uni_vlan_available(uni)
+        assert uni.interface.make_tags_available.call_count == 1
+
+        uni.user_tag.value = [[1, 10]]
+        uni_dif = get_uni_mocked(tag_value=[[1, 2]])
+        evc.make_uni_vlan_available(uni, uni_dif)
         assert uni.interface.make_tags_available.call_count == 2
+
+        uni.interface.make_tags_available.side_effect = KytosTagError("")
+        evc.make_uni_vlan_available(uni)
+        assert mock_log.error.call_count == 1
 
         uni.user_tag = None
         evc.make_uni_vlan_available(uni)
-        assert uni.interface.make_tags_available.call_count == 2
+        assert uni.interface.make_tags_available.call_count == 3
 
     def test_remove_uni_tags(self):
         """Test remove_uni_tags"""
@@ -607,3 +659,20 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         evc.make_uni_vlan_available = MagicMock()
         evc.remove_uni_tags()
         assert evc.make_uni_vlan_available.call_count == 2
+
+    def test_tag_lists_equal(self):
+        """Test _tag_lists_equal"""
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "enable": True,
+            "uni_a": get_uni_mocked(is_valid=True),
+            "uni_z": get_uni_mocked(is_valid=True)
+        }
+        evc = EVC(**attributes)
+        uni = MagicMock(user_tag=TAGRange("vlan", [[1, 10]]))
+        update_dict = {"uni_z": uni}
+        assert evc._tag_lists_equal(**update_dict) is False
+
+        update_dict = {"uni_a": uni, "uni_z": uni}
+        assert evc._tag_lists_equal(**update_dict)

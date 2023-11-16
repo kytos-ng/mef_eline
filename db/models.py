@@ -38,11 +38,14 @@ class CircuitScheduleDoc(BaseModel):
 class TAGDoc(BaseModel):
     """TAG model"""
     tag_type: str
-    value: Union[int, str]
+    value: Union[int, str, list[list[int]]]
+    mask_list: Optional[list[str, int]]
 
     @validator('value')
     def validate_value(cls, value):
         """Validate value when is a string"""
+        if isinstance(value, list):
+            return value
         if isinstance(value, int):
             return value
         if isinstance(value, str) and value in ("any", "untagged"):
