@@ -11,6 +11,7 @@ from threading import Lock
 from pydantic import ValidationError
 
 from kytos.core import KytosNApp, log, rest
+from kytos.core.events import KytosEvent
 from kytos.core.helpers import (alisten_to, listen_to, load_spec,
                                 validate_openapi)
 from kytos.core.interface import TAG, UNI
@@ -732,26 +733,42 @@ class Main(KytosNApp):
                 with evc.lock:
                     evc.handle_link_up(event.content["link"])
 
-    @listen_to("kytos/topology.updated")
-    def on_topology_update(self, event):
-        """Capture topology update event"""
-        self.handle_topology_update(event)
-
-    def handle_topology_update(self, event):
-        """Handle topology update"""
+    # Possibly replace this with interruptions?
+    @listen_to(
+        '.*.switch.interface.(link_up|link_down|created|deleted)',
+        pool='dynamic_single'
+    )
+    def on_interface_link_change(self, event: KytosEvent):
+        """
+        Handler for interface link_up and link_down events
+        """
         with self._lock:
-            if (
-                self._topology_updated_at
-                and self._topology_updated_at > event.timestamp
-            ):
-                return
-            self._topology_updated_at = event.timestamp
-            for evc in self.get_evcs_by_svc_level():
-                if evc.is_enabled() and not evc.archived:
-                    with evc.lock:
-                        evc.handle_topology_update(
-                            event.content["topology"].switches
-                        )
+            _, _, event_type = event.name.rpartition('.')
+            iface = event.content.get("interface")
+            if event_type in ('link_up', 'created'):
+                self.handle_interface_link_up(iface)
+            elif event_type in ('link_down', 'deleted'):
+                self.handle_interface_link_down(iface)
+
+    def handle_interface_link_up(self, interface):
+        """
+        Handler for interface link_up events
+        """
+        for evc in self.get_evcs_by_svc_level():
+            log.info("Event handle_interface_link_up %s", interface)
+            evc.handle_interface_link_up(
+                interface
+            )
+
+    def handle_interface_link_down(self, interface):
+        """
+        Handler for interface link_down events
+        """
+        for evc in self.get_evcs_by_svc_level():
+            log.info("Event handle_interface_link_down %s", interface)
+            evc.handle_interface_link_down(
+                interface
+            )
 
     @listen_to("kytos/topology.link_down")
     def on_link_down(self, event):
@@ -897,8 +914,7 @@ class Main(KytosNApp):
 
         if evc.archived:
             return None
-        evc.deactivate()
-        evc.sync()
+
         self.circuits.setdefault(evc.id, evc)
         self.sched.add(evc)
         return evc

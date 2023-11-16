@@ -101,8 +101,8 @@ class EVCBase(GenericEntity):
 
         # required attributes
         self._id = kwargs.get("id", uuid4().hex)[:14]
-        self.uni_a = kwargs.get("uni_a")
-        self.uni_z = kwargs.get("uni_z")
+        self.uni_a: UNI = kwargs.get("uni_a")
+        self.uni_z: UNI = kwargs.get("uni_z")
         self.name = kwargs.get("name")
 
         # optional attributes
@@ -1407,40 +1407,55 @@ class LinkProtection(EVCDeploy):
             link(Link): Link affected by link.up event.
 
         """
-        if self.is_intra_switch():
-            return True
-
-        if self.is_using_primary_path():
-            return True
-
-        success = False
-        if self.primary_path.is_affected_by_link(link):
-            success = self.deploy_to_primary_path()
-
-        if success:
-            return True
-
-        # We tried to deploy(primary_path) without success.
-        # And in this case is up by some how. Nothing to do.
-        if self.is_using_backup_path() or self.is_using_dynamic_path():
-            return True
-
-        # In this case, probably the circuit is not being used and
-        # we can move to backup
-        if self.backup_path.is_affected_by_link(link):
-            success = self.deploy_to_backup_path()
-
-        # In this case, the circuit is not being used and we should
-        # try a dynamic path
-        if not success and self.dynamic_backup_path:
-            success = self.deploy_to_path()
-
-        if success:
-            emit_event(self._controller, "redeployed_link_up",
-                       content=map_evc_event_content(self))
-            return True
-
-        return True
+        condition_pairs = [
+            (
+                lambda me: me.is_using_primary_path(),
+                lambda _: (True, 'nothing')
+            ),
+            (
+                lambda me: me.is_intra_switch(),
+                lambda _: (True, 'nothing')
+            ),
+            (
+                lambda me: me.primary_path.is_affected_by_link(link),
+                lambda me: (me.deploy_to_primary_path(), 'redeploy')
+            ),
+            # We tried to deploy(primary_path) without success.
+            # And in this case is up by some how. Nothing to do.
+            (
+                lambda me: me.is_using_backup_path(),
+                lambda _: (True, 'nothing')
+            ),
+            (
+                lambda me:  me.is_using_dynamic_path(),
+                lambda _: (True, 'nothing')
+            ),
+            # In this case, probably the circuit is not being used and
+            # we can move to backup
+            (
+                lambda me: me.backup_path.is_affected_by_link(link),
+                lambda me: (me.deploy_to_backup_path(), 'redeploy')
+            ),
+            # In this case, the circuit is not being used and we should
+            # try a dynamic path
+            (
+                lambda me: me.dynamic_backup_path,
+                lambda me: (me.deploy_to_path(), 'redeploy')
+            )
+        ]
+        for predicate, action in condition_pairs:
+            if not predicate(self):
+                continue
+            success, succcess_type = action(self)
+            if success:
+                if succcess_type == 'redeploy':
+                    emit_event(
+                        self._controller,
+                        "redeployed_link_up",
+                        content=map_evc_event_content(self)
+                    )
+                return True
+        return False
 
     def handle_link_down(self):
         """Handle circuit when link down.
@@ -1475,41 +1490,6 @@ class LinkProtection(EVCDeploy):
         interface = switch.interfaces[uni.interface.port_number]
         return interface
 
-    def handle_topology_update(self, switches: dict):
-        """Handle changes in the topology"""
-        # All intra-switch EVCs do not have current_path.
-        # In case of inter-switch EVC and not current_path,
-        # link_down should take care of deactivation.
-        if not self.is_intra_switch and not self.current_path:
-            return
-        try:
-            interface_a = self.get_interface_from_switch(self.uni_a, switches)
-        except KeyError:
-            id_ = self.uni_a.interface.id
-            log.warning(f"The interface {id_} was not found")
-            return
-
-        try:
-            interface_z = self.get_interface_from_switch(self.uni_z, switches)
-        except KeyError:
-            id_ = self.uni_z.interface.id
-            log.warning(f"The interface {id_} was not found")
-            return
-
-        active, interfaces = self.is_uni_interface_active(
-            interface_a, interface_z
-        )
-        if self.is_active() != active:
-            if active:
-                self.activate()
-                log.info(f"Activating EVC {self.id}. Interfaces: "
-                         f"{interfaces}.")
-            else:
-                self.deactivate()
-                log.info(f"Deactivating EVC {self.id}. Interfaces: "
-                         f"{interfaces}.")
-            self.sync()
-
     def are_unis_active(self, switches: dict) -> bool:
         """Determine whether this EVC should be active"""
         interface_a = self.get_interface_from_switch(self.uni_a, switches)
@@ -1519,32 +1499,89 @@ class LinkProtection(EVCDeploy):
 
     @staticmethod
     def is_uni_interface_active(
-        interface_a: Interface,
-        interface_z: Interface
+        *interfaces: Interface
     ) -> tuple[bool, dict]:
         """Determine whether a UNI should be active"""
         active = True
-        interfaces = {}
-        interface_a_dict = {
-            "status": interface_a.status.value,
-            "status_reason": interface_a.status_reason
-        }
-        interface_z_dict = {
-            "status": interface_z.status.value,
-            "status_reason": interface_z.status_reason
-        }
-        if (interface_a.status != EntityStatus.UP
-                or interface_a.status_reason != set()):
+        bad_interfaces = [
+            interface
+            for interface in interfaces
+            if interface.status != EntityStatus.UP
+        ]
+        if bad_interfaces:
             active = False
-            interfaces[interface_a.id] = interface_a_dict
-        if (interface_z.status != EntityStatus.UP
-                or interface_z.status_reason != set()):
-            active = False
-            interfaces[interface_z.id] = interface_z_dict
-        if active:
-            interfaces[interface_a.id] = interface_a_dict
-            interfaces[interface_z.id] = interface_z_dict
-        return active, interfaces
+            interfaces = bad_interfaces
+        return active, {
+            interface.id: {
+                'status': interface.status.value,
+                'status_reason': interface.status_reason,
+            }
+            for interface in interfaces
+        }
+
+    def handle_interface_link_up(self, interface: Interface):
+        """
+        Handler for interface link_up events
+        """
+        if self.archived:
+            return
+        if self.is_active():
+            return
+        interfaces = (self.uni_a.interface, self.uni_z.interface)
+        if interface not in interfaces:
+            return
+        down_interfaces = [
+            interface
+            for interface in interfaces
+            if interface.status != EntityStatus.UP
+        ]
+        if down_interfaces:
+            return
+        interface_dicts = {
+            interface.id: {
+                'status': interface.status.value,
+                'status_reason': interface.status_reason,
+            }
+            for interface in interfaces
+        }
+        self.activate()
+        log.info(
+            f"Activating EVC {self.id}. Interfaces: "
+            f"{interface_dicts}."
+        )
+        self.sync()
+
+    def handle_interface_link_down(self, interface):
+        """
+        Handler for interface link_down events
+        """
+        if self.archived:
+            return
+        if not self.is_active():
+            return
+        interfaces = (self.uni_a.interface, self.uni_z.interface)
+        if interface not in interfaces:
+            return
+        down_interfaces = [
+            interface
+            for interface in interfaces
+            if interface.status != EntityStatus.UP
+        ]
+        if not down_interfaces:
+            return
+        interface_dicts = {
+            interface.id: {
+                'status': interface.status.value,
+                'status_reason': interface.status_reason,
+            }
+            for interface in down_interfaces
+        }
+        self.deactivate()
+        log.info(
+            f"Deactivating EVC {self.id}. Interfaces: "
+            f"{interface_dicts}."
+        )
+        self.sync()
 
 
 class EVC(LinkProtection):

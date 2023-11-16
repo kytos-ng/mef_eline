@@ -2205,8 +2205,6 @@ class TestMain:
 
         result = self.napp._load_evc(evc_dict)
         assert result == evc
-        evc.deactivate.assert_called()
-        evc.sync.assert_called()
         self.napp.sched.add.assert_called_with(evc)
         assert self.napp.circuits[1] == evc
 
@@ -2363,20 +2361,3 @@ class TestMain:
             self.napp._use_uni_tags(evc_mock)
         assert evc_mock._use_uni_vlan.call_count == 5
         assert evc_mock.make_uni_vlan_available.call_count == 1
-
-    async def test_handle_topology_update(self):
-        """Test handle_topology_update"""
-        evc_mock = create_autospec(EVC)
-        evc_mock.service_level, evc_mock.creation_time = 0, 1
-        evc_mock.is_enabled = MagicMock(side_effect=[True, False, True])
-        evc_mock.lock = MagicMock()
-        type(evc_mock).archived = PropertyMock(
-            side_effect=[True, False, False]
-        )
-        evcs = [evc_mock, evc_mock, evc_mock]
-        topology = MagicMock()
-        topology.switches = "mock"
-        event = KytosEvent(name="test", content={"topology": topology})
-        self.napp.circuits = dict(zip(["1", "2", "3"], evcs))
-        self.napp.handle_topology_update(event)
-        evc_mock.handle_topology_update.assert_called_once_with("mock")
