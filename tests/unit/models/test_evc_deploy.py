@@ -18,7 +18,7 @@ from napps.kytos.mef_eline.exceptions import FlowModException  # NOQA
 from napps.kytos.mef_eline.models import EVC, EVCDeploy, Path  # NOQA
 from napps.kytos.mef_eline.settings import (ANY_SB_PRIORITY,  # NOQA
                                             EPL_SB_PRIORITY, EVPL_SB_PRIORITY,
-                                            MANAGER_URL, RANGE_SB_PRIORITY,
+                                            MANAGER_URL,
                                             SDN_TRACE_CP_URL,
                                             UNTAGGED_SB_PRIORITY)
 from napps.kytos.mef_eline.tests.helpers import (get_link_mocked,  # NOQA
@@ -1969,7 +1969,7 @@ class TestEVC():
         assert epl_value == EPL_SB_PRIORITY
 
         epl_value = EVC.get_priority([[1, 5]])
-        assert epl_value == RANGE_SB_PRIORITY
+        assert epl_value == EVPL_SB_PRIORITY
 
     def test_set_flow_table_group_id(self):
         """Test set_flow_table_group_id"""
@@ -2054,11 +2054,11 @@ class TestEVC():
         for i in range(0, 3):
             assert flows[i]["match"]["in_port"] == 1
             assert flows[i]["match"]["dl_vlan"] == mask_list[i]
-            assert flows[i]["priority"] == RANGE_SB_PRIORITY
+            assert flows[i]["priority"] == EVPL_SB_PRIORITY
         for i in range(3, 6):
             assert flows[i]["match"]["in_port"] == 2
             assert flows[i]["match"]["dl_vlan"] == mask_list[i-3]
-            assert flows[i]["priority"] == RANGE_SB_PRIORITY
+            assert flows[i]["priority"] == EVPL_SB_PRIORITY
 
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_trace")
     def test_check_range(self, mock_check_range):

@@ -43,7 +43,6 @@ EVPL_SB_PRIORITY = 20000
 EPL_SB_PRIORITY = 10000
 ANY_SB_PRIORITY = 15000
 UNTAGGED_SB_PRIORITY = 20000
-RANGE_SB_PRIORITY = 18000
 
 #  Time (seconds) to check if an evc has been updated
 #  or flows have been deleted.

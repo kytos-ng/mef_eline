@@ -384,6 +384,11 @@ class Main(KytosNApp):
                     detail=f"Path is not valid: {exception}"
                 ) from exception
 
+        if self._is_duplicated_evc(evc):
+            result = "The EVC already exists."
+            log.debug("create_circuit result %s %s", result, 409)
+            raise HTTPException(409, detail=result)
+
         if evc.is_active():
             if enable is False:  # disable if active
                 with evc.lock:
@@ -723,7 +728,8 @@ class Main(KytosNApp):
 
         """
         for circuit in tuple(self.circuits.values()):
-            if not circuit.archived and circuit.shares_uni(evc):
+            if (not circuit.archived and circuit._id != evc._id
+                    and circuit.shares_uni(evc)):
                 return True
         return False
 
