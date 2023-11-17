@@ -454,7 +454,7 @@ class EVCBase(GenericEntity):
             if not tag:
                 return
         uni.interface.use_tags(
-            self._controller, tag, tag_type
+            self._controller, tag, tag_type, False
         )
 
     def make_uni_vlan_available(
@@ -476,7 +476,7 @@ class EVCBase(GenericEntity):
                 return
         try:
             conflict = uni.interface.make_tags_available(
-                self._controller, tag, tag_type
+                self._controller, tag, tag_type, False
             )
         except KytosTagError as err:
             log.error(f"Error in circuit {self._id}: {err}")
