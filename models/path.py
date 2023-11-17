@@ -45,7 +45,7 @@ class Path(list, GenericEntity):
         for link in self:
             tag = link.get_metadata("s_vlan")
             conflict_a, conflict_b = link.make_tags_available(
-                controller, tag.value, link.id, tag.tag_type
+                controller, tag.value, link.id, tag.tag_type, False
             )
             if conflict_a:
                 log.error(f"Tags {conflict_a} was already available in"
