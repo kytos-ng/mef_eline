@@ -1219,7 +1219,7 @@ class EVCDeploy(EVCBase):
     def get_priority(vlan):
         """Return priority value depending on vlan value"""
         if isinstance(vlan, list):
-            return settings.RANGE_SB_PRIORITY
+            return settings.EVPL_SB_PRIORITY
         if vlan not in {None, "4096/4096", 0}:
             return settings.EVPL_SB_PRIORITY
         if vlan == 0:

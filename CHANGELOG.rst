@@ -12,7 +12,6 @@ Added
 - UNI tag_type are now accepted as string.
 - EVCs now listen to ``switch.interface.(link_up|link_down|created|deleted)`` events for activation/deactivation
 - Circuits with a vlan range are supported now. The ranges follows ``list[list[int]]`` format and both UNIs vlan should have the same ranges.
-- Added default priority ``RANGE_SB_PRIORITY`` with value as ``18000`` for circuits with vlan ranges.
 
 Changed
 =======
