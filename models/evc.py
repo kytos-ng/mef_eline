@@ -454,7 +454,7 @@ class EVCBase(GenericEntity):
             if not tag:
                 return
         uni.interface.use_tags(
-            self._controller, tag, tag_type, False
+            self._controller, tag, tag_type, use_lock=True, check_order=False
         )
 
     def make_uni_vlan_available(
@@ -476,7 +476,8 @@ class EVCBase(GenericEntity):
                 return
         try:
             conflict = uni.interface.make_tags_available(
-                self._controller, tag, tag_type, False
+                self._controller, tag, tag_type, use_lock=True,
+                check_order=False
             )
         except KytosTagError as err:
             log.error(f"Error in circuit {self._id}: {err}")
@@ -1424,7 +1425,9 @@ class EVCDeploy(EVCBase):
     def check_range(circuit, traces: list) -> bool:
         """Check traces when for UNI with TAGRange"""
         check = True
-        for i, mask in enumerate(circuit.uni_a.user_tag.mask_list):
+        mask_list = (circuit.uni_a.user_tag.mask_list or
+                     circuit.uni_z.user_tag.mask_list)
+        for i, mask in enumerate(mask_list):
             trace_a = traces[i*2]
             trace_z = traces[i*2+1]
             check &= EVCDeploy.check_trace(
@@ -1452,7 +1455,8 @@ class EVCDeploy(EVCBase):
             i = 0
             for circuit in list_circuits:
                 if isinstance(circuit.uni_a.user_tag, TAGRange):
-                    length = len(circuit.uni_a.user_tag.mask_list)
+                    length = (len(circuit.uni_a.user_tag.mask_list) or
+                              len(circuit.uni_z.user_tag.mask_list))
                     circuits_checked[circuit.id] = EVCDeploy.check_range(
                         circuit, traces[i:i+length*2]
                     )
@@ -1657,7 +1661,7 @@ class LinkProtection(EVCDeploy):
         """
         Handler for interface link_up events
         """
-        if self.archived:  # TODO: Remove when addressing issue #369
+        if self.archived:
             return
         if self.is_active():
             return

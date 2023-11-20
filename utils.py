@@ -125,7 +125,9 @@ def make_uni_list(list_circuits: list) -> list:
     for circuit in list_circuits:
         if isinstance(circuit.uni_a.user_tag, TAGRange):
             # TAGRange value from uni_a and uni_z are currently mirrored
-            for mask in circuit.uni_a.user_tag.mask_list:
+            mask_list = (circuit.uni_a.user_tag.mask_list or
+                         circuit.uni_z.user_tag.mask_list)
+            for mask in mask_list:
                 uni_list.append((circuit.uni_a.interface, mask))
                 uni_list.append((circuit.uni_z.interface, mask))
         else:
