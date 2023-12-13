@@ -1116,3 +1116,22 @@ class Main(KytosNApp):
         content = {"group_table": self.table_group}
         name = "kytos/mef_eline.enable_table"
         await aemit_event(self.controller, name, content)
+
+    @listen_to('kytos/topology.switch.deleted')
+    def on_switch_deleted(self, event):
+        """Remove EVCs which were affected by the deleted switch"""
+        self.handle_switch_deleted(event)
+
+    def handle_switch_deleted(self, event):
+        """Handle switch deleted event"""
+        switch = event.content["switch"]
+        for evc in self.get_evcs_by_svc_level():
+            if (evc.uni_a.interface.switch.dpid == switch.dpid or 
+                    evc.uni_z.interface.switch.dpid == switch.dpid):
+                with evc.lock:
+                    evc.deactivate()
+                    evc.disable()
+                    self.sched.remove(evc)
+                    evc.archive()
+                    evc.remove_uni_tags()
+                    evc.sync()
