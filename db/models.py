@@ -65,6 +65,7 @@ class LinkConstraints(BaseModel):
     utilization: Optional[float]
     delay: Optional[float]
     priority: Optional[int]
+    not_ownership: Optional[str]
 
 
 class PathConstraints(BaseModel):

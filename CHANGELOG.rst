@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.1.4] - 2024-01-16
+***********************
+
+Added
+=====
+- Added support for ``not_ownership`` to dynamic path constraints.
+
 [2023.1.3] - 2023-11-01
 ***********************
 
