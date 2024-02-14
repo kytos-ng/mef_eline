@@ -4,7 +4,6 @@
 NApp to provision circuits from user request.
 """
 import pathlib
-import time
 import traceback
 from threading import Lock
 from typing import Optional
@@ -841,7 +840,7 @@ class Main(KytosNApp):
                 name="flows.install",
                 content={
                     "dpid": dpid,
-                    "flow_dict": {"flows": switch_flows[dpid]},
+                    "flow_dict": {"flows": flows},
                 }
             )
 
