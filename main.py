@@ -834,24 +834,16 @@ class Main(KytosNApp):
             else:
                 check_failover.append(evc)
 
-        while switch_flows:
-            offset = settings.BATCH_SIZE or None
-            switches = list(switch_flows.keys())
-            for dpid in switches:
-                emit_event(
-                    self.controller,
-                    context="kytos.flow_manager",
-                    name="flows.install",
-                    content={
-                        "dpid": dpid,
-                        "flow_dict": {"flows": switch_flows[dpid][:offset]},
-                    }
-                )
-                if offset is None or offset >= len(switch_flows[dpid]):
-                    del switch_flows[dpid]
-                    continue
-                switch_flows[dpid] = switch_flows[dpid][offset:]
-            time.sleep(settings.BATCH_INTERVAL)
+        for dpid, flows in switch_flows.items():
+            emit_event(
+                self.controller,
+                context="kytos.flow_manager",
+                name="flows.install",
+                content={
+                    "dpid": dpid,
+                    "flow_dict": {"flows": switch_flows[dpid]},
+                }
+            )
 
         for evc in evcs_with_failover:
             with evc.lock:
