@@ -665,6 +665,7 @@ module.exports = {
         'mandatory_metrics.delay': 'Delay',
         'mandatory_metrics.reliability': 'Reliability',
         'mandatory_metrics.ownership': 'Ownership',
+        'mandatory_metrics.not_wnership': 'Not ownership',
         'flexible_metrics': 'Flexible metrics',
         'flexible_metrics.bandwidth': 'Bandwidth',
         'flexible_metrics.utilization': 'Utilization',
@@ -672,6 +673,7 @@ module.exports = {
         'flexible_metrics.delay': 'Delay',
         'flexible_metrics.reliability': 'Reliability',
         'flexible_metrics.ownership': 'Ownership',
+        'flexible_metrics.not_ownership': 'Not ownership',
       };
 
       let _constraint = {};
@@ -690,12 +692,14 @@ module.exports = {
             'priority': data['mandatory_metrics']['priority'],
             'delay': data['mandatory_metrics']['delay'],
             'reliability': data['mandatory_metrics']['reliability'],
-            'ownership': data['mandatory_metrics']['ownership']
+            'ownership': data['mandatory_metrics']['ownership'],
+            'not_ownership': JSON.stringify(data['mandatory_metrics']['not_ownership']),
           };
         } else {
           _constraint.mandatory_metrics = {
             'bandwidth': '', 'utilization': '', 'priority': '',
             'delay': '', 'reliability': '', 'ownership': '',
+            'not_ownership': [],
           };
         } 
         if(data['flexible_metrics']) {
@@ -705,12 +709,14 @@ module.exports = {
             'priority': data['flexible_metrics']['priority'],
             'delay': data['flexible_metrics']['delay'],
             'reliability': data['flexible_metrics']['reliability'],
-            'ownership': data['flexible_metrics']['ownership']
+            'ownership': data['flexible_metrics']['ownership'],
+            'not_ownership': JSON.stringify(data['flexible_metrics']['not_ownership']),
           };
         } else {
           _constraint.flexible_metrics = {
             'bandwidth': '', 'utilization': '', 'priority': '',
             'delay': '', 'reliability': '', 'ownership': '',
+            'not_ownership': [],
           };
         }
 
@@ -782,7 +788,7 @@ module.exports = {
       */
       var _this = this;
       let id = this.basics["ID"]["value"];
-
+      var parse_error = ""
       let payload = {
         name: this.basics["Name"]["value"],
         enable: this.flags["Enabled"]["value"],
@@ -848,6 +854,18 @@ module.exports = {
             if(metric['ownership'] !== undefined) { // can be empty
               _result_metrics['ownership'] = metric['ownership'];
             }
+            if(metric['not_ownership'] !== undefined && metric['not_ownership'] !== '') {
+              try{_result_metrics['not_ownership'] = JSON.parse(metric['not_ownership'])}
+              catch(e){
+                if (e instanceof SyntaxError){
+                  _result_metrics['not_ownership'] = metric['not_ownership']
+                  parse_error = " Detected error with " + metric['not_ownership'] + ", it could not be parsed."
+                }
+                else{
+                  throw e
+                }
+              }
+            }
             if(!$.isEmptyObject(_result_metrics)) {
               _constraint_payload[_metric_type] = _result_metrics;
             } else {
@@ -876,7 +894,7 @@ module.exports = {
       request.fail(function(data) {
         let notification = {
           title: 'Update EVC failed',
-          description: 'Error updating EVC ' + id +'. ' + data.responseJSON.description
+          description: 'Error updating EVC ' + id +'. ' + data.responseJSON.description + parse_error
         }
         _this.$kytos.$emit("setNotification" , notification);
       });
@@ -911,7 +929,8 @@ module.exports = {
             'priority': '',
             'delay': '',
             'reliability': '',
-            'ownership': ''
+            'ownership': '',
+            'not_ownership': [],
           },
           'flexible_metrics': {
             'bandwidth': '',
@@ -919,7 +938,8 @@ module.exports = {
             'priority': '',
             'delay': '',
             'reliability': '',
-            'ownership': ''
+            'ownership': '',
+            'not_ownership': [],
           }
         };
       });

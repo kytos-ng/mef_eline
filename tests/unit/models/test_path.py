@@ -488,8 +488,14 @@ class TestDynamicPathManager():
         assert isinstance(res_paths, list)
         assert mock_log.error.call_count == 1
 
+    # pylint: disable=too-many-statements, too-many-locals
+    @patch.object(
+        DynamicPathManager,
+        "get_shared_components",
+        side_effect=DynamicPathManager.get_shared_components
+    )
     @patch("requests.post")
-    def test_get_disjoint_paths(self, mock_requests_post):
+    def test_get_disjoint_paths(self, mock_requests_post, mock_shared):
         """Test get_disjoint_paths method."""
 
         controller = MagicMock()
@@ -506,6 +512,8 @@ class TestDynamicPathManager():
         }
         evc.uni_a.interface.id = "1"
         evc.uni_z.interface.id = "2"
+        evc.uni_a.interface.switch.id = "00:00:00:00:00:00:00:01"
+        evc.uni_z.interface.switch.id = "00:00:00:00:00:00:00:05"
 
         # Topo0
         paths1 = {
@@ -633,12 +641,25 @@ class TestDynamicPathManager():
                 id_to_interface_mock("00:00:00:00:00:00:00:05:2")
             ),
         ]
+        path_links = [
+            ("00:00:00:00:00:00:00:01:2", "00:00:00:00:00:00:00:02:2"),
+            ("00:00:00:00:00:00:00:02:3", "00:00:00:00:00:00:00:04:2"),
+            ("00:00:00:00:00:00:00:04:3", "00:00:00:00:00:00:00:05:2")
+        ]
+        path_switches = {
+            "00:00:00:00:00:00:00:04",
+            "00:00:00:00:00:00:00:02"
+        }
 
         # only one path available from pathfinder (precesilly the
         # current_path), so the maximum disjoint path will be empty
         mock_response.json.return_value = {"paths": paths1["paths"][0:1]}
         mock_requests_post.return_value = mock_response
         paths = list(DynamicPathManager.get_disjoint_paths(evc, current_path))
+        args = mock_shared.call_args[0]
+        assert args[0] == paths1["paths"][0]
+        assert args[1] == path_links
+        assert args[2] == path_switches
         assert len(paths) == 0
 
         expected_disjoint_path = [
@@ -664,6 +685,13 @@ class TestDynamicPathManager():
         mock_response.json.return_value = paths1
         mock_requests_post.return_value = mock_response
         paths = list(DynamicPathManager.get_disjoint_paths(evc, current_path))
+        args = mock_shared.call_args[0]
+        assert args[0] == paths1["paths"][-1]
+        assert args[1] == path_links
+        assert args[2] == {
+            "00:00:00:00:00:00:00:04",
+            "00:00:00:00:00:00:00:02"
+        }
         assert len(paths) == 4
         # for more information on the paths please refer to EP029
         assert len(paths[0]) == 4  # path S-Z-W-I-D
@@ -692,6 +720,8 @@ class TestDynamicPathManager():
         mock_requests_post.assert_has_calls([expected_call])
 
         # EP029 Topo2
+        evc.uni_a.interface.switch.id = "00:00:00:00:00:00:00:01"
+        evc.uni_z.interface.switch.id = "00:00:00:00:00:00:00:07"
         paths2 = {
             "paths": [
                 {
@@ -758,6 +788,17 @@ class TestDynamicPathManager():
                 id_to_interface_mock("00:00:00:00:00:00:00:07:2")
             ),
         ]
+        path_interfaces = [
+            ("00:00:00:00:00:00:00:01:2", "00:00:00:00:00:00:00:02:1"),
+            ("00:00:00:00:00:00:00:02:2", "00:00:00:00:00:00:00:03:1"),
+            ("00:00:00:00:00:00:00:03:2", "00:00:00:00:00:00:00:04:1"),
+            ("00:00:00:00:00:00:00:04:2", "00:00:00:00:00:00:00:07:2")
+        ]
+        path_switches = {
+            "00:00:00:00:00:00:00:02",
+            "00:00:00:00:00:00:00:03",
+            "00:00:00:00:00:00:00:04"
+        }
 
         expected_disjoint_path = [
             Link(
@@ -785,8 +826,116 @@ class TestDynamicPathManager():
         mock_response.json.return_value = {"paths": paths2["paths"]}
         mock_requests_post.return_value = mock_response
         paths = list(DynamicPathManager.get_disjoint_paths(evc, current_path))
+        args = mock_shared.call_args[0]
+        assert args[0] == paths2["paths"][-1]
+        assert args[1] == path_interfaces
+        assert args[2] == path_switches
         assert len(paths) == 1
         assert (
             [link.id for link in paths[0]] ==
             [link.id for link in expected_disjoint_path]
         )
+
+    @patch("requests.post")
+    def test_get_disjoint_paths_simple_evc(self, mock_requests_post):
+        """Test get_disjoint_paths method for simple EVCs."""
+        controller = MagicMock()
+        controller.get_interface_by_id.side_effect = id_to_interface_mock
+        DynamicPathManager.set_controller(controller)
+
+        evc = MagicMock()
+        evc.secondary_constraints = {
+            "spf_attribute": "hop",
+            "spf_max_path_cost": 20,
+            "mandatory_metrics": {
+                "ownership": "red"
+            }
+        }
+        evc.uni_a.interface.id = "1"
+        evc.uni_z.interface.id = "2"
+        evc.uni_a.interface.switch.id = "00:00:00:00:00:00:00:01"
+        evc.uni_z.interface.switch.id = "00:00:00:00:00:00:00:05"
+
+        mock_paths = {
+            "paths": [
+                {
+                    "cost": 5,
+                    "hops": [
+                        "00:00:00:00:00:00:00:01:1",
+                        "00:00:00:00:00:00:00:01",
+                        "00:00:00:00:00:00:00:01:3",
+                        "00:00:00:00:00:00:00:02:2",
+                        "00:00:00:00:00:00:00:02",
+                        "00:00:00:00:00:00:00:02:1"
+                        ]
+                },
+                {
+                    "cost": 8,
+                    "hops": [
+                        "00:00:00:00:00:00:00:01:1",
+                        "00:00:00:00:00:00:00:01",
+                        "00:00:00:00:00:00:00:01:4",
+                        "00:00:00:00:00:00:00:03:3",
+                        "00:00:00:00:00:00:00:03",
+                        "00:00:00:00:00:00:00:03:2",
+                        "00:00:00:00:00:00:00:02:3",
+                        "00:00:00:00:00:00:00:02",
+                        "00:00:00:00:00:00:00:02:1"
+                        ]
+                },
+            ]
+        }
+        current_path = [
+            Link(
+                id_to_interface_mock("00:00:00:00:00:00:00:01:3"),
+                id_to_interface_mock("00:00:00:00:00:00:00:02:2")
+            ),
+        ]
+        expected_disjoint_path = [
+            Link(
+                id_to_interface_mock("00:00:00:00:00:00:00:01:4"),
+                id_to_interface_mock("00:00:00:00:00:00:00:03:3")
+            ),
+            Link(
+                id_to_interface_mock("00:00:00:00:00:00:00:02:3"),
+                id_to_interface_mock("00:00:00:00:00:00:00:03:2")
+            ),
+        ]
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_paths
+        mock_requests_post.return_value = mock_response
+        paths = list(DynamicPathManager.get_disjoint_paths(evc, current_path))
+        assert len(paths) == 1
+        assert (
+            [link.id for link in paths[0]] ==
+            [link.id for link in expected_disjoint_path]
+        )
+
+    def test_get_shared_components(self):
+        """Test get_shared_components"""
+        mock_path = {"hops": [
+            '00:00:00:00:00:00:00:01:1',
+            '00:00:00:00:00:00:00:01',
+            '00:00:00:00:00:00:00:01:4',
+            '00:00:00:00:00:00:00:05:2',
+            '00:00:00:00:00:00:00:05',
+            '00:00:00:00:00:00:00:05:3',
+            '00:00:00:00:00:00:00:02:4',
+            '00:00:00:00:00:00:00:02',
+            '00:00:00:00:00:00:00:02:3',
+            '00:00:00:00:00:00:00:03:2',
+            '00:00:00:00:00:00:00:03',
+            '00:00:00:00:00:00:00:03:1'
+        ]}
+        mock_links = [
+            ("00:00:00:00:00:00:00:01:2", "00:00:00:00:00:00:00:02:2"),
+            ("00:00:00:00:00:00:00:02:3", "00:00:00:00:00:00:00:03:2")
+        ]
+        mock_switches = {"00:00:00:00:00:00:00:02"}
+        actual_lk, actual_sw = DynamicPathManager.get_shared_components(
+            mock_path, mock_links, mock_switches
+        )
+        assert actual_lk == 1
+        assert actual_sw == 1

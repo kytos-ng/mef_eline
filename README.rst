@@ -35,7 +35,10 @@ To install this NApp, first, make sure to have the same venv activated as you ha
 
    $ git clone https://github.com/kytos-ng/mef_eline.git
    $ cd mef_eline
-   $ python3 setup.py develop
+   $ python3 -m pip install --editable .
+
+To install the kytos environment, please follow our
+`development environment setup <https://github.com/kytos-ng/documentation/blob/master/tutorials/napps/development_environment_setup.rst>`_.
 
 Requirements
 ============

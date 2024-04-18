@@ -3,8 +3,19 @@ Changelog
 #########
 All notable changes to the MEF_ELine NApp will be documented in this file.
 
-[Unreleased]
-************
+[UNRELEASED] - Under development
+********************************
+
+Changed
+=======
+- Updated python environment installation from 3.9 to 3.11
+- Updated test dependencies
+
+[2023.2.0] - 2024-02-16
+***********************
+
+[2023.2.0] - 2024-02-16
+***********************
 
 Added
 =====
@@ -14,7 +25,9 @@ Added
 - EVCs now listen to ``switch.interface.(link_up|link_down|created|deleted)`` events for activation/deactivation
 - Circuits with a vlan range are supported now. The ranges follows ``list[list[int]]`` format and both UNIs vlan should have the same ranges.
 - Usage of special vlans ``"untagged"`` and ``"any"`` now send an event to each Interface.
+- Added ``UNI_STATE_CHANGE_DELAY`` which configures the time for ``mef_eline`` to wait on link state flaps and update EVCs with last updated event.
 - Added support for ``not_ownership`` to dynamic path constraints.
+- Added support for ``not_ownership`` on main UI interface.
 
 Changed
 =======
@@ -27,6 +40,8 @@ Changed
 - Improved log for invalid traces by adding ``From EVC(evc_id) named 'evc_name'``
 - An inactive and enabled EVC will be redeploy if an attribute from ``attributes_requiring_redeploy`` is updated.
 - If a KytosEvent can't be put on ``buffers.app`` during ``setup()``, it'll make the NApp to fail to start
+- Disjointedness algorithm now takes into account switches, excepting the UNIs switches. Unwanted switches have the same value as the unwanted links.
+- Archived EVCs are not longer kept in memory. They can only be found in the database.
 
 Deprecated
 ==========
@@ -43,6 +58,7 @@ Fixed
 - fixed race condition in ``failover_path`` when handling simultaneous Link Down events leading to inconsistencies on some EVC
 - fixed sdntrace_cp check_trace ``current_path`` comparison with the expected UNI order
 - fixed ``DynamicPathManager.get_paths`` return value when ``pathfinder`` returns a request error
+- ``failover_path`` will get removed if it exists during a redeploy
 
 [2023.1.0] - 2023-06-27
 ***********************

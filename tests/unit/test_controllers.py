@@ -76,11 +76,19 @@ class TestControllers():
         self.eline.upsert_evc(self.evc_dict)
         assert self.eline.db.evcs.find_one_and_update.call_count == 1
 
-    def test_update_evcs(self):
-        """Test update_evcs"""
+    def test_update_evcs_metadata(self):
+        """Test update_evcs_metadata"""
         circuit_ids = ["123", "456", "789"]
         metadata = {"info": "testing"}
-        self.eline.update_evcs(circuit_ids, metadata, "add")
+        self.eline.update_evcs_metadata(circuit_ids, metadata, "add")
         arg = self.eline.db.evcs.bulk_write.call_args[0][0]
         assert len(arg) == 3
+        assert self.eline.db.evcs.bulk_write.call_count == 1
+
+    def test_update_evcs(self):
+        """Test update_evcs"""
+        evc2 = dict(self.evc_dict | {"id": "456"})
+        self.eline.update_evcs([self.evc_dict, evc2])
+        arg = self.eline.db.evcs.bulk_write.call_args[0][0]
+        assert len(arg) == 2
         assert self.eline.db.evcs.bulk_write.call_count == 1

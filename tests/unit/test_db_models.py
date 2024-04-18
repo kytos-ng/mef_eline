@@ -95,7 +95,7 @@ class TestDBModels():
         """test_document_base_model_dict."""
         self.evc_dict["_id"] = "some_id"
         model = DocumentBaseModel(**self.evc_dict)
-        assert "_id" not in model.dict(exclude={"_id"})
+        assert "_id" not in model.model_dump(exclude={"_id"})
 
     def test_tagdoc_value(self):
         """Test TAGDoc value restrictions"""

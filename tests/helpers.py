@@ -23,6 +23,7 @@ def id_to_interface_mock(interface_id):
     switch_id = ":".join(interface_id.split(":")[:-1])
     port_id = int(interface_id.split(":")[-1])
     switch = get_switch_mock(switch_id, 0x04)
+    switch.id = switch_id
     interface = get_interface_mock(port_id, port_id, switch)
     return interface
 

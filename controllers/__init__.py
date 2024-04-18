@@ -88,7 +88,7 @@ class ELineController:
                 **evc,
                 **{"_id": evc["id"]}
             }
-        ).dict(exclude={"inserted_at"}, exclude_none=True)
+        ).model_dump(exclude={"inserted_at"}, exclude_none=True)
         model.setdefault("queue_id", None)
         updated = self.db.evcs.find_one_and_update(
             {"_id": evc["id"]},
@@ -121,8 +121,37 @@ class ELineController:
         )
         return updated
 
-    def update_evcs(self, circuit_ids: list, metadata: dict, action: str):
-        """Update a bulk of EVC"""
+    def update_evcs(self, evcs: list[dict]) -> int:
+        """Update EVCs and return the number of modified documents."""
+        if not evcs:
+            return 0
+
+        ops = []
+        utc_now = datetime.utcnow()
+
+        for evc in evcs:
+            evc["updated_at"] = utc_now
+            model = EVCBaseDoc(
+                **{
+                    **evc,
+                    **{"_id": evc["id"]}
+                }
+            ).model_dump(exclude_none=True)
+            ops.append(
+                UpdateOne(
+                    {"_id": evc["id"]},
+                    {
+                        "$set": model,
+                        "$setOnInsert": {"inserted_at": utc_now}
+                    },
+                )
+            )
+        return self.db.evcs.bulk_write(ops).modified_count
+
+    def update_evcs_metadata(
+        self, circuit_ids: list, metadata: dict, action: str
+    ):
+        """Bulk update EVCs metadata."""
         utc_now = datetime.utcnow()
         metadata = {f"metadata.{k}": v for k, v in metadata.items()}
         if action == "add":

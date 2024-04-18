@@ -138,6 +138,8 @@ class EVCBase(GenericEntity):
         self.current_links_cache = set()
         self.primary_links_cache = set()
         self.backup_links_cache = set()
+        self.affected_by_link_at = get_time("0001-01-01T00:00:00")
+        self.old_path = Path([])
 
         self.lock = Lock()
 
@@ -871,6 +873,14 @@ class EVCDeploy(EVCBase):
         self.sync()
         log.info(f"{self} was deployed.")
         return True
+
+    def try_setup_failover_path(self, wait=settings.DEPLOY_EVCS_INTERVAL):
+        """Try setup failover_path whenever possible."""
+        if self.failover_path:
+            return
+        if (now() - self.affected_by_link_at).seconds >= wait:
+            with self.lock:
+                self.setup_failover_path()
 
     def setup_failover_path(self):
         """Install flows for the failover path of this EVC.
@@ -1686,8 +1696,6 @@ class LinkProtection(EVCDeploy):
         """
         Handler for interface link_up events
         """
-        if self.archived:  # TODO: Remove when addressing issue #369
-            return
         if self.is_active():
             return
         interfaces = (self.uni_a.interface, self.uni_z.interface)
@@ -1718,8 +1726,6 @@ class LinkProtection(EVCDeploy):
         """
         Handler for interface link_down events
         """
-        if self.archived:
-            return
         if not self.is_active():
             return
         interfaces = (self.uni_a.interface, self.uni_z.interface)

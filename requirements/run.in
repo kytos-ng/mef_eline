@@ -1,3 +1,3 @@
 apscheduler==3.8.0
-requests==2.27.0
+requests==2.31.0
 glom==20.11.0

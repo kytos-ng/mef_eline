@@ -1,9 +1,11 @@
 """Module to test the main napp file."""
-from unittest.mock import (AsyncMock, MagicMock, PropertyMock, call,
+import asyncio
+from unittest.mock import (AsyncMock, MagicMock, Mock, call,
                            create_autospec, patch)
 
 import pytest
 from kytos.lib.helpers import get_controller_mock, get_test_client
+from kytos.core.helpers import now
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
 from kytos.core.exceptions import KytosTagError
@@ -424,12 +426,11 @@ class TestMain:
         evc_deploy_mock,
         mock_use_uni_tags,
         mock_tags_equal,
-        mock_check_duplicate,
-        event_loop
+        mock_check_duplicate
     ):
         """Test create a new circuit."""
         # pylint: disable=too-many-locals
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
         evc_deploy_mock.return_value = True
@@ -506,9 +507,9 @@ class TestMain:
         # verify add circuit in sched
         sched_add_mock.assert_called_once()
 
-    async def test_create_a_circuit_case_2(self, event_loop):
+    async def test_create_a_circuit_case_2(self):
         """Test create a new circuit trying to send request without a json."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         url = f"{self.base_endpoint}/v2/evc/"
 
         response = await self.api_client.post(url)
@@ -516,10 +517,10 @@ class TestMain:
         assert 400 == response.status_code
         assert "Missing required request body" in current_data["description"]
 
-    async def test_create_a_circuit_case_3(self, event_loop):
+    async def test_create_a_circuit_case_3(self):
         """Test create a new circuit trying to send request with an
         invalid json."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         url = f"{self.base_endpoint}/v2/evc/"
 
         response = await self.api_client.post(
@@ -528,19 +529,18 @@ class TestMain:
         )
         current_data = response.json()
         assert 400 == response.status_code
-        assert "contains invalid" in current_data["description"]
+        assert "This is an {Invalid:" in current_data["description"]
 
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     async def test_create_a_circuit_case_4(
         self,
         mongo_controller_upsert_mock,
-        uni_from_dict_mock,
-        event_loop
+        uni_from_dict_mock
     ):
         """Test create a new circuit trying to send request with an
         invalid value."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         # pylint: disable=too-many-locals
         uni_from_dict_mock.side_effect = ValueError("Could not instantiate")
         mongo_controller_upsert_mock.return_value = True
@@ -574,11 +574,10 @@ class TestMain:
     async def test_create_a_circuit_case_5(
         self,
         validate_mock,
-        uni_from_dict_mock,
-        event_loop
+        uni_from_dict_mock
     ):
         """Test create a new intra circuit with a disabled switch"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         uni1 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
@@ -603,9 +602,9 @@ class TestMain:
         response = await self.api_client.post(url, json=payload)
         assert 409 == response.status_code, response.data
 
-    async def test_create_a_circuit_invalid_queue_id(self, event_loop):
+    async def test_create_a_circuit_invalid_queue_id(self):
         """Test create a new circuit with invalid queue_id."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         url = f"{self.base_endpoint}/v2/evc/"
 
         payload = {
@@ -646,12 +645,11 @@ class TestMain:
         evc_deploy_mock,
         mock_use_uni_tags,
         mock_tags_equal,
-        mock_check_duplicate,
-        event_loop
+        mock_check_duplicate
     ):
         """Test create an already created circuit."""
         # pylint: disable=too-many-locals
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
@@ -703,11 +701,10 @@ class TestMain:
     async def test_create_circuit_case_5(
         self,
         uni_from_dict_mock,
-        mock_tags_equal,
-        event_loop
+        mock_tags_equal
     ):
         """Test when neither primary path nor dynamic_backup_path is set."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         mock_tags_equal.return_value = True
         url = f"{self.base_endpoint}/v2/evc/"
         uni1 = create_autospec(UNI)
@@ -739,9 +736,9 @@ class TestMain:
         assert current_data["description"] == expected_data
 
     @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
-    async def test_create_circuit_case_6(self, mock_evc, event_loop):
+    async def test_create_circuit_case_6(self, mock_evc):
         """Test create_circuit with KytosTagError"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         url = f"{self.base_endpoint}/v2/evc/"
         mock_evc.side_effect = KytosTagError("")
         payload = {
@@ -761,11 +758,10 @@ class TestMain:
     async def test_create_circuit_case_7(
         self,
         mock_evc,
-        mock_check_disabled_component,
-        event_loop
+        mock_check_disabled_component
     ):
         """Test create_circuit with InvalidPath"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         mock_check_disabled_component.return_value = True
         url = f"{self.base_endpoint}/v2/evc/"
         uni1 = get_uni_mocked()
@@ -801,11 +797,10 @@ class TestMain:
     async def test_create_circuit_case_8(
         self,
         mock_evc,
-        mock_check_disabled_component,
-        event_loop
+        mock_check_disabled_component
     ):
         """Test create_circuit wit no equal tag lists"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         mock_check_disabled_component.return_value = True
         url = f"{self.base_endpoint}/v2/evc/"
         uni1 = get_uni_mocked()
@@ -834,6 +829,8 @@ class TestMain:
         self.napp.circuits = {"1": evc1, "2": MagicMock()}
         url = f"{self.base_endpoint}/v2/evc/1/redeploy"
         response = await self.api_client.patch(url)
+        evc1.remove_failover_flows.assert_called()
+        evc1.remove_current_flows.assert_called()
         assert response.status_code == 202, response.data
 
     async def test_redeploy_evc_disabled(self):
@@ -843,6 +840,8 @@ class TestMain:
         self.napp.circuits = {"1": evc1, "2": MagicMock()}
         url = f"{self.base_endpoint}/v2/evc/1/redeploy"
         response = await self.api_client.patch(url)
+        evc1.remove_failover_flows.assert_not_called()
+        evc1.remove_current_flows.assert_not_called()
         assert response.status_code == 409, response.data
 
     async def test_redeploy_evc_deleted(self):
@@ -1027,11 +1026,10 @@ class TestMain:
         mongo_controller_upsert_mock,
         uni_from_dict_mock,
         sched_add_mock,
-        scheduler_add_job_mock,
-        event_loop
+        scheduler_add_job_mock
     ):
         """Test create a circuit schedule."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
         uni_from_dict_mock.side_effect = self._uni_from_dict_side_effect
@@ -1073,9 +1071,9 @@ class TestMain:
         response = await self.api_client.post(url, json=payload)
         assert response.status_code == 201
 
-    async def test_create_schedule_invalid_request(self, event_loop):
+    async def test_create_schedule_invalid_request(self):
         """Test create schedule API with invalid request."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc1 = MagicMock()
         self.napp.circuits = {'bb:bb:bb': evc1}
         url = f'{self.base_endpoint}/v2/evc/schedule/'
@@ -1084,23 +1082,12 @@ class TestMain:
         response = await self.api_client.post(url, json={})
         assert response.status_code == 400
 
-        # case 2: content-type not specified
-        payload = {
-            "circuit_id": "bb:bb:bb",
-            "schedule": {
-                "frequency": "1 * * * *",
-                "action": "create"
-            }
-        }
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 409
-
-        # case 3: not a dictionary
+        # case 2: not a dictionary
         payload = []
         response = await self.api_client.post(url, json=payload)
         assert response.status_code == 400
 
-        # case 4: missing circuit id
+        # case 3: missing circuit id
         payload = {
             "schedule": {
                 "frequency": "1 * * * *",
@@ -1110,14 +1097,14 @@ class TestMain:
         response = await self.api_client.post(url, json=payload)
         assert response.status_code == 400
 
-        # case 5: missing schedule
+        # case 4: missing schedule
         payload = {
             "circuit_id": "bb:bb:bb"
         }
         response = await self.api_client.post(url, json=payload)
         assert response.status_code == 400
 
-        # case 6: invalid circuit
+        # case 5: invalid circuit
         payload = {
             "circuit_id": "xx:xx:xx",
             "schedule": {
@@ -1128,19 +1115,7 @@ class TestMain:
         response = await self.api_client.post(url, json=payload)
         assert response.status_code == 404
 
-        # case 7: archived or deleted evc
-        evc1.archived.return_value = True
-        payload = {
-            "circuit_id": "bb:bb:bb",
-            "schedule": {
-                "frequency": "1 * * * *",
-                "action": "create"
-            }
-        }
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 409
-
-        # case 8: invalid json
+        # case 6: invalid json
         response = await self.api_client.post(url, json="test")
         assert response.status_code == 400
 
@@ -1157,11 +1132,10 @@ class TestMain:
         mongo_controller_upsert_mock,
         uni_from_dict_mock,
         sched_add_mock,
-        scheduler_remove_job_mock,
-        event_loop
+        scheduler_remove_job_mock
     ):
         """Test create a circuit schedule."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         mongo_payload_1 = {
             "circuits": {
                 "aa:aa:aa": {
@@ -1212,10 +1186,10 @@ class TestMain:
 
     @patch('napps.kytos.mef_eline.main.Main._find_evc_by_schedule_id')
     async def test_update_no_schedule(
-        self, find_evc_by_schedule_id_mock, event_loop
+        self, find_evc_by_schedule_id_mock
     ):
         """Test update a circuit schedule."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         url = f"{self.base_endpoint}/v2/evc/schedule/1"
         payload = {"frequency": "*/1 * * * *", "action": "create"}
 
@@ -1223,52 +1197,6 @@ class TestMain:
 
         response = await self.api_client.patch(url, json=payload)
         assert response.status_code == 404
-
-    @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
-    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.main.EVC.as_dict")
-    @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
-    async def test_update_schedule_archived(
-        self,
-        validate_mock,
-        evc_as_dict_mock,
-        uni_from_dict_mock,
-        sched_add_mock,
-        event_loop
-    ):
-        """Test create a circuit schedule."""
-        self.napp.controller.loop = event_loop
-        mongo_payload_1 = {
-            "circuits": {
-                "aa:aa:aa": {
-                    "id": "aa:aa:aa",
-                    "name": "my evc1",
-                    "archived": True,
-                    "circuit_scheduler": [
-                        {
-                            "id": "1",
-                            "frequency": "* * * * *",
-                            "action": "create"
-                        }
-                    ],
-                }
-            }
-        }
-
-        validate_mock.return_value = True
-        sched_add_mock.return_value = True
-        uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
-        evc_as_dict_mock.return_value = {}
-        self.napp.mongo_controller.get_circuits.return_value = mongo_payload_1
-
-        requested_schedule_id = "1"
-        url = f"{self.base_endpoint}/v2/evc/schedule/{requested_schedule_id}"
-
-        payload = {"frequency": "*/1 * * * *", "action": "create"}
-
-        # Call URL
-        response = await self.api_client.patch(url, json=payload)
-        assert response.status_code == 409
 
     @patch("apscheduler.schedulers.background.BackgroundScheduler.remove_job")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
@@ -1326,46 +1254,6 @@ class TestMain:
         mongo_controller_upsert_mock.assert_called_once()
         assert "Schedule removed" in f"{response.json()}"
 
-    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.main.EVC.as_dict")
-    @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
-    async def test_delete_schedule_archived(self, *args):
-        """Test create a circuit schedule."""
-        (
-            validate_mock,
-            evc_as_dict_mock,
-            uni_from_dict_mock,
-        ) = args
-
-        mongo_payload_1 = {
-            "circuits": {
-                "2": {
-                    "id": "2",
-                    "name": "my evc1",
-                    "archived": True,
-                    "circuit_scheduler": [
-                        {
-                            "id": "1",
-                            "frequency": "* * * * *",
-                            "action": "create"
-                        }
-                    ],
-                }
-            }
-        }
-
-        validate_mock.return_value = True
-        uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
-        evc_as_dict_mock.return_value = {}
-        self.napp.mongo_controller.get_circuits.return_value = mongo_payload_1
-
-        requested_schedule_id = "1"
-        url = f"{self.base_endpoint}/v2/evc/schedule/{requested_schedule_id}"
-
-        # Call URL
-        response = await self.api_client.delete(url)
-        assert response.status_code == 409
-
     @patch('napps.kytos.mef_eline.main.Main._find_evc_by_schedule_id')
     async def test_delete_schedule_not_found(self, mock_find_evc_by_sched):
         """Test delete a circuit schedule - unexisting."""
@@ -1393,6 +1281,14 @@ class TestMain:
         evcs_by_level = self.napp.get_evcs_by_svc_level()
         for i in range(2):
             assert evcs_by_level[i].creation_time == i
+
+        self.napp.circuits[1].is_enabled = lambda: False
+        evcs_by_level = self.napp.get_evcs_by_svc_level()
+        assert len(evcs_by_level) == 1
+
+        self.napp.circuits[1].is_enabled = lambda: False
+        evcs_by_level = self.napp.get_evcs_by_svc_level(enable_filter=False)
+        assert len(evcs_by_level) == 2
 
     async def test_get_circuit_not_found(self):
         """Test /v2/evc/<circuit_id> 404."""
@@ -1424,11 +1320,10 @@ class TestMain:
         _mongo_controller_update_mock,
         _sched_add_mock,
         mock_use_uni_tags,
-        requests_mock,
-        event_loop,
+        requests_mock
     ):
         """Test update a circuit circuit."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         mock_use_uni_tags.return_value = True
         interface_by_id_mock.return_value = get_uni_mocked().interface
         unis = [
@@ -1537,18 +1432,6 @@ class TestMain:
         assert 200 == response.status_code
         evc_deploy.assert_called_once()
 
-        await self.api_client.delete(
-            f"{self.base_endpoint}/v2/evc/{circuit_id}"
-        )
-        evc_deploy.reset_mock()
-        response = await self.api_client.patch(
-            f"{self.base_endpoint}/v2/evc/{circuit_id}",
-            json=payloads[1],
-        )
-        evc_deploy.assert_not_called()
-        assert 409 == response.status_code
-        assert "Can't update archived EVC" in response.json()["description"]
-
     @patch("napps.kytos.mef_eline.main.Main._check_no_tag_duplication")
     @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
@@ -1568,11 +1451,10 @@ class TestMain:
         evc_deploy_mock,
         mock_use_uni_tags,
         mock_tags_equal,
-        mock_check_duplicate,
-        event_loop
+        mock_check_duplicate
     ):
         """Test update a circuit circuit."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
@@ -1646,11 +1528,10 @@ class TestMain:
         evc_deploy_mock,
         mock_use_uni_tags,
         mock_tags_equal,
-        mock_check_duplicate,
-        event_loop
+        mock_check_duplicate
     ):
         """Test update a circuit circuit."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         is_valid_mock.side_effect = InvalidPath("error")
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
@@ -1722,8 +1603,7 @@ class TestMain:
         _mock_validate,
         _mongo_controller_upsert_mock,
         mock_use_uni_tags,
-        mock_get_unis,
-        event_loop,
+        mock_get_unis
     ):
         """Test update a circuit that result in an intra-switch EVC
         with disabled switches or interfaces"""
@@ -1731,7 +1611,7 @@ class TestMain:
         _mock_validate.return_value = True
         _mongo_controller_upsert_mock.return_value = True
         mock_use_uni_tags.return_value = True
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         # Interfaces from get_uni_mocked() are disabled
         uni_a = get_uni_mocked(
             switch_dpid="00:00:00:00:00:00:00:01",
@@ -1818,11 +1698,10 @@ class TestMain:
         evc_deploy_mock,
         mock_use_uni_tags,
         mock_tags_equal,
-        mock_check_duplicate,
-        event_loop
+        mock_check_duplicate
     ):
         """Test update a circuit with wrong mimetype."""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         sched_add_mock.return_value = True
         evc_deploy_mock.return_value = True
@@ -1900,11 +1779,10 @@ class TestMain:
         mock_remove_tags,
         mock_use_uni,
         mock_tags_equal,
-        mock_check_duplicate,
-        event_loop
+        mock_check_duplicate
     ):
         """Try to delete an archived EVC"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
         sched_add_mock.return_value = True
@@ -1940,6 +1818,7 @@ class TestMain:
             json=payload1
         )
         assert 201 == response.status_code
+        assert len(self.napp.circuits) == 1
 
         current_data = response.json()
         circuit_id = current_data["circuit_id"]
@@ -1948,29 +1827,32 @@ class TestMain:
         )
         assert 200 == response.status_code
         assert mock_remove_tags.call_count == 1
+        assert len(self.napp.circuits) == 0
 
         response = await self.api_client.delete(
             f"{self.base_endpoint}/v2/evc/{circuit_id}"
         )
         current_data = response.json()
-        expected_data = f"Circuit {circuit_id} already removed"
+        expected_data = f"circuit_id {circuit_id} not found"
         assert current_data["description"] == expected_data
         assert 404 == response.status_code
+        assert len(self.napp.circuits) == 0
 
     def test_handle_link_up(self):
         """Test handle_link_up method."""
         evc_mock = create_autospec(EVC)
         evc_mock.service_level, evc_mock.creation_time = 0, 1
-        evc_mock.is_enabled = MagicMock(side_effect=[True, False, True])
+        evc_mock.is_enabled = MagicMock(side_effect=[
+            True, False, True, True, True
+        ])
         evc_mock.lock = MagicMock()
-        type(evc_mock).archived = PropertyMock(
-            side_effect=[True, False, False]
-        )
+        evc_mock.archived = False
         evcs = [evc_mock, evc_mock, evc_mock]
         event = KytosEvent(name="test", content={"link": "abc"})
         self.napp.circuits = dict(zip(["1", "2", "3"], evcs))
         self.napp.handle_link_up(event)
-        evc_mock.handle_link_up.assert_called_once_with("abc")
+        assert evc_mock.handle_link_up.call_count == 2
+        evc_mock.handle_link_up.assert_called_with("abc")
 
     @patch("time.sleep", return_value=None)
     @patch("napps.kytos.mef_eline.main.emit_event")
@@ -1986,6 +1868,8 @@ class TestMain:
         evc1.failover_path = None
         evc2 = MagicMock(id="2", service_level=6, creation_time=1)
         evc2.is_affected_by_link.return_value = False
+        evc2.is_failover_path_affected_by_link.return_value = True
+        evc2.as_dict.return_value = {"id": "2"}
         evc3 = MagicMock(id="3", service_level=5, creation_time=1,
                          metadata="mock", _active="true", _enabled="true",
                          uni_a=uni, uni_z=uni)
@@ -2004,6 +1888,7 @@ class TestMain:
             "2": ["flow1", "flow2"],
             "3": ["flow3", "flow4", "flow5", "flow6"],
         }
+        evc4.as_dict.return_value = {"id": "4"}
         evc5 = MagicMock(id="5", service_level=7, creation_time=1)
         evc5.is_affected_by_link.return_value = True
         evc5.is_failover_path_affected_by_link.return_value = False
@@ -2012,6 +1897,7 @@ class TestMain:
             "4": ["flow7", "flow8"],
             "5": ["flow9", "flow10"],
         }
+        evc5.as_dict.return_value = {"id": "5"}
         evc6 = MagicMock(id="6", service_level=8, creation_time=1,
                          metadata="mock", _active="true", _enabled="true",
                          uni_a=uni, uni_z=uni)
@@ -2078,7 +1964,7 @@ class TestMain:
         # evc3 should be handled before evc1
         emit_event_mock.assert_has_calls([
             call(self.napp.controller, event_name, content={
-                "link_id": "123",
+                "link": link,
                 "evc_id": "6",
                 "name": "name",
                 "metadata": "mock",
@@ -2088,7 +1974,7 @@ class TestMain:
                 "uni_z": uni.as_dict(),
             }),
             call(self.napp.controller, event_name, content={
-                "link_id": "123",
+                "link": link,
                 "evc_id": "3",
                 "name": "name",
                 "metadata": "mock",
@@ -2098,7 +1984,7 @@ class TestMain:
                 "uni_z": uni.as_dict(),
             }),
             call(self.napp.controller, event_name, content={
-                "link_id": "123",
+                "link": link,
                 "evc_id": "1",
                 "name": "name",
                 "metadata": "mock",
@@ -2108,7 +1994,9 @@ class TestMain:
                 "uni_z": uni.as_dict(),
             }),
         ])
-        evc4.sync.assert_called_once()
+        self.napp.mongo_controller.update_evcs.assert_called_with(
+            [{"id": "5"}, {"id": "4"}, {"id": "2"}]
+        )
         event_name = "redeployed_link_down"
         emit_event_mock.assert_has_calls([
             call(self.napp.controller, event_name, content={
@@ -2150,7 +2038,7 @@ class TestMain:
 
         event = KytosEvent(name="e1", content={
             "evc_id": "3",
-            "link_id": "1",
+            "link": MagicMock(),
         })
         self.napp.handle_evc_affected_by_link_down(event)
         emit_event_mock.assert_not_called()
@@ -2182,23 +2070,21 @@ class TestMain:
             }
         )
 
-    def test_handle_evc_deployed(self):
-        """Test handle_evc_deployed method."""
-        evc = create_autospec(EVC, id="1")
-        evc.lock = MagicMock()
-        self.napp.circuits = {"1": evc}
+    def test_cleanup_evcs_old_path(self):
+        """Test handle_cleanup_evcs_old_path method."""
+        evc1 = create_autospec(EVC, id="1", old_path=["1"])
+        evc2 = create_autospec(EVC, id="2", old_path=["2"])
+        evc3 = create_autospec(EVC, id="3", old_path=[])
 
-        event = KytosEvent(name="e1", content={"evc_id": "2"})
-        self.napp.handle_evc_deployed(event)
-        evc.setup_failover_path.assert_not_called()
+        event = KytosEvent(name="e1", content={"evcs": [evc1, evc2, evc3]})
+        self.napp.handle_cleanup_evcs_old_path(event)
+        evc1.remove_path_flows.assert_called_with(["1"])
+        evc2.remove_path_flows.assert_called_with(["2"])
+        evc3.remove_path_flows.assert_not_called()
 
-        event.content["evc_id"] = "1"
-        self.napp.handle_evc_deployed(event)
-        evc.setup_failover_path.assert_called()
-
-    async def test_add_metadata(self, event_loop):
+    async def test_add_metadata(self):
         """Test method to add metadata"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evc_mock.metadata = {}
         evc_mock.id = 1234
@@ -2213,9 +2099,9 @@ class TestMain:
         assert response.status_code == 201
         evc_mock.extend_metadata.assert_called_with(payload)
 
-    async def test_add_metadata_malformed_json(self, event_loop):
+    async def test_add_metadata_malformed_json(self):
         """Test method to add metadata with a malformed json"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         payload = b'{"metadata1": 1, "metadata2": 2,}'
         response = await self.api_client.post(
             f"{self.base_endpoint}/v2/evc/1234/metadata",
@@ -2224,11 +2110,11 @@ class TestMain:
         )
 
         assert response.status_code == 400
-        assert "Failed to deserialize" in response.json()["description"]
+        assert "body contains invalid API" in response.json()["description"]
 
-    async def test_add_metadata_no_body(self, event_loop):
+    async def test_add_metadata_no_body(self):
         """Test method to add metadata with no body"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         response = await self.api_client.post(
             f"{self.base_endpoint}/v2/evc/1234/metadata"
         )
@@ -2236,9 +2122,9 @@ class TestMain:
         assert response.json()["description"] == \
             "Missing required request body"
 
-    async def test_add_metadata_no_evc(self, event_loop):
+    async def test_add_metadata_no_evc(self):
         """Test method to add metadata with no evc"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         payload = {"metadata1": 1, "metadata2": 2}
         response = await self.api_client.post(
             f"{self.base_endpoint}/v2/evc/1234/metadata",
@@ -2248,9 +2134,9 @@ class TestMain:
         assert response.json()["description"] == \
             "circuit_id 1234 not found."
 
-    async def test_add_metadata_wrong_content_type(self, event_loop):
+    async def test_add_metadata_wrong_content_type(self):
         """Test method to add metadata with wrong content type"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         payload = {"metadata1": 1, "metadata2": 2}
         response = await self.api_client.post(
             f"{self.base_endpoint}/v2/evc/1234/metadata",
@@ -2404,9 +2290,9 @@ class TestMain:
         self.napp.handle_flow_delete(event)
         evc.set_flow_removed_at.assert_called_once()
 
-    async def test_add_bulk_metadata(self, event_loop):
+    async def test_add_bulk_metadata(self):
         """Test add_bulk_metadata method"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2420,18 +2306,18 @@ class TestMain:
             json=payload
         )
         assert response.status_code == 201
-        args = self.napp.mongo_controller.update_evcs.call_args[0]
+        args = self.napp.mongo_controller.update_evcs_metadata.call_args[0]
         ids = payload.pop("circuit_ids")
         assert args[0] == ids
         assert args[1] == payload
         assert args[2] == "add"
-        calls = self.napp.mongo_controller.update_evcs.call_count
+        calls = self.napp.mongo_controller.update_evcs_metadata.call_count
         assert calls == 1
         evc_mock.extend_metadata.assert_called_with(payload)
 
-    async def test_add_bulk_metadata_empty_list(self, event_loop):
+    async def test_add_bulk_metadata_empty_list(self):
         """Test add_bulk_metadata method empty list"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2447,9 +2333,9 @@ class TestMain:
         assert response.status_code == 400
         assert "invalid" in response.json()["description"]
 
-    async def test_add_bulk_metadata_no_id(self, event_loop):
+    async def test_add_bulk_metadata_no_id(self):
         """Test add_bulk_metadata with unknown evc id"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2462,9 +2348,9 @@ class TestMain:
         )
         assert response.status_code == 404
 
-    async def test_add_bulk_metadata_no_circuits(self, event_loop):
+    async def test_add_bulk_metadata_no_circuits(self):
         """Test add_bulk_metadata without circuit_ids"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2477,9 +2363,9 @@ class TestMain:
         )
         assert response.status_code == 400
 
-    async def test_delete_bulk_metadata(self, event_loop):
+    async def test_delete_bulk_metadata(self):
         """Test delete_metadata method"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2492,17 +2378,17 @@ class TestMain:
             json=payload
         )
         assert response.status_code == 200
-        args = self.napp.mongo_controller.update_evcs.call_args[0]
+        args = self.napp.mongo_controller.update_evcs_metadata.call_args[0]
         assert args[0] == payload["circuit_ids"]
         assert args[1] == {"metadata1": ""}
         assert args[2] == "del"
-        calls = self.napp.mongo_controller.update_evcs.call_count
+        calls = self.napp.mongo_controller.update_evcs_metadata.call_count
         assert calls == 1
         assert evc_mock.remove_metadata.call_count == 1
 
-    async def test_delete_bulk_metadata_error(self, event_loop):
+    async def test_delete_bulk_metadata_error(self):
         """Test bulk_delete_metadata with ciruit erroring"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evcs = [evc_mock, evc_mock]
         self.napp.circuits = dict(zip(["1", "2"], evcs))
@@ -2515,9 +2401,9 @@ class TestMain:
         assert response.status_code == 404, response.data
         assert response.json()["description"] == ["3"]
 
-    async def test_use_uni_tags(self, event_loop):
+    async def test_use_uni_tags(self):
         """Test _use_uni_tags"""
-        self.napp.controller.loop = event_loop
+        self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
         evc_mock.uni_a = "uni_a_mock"
         evc_mock.uni_z = "uni_z_mock"
@@ -2561,3 +2447,52 @@ class TestMain:
 
         self.napp._check_no_tag_duplication(evc_id, None, None)
         assert evc.check_no_tag_duplicate.call_count == 3
+
+    @patch("napps.kytos.mef_eline.main.time")
+    @patch("napps.kytos.mef_eline.main.Main.handle_interface_link_up")
+    @patch("napps.kytos.mef_eline.main.Main.handle_interface_link_down")
+    def test_handle_on_interface_link_change(
+        self,
+        mock_down,
+        mock_up,
+        mock_time
+    ):
+        """Test handle_on_interface_link_change"""
+        mock_time.sleep.return_value = True
+        mock_intf = Mock()
+        mock_intf.id = "mock_intf"
+
+        # Created/link_up
+        name = '.*.switch.interface.created'
+        content = {"interface": mock_intf}
+        event = KytosEvent(name=name, content=content)
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 0
+        assert mock_up.call_count == 1
+
+        # Deleted/link_down
+        name = '.*.switch.interface.deleted'
+        event = KytosEvent(name=name, content=content)
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 1
+        assert mock_up.call_count == 1
+
+        # Event delay
+        self.napp._intf_events[mock_intf.id]["last_acquired"] = "mock_time"
+        for _ in range(1, 6):
+            self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 1
+        assert mock_up.call_count == 1
+
+        self.napp._intf_events[mock_intf.id].pop("last_acquired")
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 2
+        assert mock_up.call_count == 1
+
+        # Out of order event
+        event = KytosEvent(name=name, content=content)
+        self.napp._intf_events[mock_intf.id]["event"] = Mock(timestamp=now())
+
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 2
+        assert mock_up.call_count == 1

@@ -199,6 +199,25 @@
                     :action="function(val) {form_constraints[constraint].metrics.ownership = val}"></k-input>
                   </div>
                 </div>
+
+                <div class="metric">
+                  <div class="metric-dropdown">
+                    <k-dropdown :options="metric_options" 
+                    :title="constraint_titles['not_ownership']"
+                    :value.sync="form_constraints[constraint].is_flexible.not_ownership"
+                    ref="is_flexible"></k-dropdown>
+                  </div>
+                  <div class="metric-field">
+                    <k-input icon="arrow-right"
+                    placeholder='["blue", "red"]'
+                    :value.sync="form_constraints[constraint].not_ownership"
+                    :action="function(val){
+                        try{form_constraints[constraint].metrics.not_ownership = JSON.parse(val)}
+                        catch(e){
+                          if(e instanceof SyntaxError){form_constraints[constraint].metrics.not_ownership=val}
+                          else{throw e}}}"></k-input>
+                  </div>
+                </div>
             </k-accordion-item>
         </span>
         <k-button tooltip="Request Circuit" title="Request Circuit"
@@ -244,6 +263,7 @@ module.exports = {
             metrics: {
               bandwidth: '', utilization: '', priority: '',
               delay: '', reliability: '', ownership: '',
+              not_ownership: [],
             },
             is_flexible: {
               bandwidth: false,
@@ -251,7 +271,8 @@ module.exports = {
               delay: false,
               utilization: false,
               priority: false,
-              ownership: false
+              ownership: false,
+              not_ownership: false,
             },
           },
           secondary_constraints: {
@@ -262,6 +283,7 @@ module.exports = {
             metrics: {
               bandwidth: '', utilization: '', priority: '',
               delay: '', reliability: '', ownership: '',
+              not_ownership: [],
             },
             is_flexible: {
               bandwidth: false,
@@ -269,7 +291,8 @@ module.exports = {
               delay: false,
               utilization: false,
               priority: false,
-              ownership: false
+              ownership: false,
+              not_ownership: false,
             },
           }
         },
@@ -340,6 +363,7 @@ module.exports = {
         'delay': 'Delay',
         'reliability': 'Reliability',
         'ownership': 'Ownership',
+        'not_ownership': 'Not ownership',
       };
 
       this.form_constraints = {
@@ -351,6 +375,7 @@ module.exports = {
             metrics: {
               bandwidth: '', utilization: '', priority: '',
               delay: '', reliability: '', ownership: '',
+              not_ownership: [],
             },
             is_flexible: {
               bandwidth: false,
@@ -358,7 +383,8 @@ module.exports = {
               delay: false,
               utilization: false,
               priority: false,
-              ownership: false
+              ownership: false,
+              not_ownership: false,
             },
           },
           secondary_constraints: {
@@ -369,6 +395,7 @@ module.exports = {
             metrics: {
               bandwidth: '', utilization: '', priority: '',
               delay: '', reliability: '', ownership: '',
+              not_ownership: [],
             },
             is_flexible: {
               bandwidth: false,
@@ -376,7 +403,8 @@ module.exports = {
               delay: false,
               utilization: false,
               priority: false,
-              ownership: false
+              ownership: false,
+              not_ownership: false,
             },
           }
         };
@@ -480,7 +508,7 @@ module.exports = {
           // mandatory and flexible metrics. Filter empty values.
           let _flexible_metrics = {};
           let _mandatory_metrics = {};
-          ['bandwidth', 'utilization', 'priority', 'delay', 'reliability', 'ownership'].forEach(_m => {
+          ['bandwidth', 'utilization', 'priority', 'delay', 'reliability', 'ownership', 'not_ownership'].forEach(_m => {
             if(this.form_constraints[_type].metrics[_m] !== '') {
               if (this.form_constraints[_type].is_flexible[_m]) {
                 _flexible_metrics[_m] = this.form_constraints[_type].metrics[_m];
@@ -624,8 +652,8 @@ module.exports = {
   }
   .metric-dropdown {width:100%;}
   .metric-dropdown .k-dropdown {height: 20px; width:100%; display:flex;flex-wrap: wrap;}
-  .metric-dropdown .k-dropdown .k-dropdown__title {width:35%;}
-  .metric-dropdown .k-dropdown .k-dropdown__select {width:60%;}
+  .metric-dropdown .k-dropdown .k-dropdown__title {width:42%;}
+  .metric-dropdown .k-dropdown .k-dropdown__select {width:53%;}
   .metric-field {width:100%; display:flex; }
   .metric-field label {width:60%; }
   .metric-field label ~.k-input-wrap {width:40%; }

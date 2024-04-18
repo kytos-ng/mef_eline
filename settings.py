@@ -46,3 +46,7 @@ TABLE_GROUP_ALLOWED = {'evpl', 'epl'}
 QUEUE_ID = None
 # Default spf_attribute. Allowed values: "hop", "priority", and "delay"
 SPF_ATTRIBUTE = "hop"
+
+# Time (seconds) to update EVC after interface event
+# ".*.switch.interface.(link_up|link_down|created|deleted)"
+UNI_STATE_CHANGE_DELAY = 0.1
