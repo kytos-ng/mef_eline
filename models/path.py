@@ -88,35 +88,23 @@ class Path(list, GenericEntity):
         raise InvalidPath("Last link does not contain uni_z switch")
 
     @property
-    def status(self):
+    def status(self) -> EntityStatus:
         """Check for the  status of a path.
 
-        If any link in this path is down, the path is considered down.
+        Each endpoint link is checked instead to have the same object
+        ref as topology. If any link in this path isn't UP,
+        the path isn't considered UP.
         """
         if not self:
             return EntityStatus.DISABLED
 
-        endpoint = f"{settings.TOPOLOGY_URL}/links"
-        api_reply = requests.get(endpoint)
-        if api_reply.status_code != getattr(requests.codes, "ok"):
-            log.error(
-                "Failed to get links at %s. Returned %s",
-                endpoint,
-                api_reply.status_code,
-            )
-            return None
-        links = api_reply.json()["links"]
-        return_status = EntityStatus.UP
         for path_link in self:
-            try:
-                link = links[path_link.id]
-            except KeyError:
-                return EntityStatus.DISABLED
-            if link["enabled"] is False:
-                return EntityStatus.DISABLED
-            if link["active"] is False:
-                return_status = EntityStatus.DOWN
-        return return_status
+            link = path_link.endpoint_a.link
+            if not link or link != path_link.endpoint_b.link:
+                return EntityStatus.DOWN
+            if (status := link.status) != EntityStatus.UP:
+                return status
+        return EntityStatus.UP
 
     def as_dict(self):
         """Return list comprehension of links as_dict."""
