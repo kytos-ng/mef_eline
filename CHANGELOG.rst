@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.1] - 2024-05-23
+***********************
+
+Changed
+=======
+- Optimized ``Path.status`` not to depend on a HTTP request
+
 [2023.2.0] - 2024-02-16
 ***********************
 
