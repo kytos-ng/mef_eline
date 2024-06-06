@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.2] - 2024-06-06
+***********************
+
+Fixed
+=====
+- Only redeploy when handling ``kytos/topology.link_up`` if a dynamic EVC isn't active
+
 [2023.2.1] - 2024-05-23
 ***********************
 
