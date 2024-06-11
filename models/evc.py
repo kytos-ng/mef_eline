@@ -1612,7 +1612,7 @@ class LinkProtection(EVCDeploy):
             # In this case, the circuit is not being used and we should
             # try a dynamic path
             (
-                lambda me: me.dynamic_backup_path,
+                lambda me: me.dynamic_backup_path and not me.is_active(),
                 lambda me: (me.deploy_to_path(), 'redeploy')
             )
         ]
