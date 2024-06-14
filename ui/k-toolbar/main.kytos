@@ -60,6 +60,10 @@
 
            <k-dropdown icon="arrow-right" title="QoS Egress Queue" :options="get_queue_ids"
             v-model:value="queue_id"></k-dropdown>
+
+           <k-checkbox title="Enable INT" v-model:model="enable_int" :value="'enable'"
+                       tooltip="Enable In-band Network Telemetry (INT)"
+           ></k-checkbox>
         </k-accordion-item>
 
         <span v-for="constraint in ['primary_constraints', 'secondary_constraints']">
@@ -233,6 +237,7 @@ module.exports = {
         service_level: "",
         sb_priority: "",
         queue_id: "",
+        enable_int: [],
         dpids: [""],
         hasAutoComplete:false,
         link_options: [],
@@ -430,6 +435,7 @@ module.exports = {
       this.service_level = "";
       this.sb_priority = "";
       this.queue_id = "";
+      this.enable_int = [],
       this.link_options = [];
 
       this.init_path_constraints();
@@ -487,6 +493,9 @@ module.exports = {
         }
         if (this.queue_id !== undefined && this.queue_id !== "") {
             request.queue_id = parseInt(this.queue_id)
+        }
+        if (this.enable_int.includes('enable')) {
+          request.metadata = {telemetry_request: {}}
         }
 
         ['primary_constraints', 'secondary_constraints'].forEach(_type => {

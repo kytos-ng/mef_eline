@@ -12,6 +12,7 @@ Added
 - Added ``kytos/mef_eline.uni_active_updated`` event
 - Included "id" on EVC mapped content to normalize it with the other models
 - Introduced ``failover_old_path``, ``failover_deployed``, and ``failover_link_down`` events, which will be primarily consumed by ``telemetry_int`` NApp
+- UI checkbox to request that In-band Network Telemetry (INT) gets enabled
 
 Changed
 =======
