@@ -105,7 +105,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Circuit'
+              $ref: '#/components/schemas/UpdateCircuit'
       responses:
         '200':
           description: OK
@@ -688,6 +688,87 @@ components:
         request_time:
           type: string
           format: date-time
+
+    UpdateCircuit: # Can be referenced via '#/components/schemas/UpdateCircuit'
+      type: object
+      additionalProperties: false
+      properties:
+        uni_a:
+          $ref: '#/components/schemas/Endpoint'
+        uni_z:
+          $ref: '#/components/schemas/Endpoint'
+        name:
+          type: string
+        request_time:
+          type: string
+          format: date-time
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        queue_id:
+          type: integer
+          format: int32
+          nullable: true
+          description: "QoS Egress Queue ID. Value -1 can be use to set this field to default."
+          minimum: -1
+          maximum: 7
+        flow_removed_at:
+          type: string
+          format: date-time
+        execution_rounds:
+          type: integer
+          format: int32
+        bandwidth:
+          type: integer
+          format: int64
+        primary_path:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewLink'
+        backup_path:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewLink'
+        primary_links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Path'
+        backup_links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Path'
+        dynamic_backup_path:
+          type: boolean
+        primary_constraints:
+          $ref: '#/components/schemas/PathConstraints'
+        secondary_constraints:
+          $ref: '#/components/schemas/PathConstraints'
+        owner:
+          type: string
+        sb_priority:
+          type: integer
+          format: int32
+          nullable: true
+          description: "Southbound priority value"
+          minimum: 0
+        service_level:
+          type: integer
+          format: int32
+          description: "Service level provided for network convergence. The higher the better"
+          default: 0
+          minimum: 0
+          maximum: 7
+        circuit_scheduler:
+          type: array
+          items:
+            $ref: '#/components/schemas/CircuitSchedule'
+        metadata:
+          type: object
+        enable:
+          type: boolean
 
     Tag: # Can be referenced via '#/components/schemas/Tag'
       type: object

@@ -105,7 +105,7 @@ class EVCUpdateDoc(DocumentBaseModel):
     service_level: Optional[int] = None
     circuit_scheduler: Optional[list[CircuitScheduleDoc]] = None
     metadata: Optional[dict] = None
-    enabled: Optional[bool] = None
+    enable: Optional[bool] = None
 
 
 class EVCBaseDoc(DocumentBaseModel):

@@ -80,7 +80,7 @@ class TestDBModels():
         assert evc.uni_z.interface_id == "00:00:00:00:00:00:00:02:3"
         assert evc.dynamic_backup_path
         assert evc.sb_priority == 81
-        assert not evc.enabled
+        assert not evc.enable
         assert not evc.circuit_scheduler
 
     def test_evcbasedoc_error(self):
