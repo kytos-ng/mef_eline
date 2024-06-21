@@ -707,32 +707,53 @@ class EVCDeploy(EVCBase):
 
     def remove_current_flows(self, current_path=None, force=True,
                              sync=True):
+        # Could be improved.
+        # Case: When flows_manger fails to install NNI/UNI this method is prompted.
+        # In the case of `Service Unavailable`, the removings of flow is very likely
+        # to fail too.
+        # Error: Not all switches are removed but all VLANs are made available.
+        # Flow in "03:2" setting a vlan 32 is not removed but a VLAN in the interface
+        # "03:2" is freed. If another EVC is created, it will use the same VLAN 32 and
+        # created a duplicated flow.
         """Remove all flows from current path."""
         switches = set()
 
-        switches.add(self.uni_a.interface.switch)
-        switches.add(self.uni_z.interface.switch)
+        switches.add(self.uni_a.interface.switch.id)
+        switches.add(self.uni_z.interface.switch.id)
         if not current_path:
             current_path = self.current_path
         for link in current_path:
-            switches.add(link.endpoint_a.switch)
-            switches.add(link.endpoint_b.switch)
+            switches.add(link.endpoint_a.switch.id)
+            switches.add(link.endpoint_b.switch.id)
 
         match = {
             "cookie": self.get_cookie(),
             "cookie_mask": int(0xffffffffffffffff)
         }
-
-        for switch in switches:
+        undeleted_switches = set()
+        for switch in switches: # Switches are delete 1 by 1.
             try:
-                self._send_flow_mods(switch.id, [match], 'delete', force=force)
+                self._send_flow_mods(switch, [match], 'delete', force=force)
             except FlowModException as err:
+                # Detect wich switch failed to be deleted
+                undeleted_switches.add(switch)
+                vlan = set()
+                for link in current_path:
+                    vlan.add(link.get_metadata("s_vlan").value)
                 log.error(
-                    f"Error removing flows from switch {switch.id} for"
-                    f"EVC {self}: {err}"
+                    f"Error removing flows from switch {switch} for"
+                    f"EVC {self}: {err}, VLAN: {vlan}"
                 )
+        deleted_switches = set()
+        error=False
+        if undeleted_switches:
+            error=True
+            deleted_switches = switches - undeleted_switches
         try:
-            current_path.make_vlans_available(self._controller)
+            # With the ordered list we can detect which switches were successfully deleted
+            # And only send those interfaces to be freed.
+            # Only NNIs VLANs matter here.
+            current_path.make_vlans_available(self._controller, deleted_switches, error)
         except KytosTagError as err:
             log.error(f"Error when removing current path flows: {err}")
         self.current_path = Path([])
@@ -744,6 +765,10 @@ class EVCDeploy(EVCBase):
         self, path=None, force=True
     ) -> dict[str, list[dict]]:
         """Remove all flows from path, and return the removed flows."""
+        # At first glance this removing method have the same problem as the
+        # the removing method remove_current_flows(). Switches are removed 1
+        # by 1 but the vlans are removed entirely. If a flow fails to be removed.
+        # The rest of the flows fails to be removed but their VLANS are being freed.
         dpid_flows_match: dict[str, list[dict]] = {}
 
         if not path:
@@ -782,20 +807,32 @@ class EVCDeploy(EVCBase):
                     "match": flow["match"],
                     "cookie_mask": int(0xffffffffffffffff)
                 })
-
+        fail_switches = set()
         for dpid, flows in dpid_flows_match.items():
             try:
                 self._send_flow_mods(dpid, flows, 'delete', force=force)
             except FlowModException as err:
+                fail_switches.add(dpid)
                 log.error(
                     "Error removing failover flows: "
                     f"dpid={dpid} evc={self} error={err}"
                 )
+
+        succefully_deleted = set()
+        error = False
+        if fail_switches:
+            error = True
+            for dpid in dpid_flows_match:
+                if dpid not in fail_switches:
+                    succefully_deleted.add(dpid)
+
         try:
-            path.make_vlans_available(self._controller)
+            path.make_vlans_available(self._controller, succefully_deleted, error)
         except KytosTagError as err:
             log.error(f"Error when removing path flows: {err}")
 
+        # Returns flows that should have been removed. When error
+        # occurs, that switch should be removed from this dictionary
         return dpid_flows_match
 
     @staticmethod
@@ -916,7 +953,7 @@ class EVCDeploy(EVCBase):
             if not use_path:
                 continue
             try:
-                use_path.choose_vlans(self._controller)
+                use_path.choose_vlans(self._controller) # Vlans used
                 break
             except KytosNoTagAvailableError:
                 pass

@@ -40,21 +40,37 @@ class Path(list, GenericEntity):
             tag = TAG('vlan', tag_value)
             link.add_metadata("s_vlan", tag)
 
-    def make_vlans_available(self, controller):
+    def make_vlans_available(self, controller, switches:set[str]=set(), error=False): # switches -> Remove only these switches
         """Make the VLANs used in a path available when undeployed."""
-        for link in self:
-            tag = link.get_metadata("s_vlan")
-            conflict_a, conflict_b = link.make_tags_available(
-                controller, tag.value, link.id, tag.tag_type,
-                check_order=False
-            )
-            if conflict_a:
-                log.error(f"Tags {conflict_a} was already available in"
-                          f"{link.endpoint_a.id}")
-            if conflict_b:
-                log.error(f"Tags {conflict_b} was already available in"
-                          f"{link.endpoint_b.id}")
-            link.remove_metadata("s_vlan")
+        if error:
+            for link in self:
+                if link.endpoint_a.switch.id in switches:
+                    tag = link.get_metadata("s_vlan")
+                    with link._get_available_vlans_lock[link.id]:
+                        link.endpoint_a.make_tags_available(
+                            controller, tag.value, tag.tag_type, check_order=False
+                        )
+                if link.endpoint_b.switch.id in switches:
+                    tag = link.get_metadata("s_vlan")
+                    with link._get_available_vlans_lock[link.id]:
+                        link.endpoint_b.make_tags_available(
+                            controller, tag.value, tag.tag_type, check_order=False
+                        )
+                link.remove_metadata("s_vlan")
+        else:
+            for link in self:
+                tag = link.get_metadata("s_vlan")
+                conflict_a, conflict_b = link.make_tags_available(
+                    controller, tag.value, link.id, tag.tag_type,
+                    check_order=False
+                )
+                if conflict_a:
+                    log.error(f"Tags {conflict_a} was already available in"
+                              f"{link.endpoint_a.id}")
+                if conflict_b:
+                    log.error(f"Tags {conflict_b} was already available in"
+                              f"{link.endpoint_b.id}")
+                link.remove_metadata("s_vlan")
 
     def is_valid(self, switch_a, switch_z, is_scheduled=False):
         """Check if this is a valid path."""
