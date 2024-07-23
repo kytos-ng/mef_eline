@@ -6,6 +6,9 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2024.1.0] - 2024-07-23
+***********************
+
 Added
 =====
 - EVC list now utilizes ``localStorage`` to store ``search_cols`` and make them persistent throughout EVC list usage.
@@ -17,7 +20,6 @@ Added
 Changed
 =======
 - Updated python environment installation from 3.9 to 3.11
-- Updated test dependencies
 - Optimized ``Path.status`` not to depend on a HTTP request
 - Upgraded UI framework to Vue3 
 - ``enable`` is not longer accepted when patching/updating an EVC, using ``enabled`` instead.
