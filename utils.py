@@ -7,7 +7,7 @@ from kytos.core.interface import UNI, Interface, TAGRange
 from napps.kytos.mef_eline.exceptions import DisabledSwitch
 
 
-def map_evc_event_content(evc, **kwargs):
+def map_evc_event_content(evc, **kwargs) -> dict:
     """Returns a set of values from evc to be used for content"""
     return kwargs | {"evc_id": evc.id,
                      "id": evc.id,

@@ -3,10 +3,13 @@ import requests
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
+from tenacity import (retry, retry_if_result, stop_after_attempt,
+                      wait_combine, wait_fixed, wait_random)
 from kytos.core.interface import TAG
 from kytos.core.link import Link
 from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.exceptions import InvalidPath
+from kytos.core.retry import before_sleep
 
 
 class Path(list, GenericEntity):
@@ -122,6 +125,14 @@ class DynamicPathManager:
         cls.controller = controller
 
     @staticmethod
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_combine(wait_fixed(3), wait_random(min=0, max=5)),
+        retry=retry_if_result(lambda result: result == []),
+        before_sleep=before_sleep,
+        reraise=True,
+        retry_error_callback=lambda _: []
+    )
     def get_paths(circuit, max_paths=2, **kwargs) -> list[dict]:
         """Get a valid path for the circuit from the Pathfinder."""
         endpoint = settings.PATHFINDER_URL

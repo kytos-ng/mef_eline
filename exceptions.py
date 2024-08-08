@@ -25,6 +25,14 @@ class DisabledSwitch(MEFELineException):
     """Exception for disabled switch in path"""
 
 
+class EVCPathNotDeleted(MEFELineException):
+    """Exception raised when a path was not deleted properly."""
+
+
+class EVCPathNotInstalled(MEFELineException):
+    """Exception raised when a path was not installed properly."""
+
+
 class DuplicatedNoTagUNI(MEFELineException):
     """Exception for duplicated no TAG UNI"""
     def __init__(self, msg: str) -> None:
