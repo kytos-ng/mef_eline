@@ -28,15 +28,6 @@ COOKIE_PREFIX = 0xAA
 # the maximum disjoint paths from unwanted_path
 DISJOINT_PATH_CUTOFF = 10
 
-# BATCH_INTERVAL: time interval between batch requests that will be sent to
-# flow_manager (in seconds) - zero enable sending all the requests in a row
-BATCH_INTERVAL = 0.5
-
-# BATCH_SIZE: size of a batch request that will be sent to flow_manager, in
-# number of FlowMod requests. Use 0 (zero) to disable BATCH mode, i.e. sends
-# everything at a glance
-BATCH_SIZE = 50
-
 # Default values for EVPL and EPL respectively. They are use when sb_priority
 # is not set in a request
 EVPL_SB_PRIORITY = 20000
