@@ -793,9 +793,9 @@ class Main(KytosNApp):
         """
         Handler for interface link_up events
         """
+        log.info("Event handle_interface_link_up %s", interface)
         for evc in self.get_evcs_by_svc_level():
             with evc.lock:
-                log.info("Event handle_interface_link_up %s", interface)
                 evc.handle_interface_link_up(
                     interface
                 )
