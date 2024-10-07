@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2024.1.5] - 2024-10-07
+***********************
+
+Changed
+=======
+- UI: fixed premature submit when pressing Enter during autocomplete on inputs.
+
 [2024.1.4] - 2024-09-09
 ***********************
 
