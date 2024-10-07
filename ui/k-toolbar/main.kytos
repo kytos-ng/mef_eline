@@ -220,6 +220,7 @@
                 </div>
             </k-accordion-item>
         </span>
+        </form>
         <k-button tooltip="Request Circuit" title="Request Circuit"
         icon="gear" :on_click="request_circuit">
         </k-button>
@@ -227,7 +228,6 @@
             <k-button tooltip="List installed EVC" title="List installed EVC"
                      icon="plug" :on_click="viewPanel">
             </k-button>
-        </form>
         </k-accordion-item>
       </k-accordion>
     </div>
