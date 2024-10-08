@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.3] - 2024-10-04
+***********************
+
+Changed
+=======
+- Optimized logging message of interface Link Up event to be generated only once instead of for each EVC
+
 [2023.2.2] - 2024-06-06
 ***********************
 
