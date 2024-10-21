@@ -3,219 +3,163 @@
     <div class="scroll">
       <k-accordion>
         <k-accordion-item title="Request E-Line Circuit">
-        <form id="mef_eline_toolbar_form" onsubmit="event.preventDefault();">
-           <k-input id="name-input" v-model:value="circuit_name"
-                    title="Circuit Name:" tooltip="Circuit name"
-                    placeholder="Circuit Name" icon="pencil"></k-input>
+          <form id="mef_eline_toolbar_form" onsubmit="event.preventDefault();">
+            <k-input id="name-input" v-model:value="circuit_name" title="Circuit Name:" tooltip="Circuit name"
+              placeholder="Circuit Name" icon="pencil"></k-input>
 
-           <k-input-auto id="endpoint-a-input" v-model:value="endpoint_a"
-                    title="Endpoint A:"
-                    tooltip="Endpoint A (format: dpid:port_number)"
-                    placeholder="Endpoint A" icon="arrow-right"
-                    :candidates="dpids" 
-                    @focus="fetch_dpids"
-                    @blur="onblur_dpid"></k-input-auto>
-            <div class="k-input mef-field-label" id="endpoint_name_a"
-                    >{{endpoint_name_a}}</div> 
-            <k-input id="endpoint-a-tag-type" v-model:value="tag_type_a"
-                    v-if=false
-                    title="Tag Type A:"
-                    tooltip="Enter with a Tag Type"
-                    placeholder="tag type" icon="arrow-right"></k-input>
+            <k-input-auto id="endpoint-a-input" v-model:value="endpoint_a" title="Endpoint A:"
+              tooltip="Endpoint A (format: dpid:port_number)" placeholder="Endpoint A" icon="arrow-right"
+              :candidates="dpids" @focus="fetch_dpids" @blur="onblur_dpid"></k-input-auto>
+            <div class="k-input mef-field-label" id="endpoint_name_a">{{ endpoint_name_a }}</div>
+            <k-input id="endpoint-a-tag-type" v-model:value="tag_type_a" v-if=false title="Tag Type A:"
+              tooltip="Enter with a Tag Type" placeholder="tag type" icon="arrow-right"></k-input>
 
-            <k-input id="endpoint-a-tag-value" v-model:value="tag_value_a"
-                    title="Tag Value A:"
-                    tooltip="Enter VLAN A value. The list format is [[inclusive, inclusive]]."
-                    placeholder="VLAN A (int or [[int, int]])" icon="arrow-right"></k-input>
+            <k-input id="endpoint-a-tag-value" v-model:value="tag_value_a" title="Tag Value A:"
+              tooltip="Enter VLAN A value. The list format is [[inclusive, inclusive]]."
+              placeholder="VLAN A (int or [[int, int]])" icon="arrow-right"></k-input>
 
-            <k-input-auto id="endpoint-z-input" v-model:value="endpoint_z"
-                    title="Endpoint Z:"
-                    tooltip="Endpoint Z (format: dpid:port_number)"
-                    placeholder="Endpoint Z" icon="arrow-left"
-                    :candidates="dpids"
-                    @focus="fetch_dpids"
-                    @blur="onblur_dpid"></k-input-auto>
-            <div class="k-input mef-field-label" id="endpoint_name_z"
-                    >{{endpoint_name_z}}</div> 
-           <k-input id="endpoint-z-tag_type" v-model:value="tag_type_z"
-                    v-if=false
-                    title="Tag Type Z:"
-                    tooltip="Enter with a Tag Type Z"
-                    placeholder="tag type" icon="arrow-right"></k-input>
+            <k-input-auto id="endpoint-z-input" v-model:value="endpoint_z" title="Endpoint Z:"
+              tooltip="Endpoint Z (format: dpid:port_number)" placeholder="Endpoint Z" icon="arrow-left"
+              :candidates="dpids" @focus="fetch_dpids" @blur="onblur_dpid"></k-input-auto>
+            <div class="k-input mef-field-label" id="endpoint_name_z">{{ endpoint_name_z }}</div>
+            <k-input id="endpoint-z-tag_type" v-model:value="tag_type_z" v-if=false title="Tag Type Z:"
+              tooltip="Enter with a Tag Type Z" placeholder="tag type" icon="arrow-right"></k-input>
 
-           <k-input id="endpoint-z-tag-value" v-model:value="tag_value_z"
-                    title="Tag Value Z:"
-                    tooltip="Enter VLAN Z value. The list format is [[inclusive, inclusive]]."
-                    placeholder="VLAN Z (int or [[int, int]])" icon="arrow-right"></k-input>
+            <k-input id="endpoint-z-tag-value" v-model:value="tag_value_z" title="Tag Value Z:"
+              tooltip="Enter VLAN Z value. The list format is [[inclusive, inclusive]]."
+              placeholder="VLAN Z (int or [[int, int]])" icon="arrow-right"></k-input>
 
-           <k-input id="service-level-input" v-model:value="service_level"
-                    title="Service level:"
-                    tooltip="Enter the service level (0-7)"
-                    placeholder="service level value" icon="arrow-right"></k-input>
+            <k-input id="service-level-input" v-model:value="service_level" title="Service level:"
+              tooltip="Enter the service level (0-7)" placeholder="service level value" icon="arrow-right"></k-input>
 
-            <k-input id="sb-priority-input" v-model:value="sb_priority"
-                    title="Southbound priority:"
-                    tooltip="Enter the southbound priority"
-                    placeholder="southbound priority" icon="arrow-right"></k-input>
+            <k-input id="sb-priority-input" v-model:value="sb_priority" title="Southbound priority:"
+              tooltip="Enter the southbound priority" placeholder="southbound priority" icon="arrow-right"></k-input>
 
-           <k-dropdown icon="arrow-right" title="QoS Egress Queue" :options="get_queue_ids"
-            v-model:value="queue_id"></k-dropdown>
+            <k-dropdown icon="arrow-right" title="QoS Egress Queue" :options="get_queue_ids"
+              v-model:value="queue_id"></k-dropdown>
 
-           <k-checkbox title="Enable INT" v-model:model="enable_int" :value="'enable'"
-                       tooltip="Enable In-band Network Telemetry (INT)"
-           ></k-checkbox>
+            <k-checkbox title="Enable INT" v-model:model="enable_int" :value="'enable'"
+              tooltip="Enable In-band Network Telemetry (INT)"></k-checkbox>
+          </form>
         </k-accordion-item>
 
         <span v-for="constraint in ['primary_constraints', 'secondary_constraints']">
-            <k-accordion-item :title="constraint_titles[constraint]" :checked=false>
+          <k-accordion-item :title="constraint_titles[constraint]" :checked=false>
 
-                <k-select :title="constraint_titles.undesired_links" :options="get_link_options()"
-                v-model:value ="form_constraints[constraint].undesired_links"
-                ref="undesired_links"
-                ></k-select>
-                
-                <div class="metric">
-                  <div class="metric-dropdown">
-                    <k-dropdown :title="constraint_titles.spf_attribute" :options="get_spf_attribute_options()"
-                    v-model:value ="form_constraints[constraint].spf_attribute"></k-dropdown>
-                  </div>
-                  <div class="metric-field">
-                    <p><!-- blank space --></p>
-                  </div>
-                </div>
+            <k-select :title="constraint_titles.undesired_links" :options="get_link_options()"
+              v-model:value="form_constraints[constraint].undesired_links" ref="undesired_links"></k-select>
 
-                <div class="metric">
-                  <div class="metric-field">
-                    <label class="metric-label">{{constraint_titles['spf_max_path_cost']}}</label> 
-                    <k-input 
-                    title="Southbound priority:"
-                    v-model:value="form_constraints[constraint].spf_max_path_cost"
-                    :action="function(val) {form_constraints[constraint].spf_max_path_cost = parseInt(val)}"></k-input>
-                  </div>
-                </div>
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :title="constraint_titles.spf_attribute" :options="get_spf_attribute_options()"
+                  v-model:value="form_constraints[constraint].spf_attribute"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <p><!-- blank space --></p>
+              </div>
+            </div>
 
-                <div class="metric">
-                  <div class="metric-field">
-                    <label class="metric-label">{{constraint_titles['minimum_flexible_hits']}}</label> 
-                    <k-input 
-                    :title="constraint_titles['minimum_flexible_hits']"
-                    v-model:value="form_constraints[constraint].minimum_flexible_hits"
-                    :action="function(val) {form_constraints[constraint].minimum_flexible_hits = parseInt(val)}"></k-input>
-                  </div>
-                </div>
+            <div class="metric">
+              <div class="metric-field">
+                <label class="metric-label">{{ constraint_titles['spf_max_path_cost'] }}</label>
+                <k-input title="Southbound priority:" v-model:value="form_constraints[constraint].spf_max_path_cost"
+                  :action="function (val) { form_constraints[constraint].spf_max_path_cost = parseInt(val) }"></k-input>
+              </div>
+            </div>
 
-                <div class="metric">
-                    <div class="metric-dropdown">
-                        <k-dropdown :options="metric_options" 
-                        :title="constraint_titles['bandwidth']"
-                        v-model:value="form_constraints[constraint].is_flexible.bandwidth"
-                        ref="is_flexible"></k-dropdown>
-                    </div>
-                    <div class="metric-field">
-                        <k-input icon="arrow-right" 
-                        v-model:value="form_constraints[constraint].bandwidth"
-                        :action="function(val) {form_constraints[constraint].metrics.bandwidth = parseInt(val)}"></k-input>
-                    </div>
-                </div>
+            <div class="metric">
+              <div class="metric-field">
+                <label class="metric-label">{{ constraint_titles['minimum_flexible_hits'] }}</label>
+                <k-input :title="constraint_titles['minimum_flexible_hits']"
+                  v-model:value="form_constraints[constraint].minimum_flexible_hits"
+                  :action="function (val) { form_constraints[constraint].minimum_flexible_hits = parseInt(val) }"></k-input>
+              </div>
+            </div>
 
-                <div class="metric">
-                  <div class="metric-dropdown">
-                    <k-dropdown :options="metric_options" 
-                    :title="constraint_titles['utilization']"
-                    v-model:value="form_constraints[constraint].is_flexible.utilization"
-                    ref="is_flexible"></k-dropdown>
-                  </div>
-                  <div class="metric-field">
-                    <k-input icon="arrow-right" 
-                    v-model:value="form_constraints[constraint].utilization"
-                    :action="function(val) {form_constraints[constraint].metrics.utilization = parseInt(val)}"></k-input>
-                  </div>
-                </div>
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :options="metric_options" :title="constraint_titles['bandwidth']"
+                  v-model:value="form_constraints[constraint].is_flexible.bandwidth" ref="is_flexible"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <k-input icon="arrow-right" v-model:value="form_constraints[constraint].bandwidth"
+                  :action="function (val) { form_constraints[constraint].metrics.bandwidth = parseInt(val) }"></k-input>
+              </div>
+            </div>
 
-                <div class="metric">
-                  <div class="metric-dropdown">
-                    <k-dropdown :options="metric_options" 
-                    :title="constraint_titles['priority']"
-                    v-model:value="form_constraints[constraint].is_flexible.priority"
-                    ref="is_flexible"></k-dropdown>
-                  </div>
-                  <div class="metric-field">
-                    <k-input icon="arrow-right" 
-                    v-model:value="form_constraints[constraint].priority"
-                    :action="function(val) {form_constraints[constraint].metrics.priority = parseInt(val)}"></k-input>
-                  </div>
-                </div>
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :options="metric_options" :title="constraint_titles['utilization']"
+                  v-model:value="form_constraints[constraint].is_flexible.utilization" ref="is_flexible"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <k-input icon="arrow-right" v-model:value="form_constraints[constraint].utilization"
+                  :action="function (val) { form_constraints[constraint].metrics.utilization = parseInt(val) }"></k-input>
+              </div>
+            </div>
 
-                <div class="metric">
-                  <div class="metric-dropdown">
-                    <k-dropdown :options="metric_options" 
-                    :title="constraint_titles['delay']"
-                    v-model:value="form_constraints[constraint].is_flexible.delay"
-                    ref="is_flexible"></k-dropdown>
-                  </div>
-                  <div class="metric-field">
-                    <k-input icon="arrow-right" 
-                    v-model:value="form_constraints[constraint].delay"
-                    :action="function(val) {form_constraints[constraint].metrics.delay = parseInt(val)}"></k-input>
-                  </div>
-                </div>
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :options="metric_options" :title="constraint_titles['priority']"
+                  v-model:value="form_constraints[constraint].is_flexible.priority" ref="is_flexible"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <k-input icon="arrow-right" v-model:value="form_constraints[constraint].priority"
+                  :action="function (val) { form_constraints[constraint].metrics.priority = parseInt(val) }"></k-input>
+              </div>
+            </div>
 
-                <div class="metric">
-                  <div class="metric-dropdown">
-                    <k-dropdown :options="metric_options"
-                    :title="constraint_titles['reliability']"
-                    v-model:value="form_constraints[constraint].is_flexible.reliability"
-                    ref="is_flexible"></k-dropdown>
-                  </div>
-                  <div class="metric-field">
-                    <k-input icon="arrow-right" 
-                    v-model:value="form_constraints[constraint].reliability"
-                    :action="function(val) {form_constraints[constraint].metrics.reliability = parseInt(val)}"></k-input>
-                  </div>
-                </div>
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :options="metric_options" :title="constraint_titles['delay']"
+                  v-model:value="form_constraints[constraint].is_flexible.delay" ref="is_flexible"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <k-input icon="arrow-right" v-model:value="form_constraints[constraint].delay"
+                  :action="function (val) { form_constraints[constraint].metrics.delay = parseInt(val) }"></k-input>
+              </div>
+            </div>
 
-                <div class="metric">
-                  <div class="metric-dropdown">
-                    <k-dropdown :options="metric_options" 
-                    :title="constraint_titles['ownership']"
-                    v-model:value="form_constraints[constraint].is_flexible.ownership"
-                    ref="is_flexible"></k-dropdown>
-                  </div>
-                  <div class="metric-field">
-                    <k-input icon="arrow-right" 
-                    v-model:value="form_constraints[constraint].ownership"
-                    :action="function(val) {form_constraints[constraint].metrics.ownership = val}"></k-input>
-                  </div>
-                </div>
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :options="metric_options" :title="constraint_titles['reliability']"
+                  v-model:value="form_constraints[constraint].is_flexible.reliability" ref="is_flexible"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <k-input icon="arrow-right" v-model:value="form_constraints[constraint].reliability"
+                  :action="function (val) { form_constraints[constraint].metrics.reliability = parseInt(val) }"></k-input>
+              </div>
+            </div>
 
-                <div class="metric">
-                  <div class="metric-dropdown">
-                    <k-dropdown :options="metric_options" 
-                    :title="constraint_titles['not_ownership']"
-                    v-model:value="form_constraints[constraint].is_flexible.not_ownership"
-                    ref="is_flexible"></k-dropdown>
-                  </div>
-                  <div class="metric-field">
-                    <k-input icon="arrow-right"
-                    placeholder='["blue", "red"]'
-                    v-model:value="form_constraints[constraint].not_ownership"
-                    :action="function(val){
-                        try{form_constraints[constraint].metrics.not_ownership = JSON.parse(val)}
-                        catch(e){
-                          if(e instanceof SyntaxError){form_constraints[constraint].metrics.not_ownership=val}
-                          else{throw e}}}"></k-input>
-                  </div>
-                </div>
-            </k-accordion-item>
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :options="metric_options" :title="constraint_titles['ownership']"
+                  v-model:value="form_constraints[constraint].is_flexible.ownership" ref="is_flexible"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <k-input icon="arrow-right" v-model:value="form_constraints[constraint].ownership"
+                  :action="function (val) { form_constraints[constraint].metrics.ownership = val }"></k-input>
+              </div>
+            </div>
+
+            <div class="metric">
+              <div class="metric-dropdown">
+                <k-dropdown :options="metric_options" :title="constraint_titles['not_ownership']"
+                  v-model:value="form_constraints[constraint].is_flexible.not_ownership" ref="is_flexible"></k-dropdown>
+              </div>
+              <div class="metric-field">
+                <k-input icon="arrow-right" placeholder='["blue", "red"]'
+                  v-model:value="form_constraints[constraint].not_ownership"
+                  :action="function (val) { set_metrics(val, constraint) }"></k-input>
+              </div>
+            </div>
+          </k-accordion-item>
         </span>
-        </form>
-        <k-button tooltip="Request Circuit" title="Request Circuit"
-        icon="gear" @click="request_circuit">
+        <k-button tooltip="Request Circuit" title="Request Circuit" icon="gear" @click="request_circuit">
         </k-button>
         <k-accordion-item title="List EVCs">
-            <k-button tooltip="List installed EVC" title="List installed EVC"
-                     icon="plug" @click="viewPanel">
-            </k-button>
+          <k-button tooltip="List installed EVC" title="List installed EVC" icon="plug" @click="viewPanel">
+          </k-button>
         </k-accordion-item>
       </k-accordion>
     </div>
@@ -223,110 +167,117 @@
 </template>
 <script>
 module.exports = {
-  data(){
+  data() {
     return {
-        circuit_name: "",
-        endpoint_a: "",
-        endpoint_name_a: "Endpoint name:",
-        tag_type_a: "vlan", // VLAN
-        tag_value_a: "",
-        endpoint_z: "",
-        endpoint_name_z: "Endpoint name:",
-        tag_type_z: "vlan", // VLAN
-        tag_value_z: "",
-        service_level: "",
-        sb_priority: "",
-        queue_id: "",
-        enable_int: [],
-        dpids: [""],
-        hasAutoComplete:false,
-        link_options: [],
+      circuit_name: "",
+      endpoint_a: "",
+      endpoint_name_a: "Endpoint name:",
+      tag_type_a: "vlan", // VLAN
+      tag_value_a: "",
+      endpoint_z: "",
+      endpoint_name_z: "Endpoint name:",
+      tag_type_z: "vlan", // VLAN
+      tag_value_z: "",
+      service_level: "",
+      sb_priority: "",
+      queue_id: "",
+      enable_int: [],
+      dpids: [""],
+      hasAutoComplete: false,
+      link_options: [],
 
-        constraint_titles: {},
-        constraints: {},
-        form_constraints: {
-          primary_constraints: {
-            undesired_links: [],
-            spf_attribute: '',
-            spf_max_path_cost: '',
-            minimum_flexible_hits: '',
-            metrics: {
-              bandwidth: '', utilization: '', priority: '',
-              delay: '', reliability: '', ownership: '',
-              not_ownership: [],
-            },
-            is_flexible: {
-              bandwidth: false,
-              reliability: false,
-              delay: false,
-              utilization: false,
-              priority: false,
-              ownership: false,
-              not_ownership: false,
-            },
+      constraint_titles: {},
+      constraints: {},
+      form_constraints: {
+        primary_constraints: {
+          undesired_links: [],
+          spf_attribute: '',
+          spf_max_path_cost: '',
+          minimum_flexible_hits: '',
+          metrics: {
+            bandwidth: '', utilization: '', priority: '',
+            delay: '', reliability: '', ownership: '',
+            not_ownership: [],
           },
-          secondary_constraints: {
-            undesired_links: [],
-            spf_attribute: '',
-            spf_max_path_cost: '',
-            minimum_flexible_hits: '',
-            metrics: {
-              bandwidth: '', utilization: '', priority: '',
-              delay: '', reliability: '', ownership: '',
-              not_ownership: [],
-            },
-            is_flexible: {
-              bandwidth: false,
-              reliability: false,
-              delay: false,
-              utilization: false,
-              priority: false,
-              ownership: false,
-              not_ownership: false,
-            },
-          }
+          is_flexible: {
+            bandwidth: false,
+            reliability: false,
+            delay: false,
+            utilization: false,
+            priority: false,
+            ownership: false,
+            not_ownership: false,
+          },
         },
+        secondary_constraints: {
+          undesired_links: [],
+          spf_attribute: '',
+          spf_max_path_cost: '',
+          minimum_flexible_hits: '',
+          metrics: {
+            bandwidth: '', utilization: '', priority: '',
+            delay: '', reliability: '', ownership: '',
+            not_ownership: [],
+          },
+          is_flexible: {
+            bandwidth: false,
+            reliability: false,
+            delay: false,
+            utilization: false,
+            priority: false,
+            ownership: false,
+            not_ownership: false,
+          },
+        }
+      },
     }
   },
   computed: {
-    metric_options(){
+    metric_options() {
       var metric_options = [];
-      metric_options.push({value: false, description: 'Mandatory', selected: true});
-      metric_options.push({value: true, description: 'Flexible'});
+      metric_options.push({ value: false, description: 'Mandatory', selected: true });
+      metric_options.push({ value: true, description: 'Flexible' });
 
       return metric_options;
     },
-    get_queue_ids(){
+    get_queue_ids() {
       let values = Array(8).fill().map((_, i) => i)
       var queue_ids = [
-        {value: "-1", description: "default", selected: true},
-        {value: null, description: "none", selected: false}
+        { value: "-1", description: "default", selected: true },
+        { value: null, description: "none", selected: false }
       ]
       values.forEach(
-          x => queue_ids.push({value:x?.toString(), description:String(x)})
+        x => queue_ids.push({ value: x?.toString(), description: String(x) })
       )
       return queue_ids;
     },
   },
   methods: {
-    get_spf_attribute_options: function() {
+    set_metrics: function (val, constraint) {
+      try { this.form_constraints[constraint].metrics.not_ownership = JSON.parse(val) }
+      catch (e) {
+        if (e instanceof SyntaxError) { this.form_constraints[constraint].metrics.not_ownership = val }
+        else { throw e }
+      }
+    },
+    get_spf_attribute_options: function () {
       /**
        * Method to build option items for spf attribute.
        */
       let _result = [
-        {value: null, description: "default", selected: true},
-        {value: "hop", description: "hop"},
-        {value: "delay", description: "delay"},
-        {value: "priority", description: "priority"},
+        { value: null, description: "default", selected: true },
+        { value: "hop", description: "hop" },
+        { value: "delay", description: "delay" },
+        { value: "priority", description: "priority" },
       ];
       return _result;
-    },    
-    get_link_options: function(){
+    },
+    get_link_options: function () {
       /**
        * Build option items for constraint (desired/undesired) link.
        */
       let _result = [];
-      $.each(this.link_options, function(key, item){
+      $.each(this.link_options, function (key, item) {
         let _item = {};
         _item.value = item.value?.toString();
         _item.description = item.description;
@@ -334,7 +285,7 @@ module.exports = {
       });
       return _result;
     },
-    init_path_constraints: function() {
+    init_path_constraints: function () {
       /**
       * Build path constraint data for exibition 
       * (primary and secondary constraints paths).
@@ -357,86 +308,86 @@ module.exports = {
       };
 
       this.form_constraints = {
-          primary_constraints: {
-            undesired_links: [],
-            spf_attribute: '',
-            spf_max_path_cost: '',
-            minimum_flexible_hits: '',
-            metrics: {
-              bandwidth: '', utilization: '', priority: '',
-              delay: '', reliability: '', ownership: '',
-              not_ownership: [],
-            },
-            is_flexible: {
-              bandwidth: false,
-              reliability: false,
-              delay: false,
-              utilization: false,
-              priority: false,
-              ownership: false,
-              not_ownership: false,
-            },
+        primary_constraints: {
+          undesired_links: [],
+          spf_attribute: '',
+          spf_max_path_cost: '',
+          minimum_flexible_hits: '',
+          metrics: {
+            bandwidth: '', utilization: '', priority: '',
+            delay: '', reliability: '', ownership: '',
+            not_ownership: [],
           },
-          secondary_constraints: {
-            undesired_links: [],
-            spf_attribute: '',
-            spf_max_path_cost: '',
-            minimum_flexible_hits: '',
-            metrics: {
-              bandwidth: '', utilization: '', priority: '',
-              delay: '', reliability: '', ownership: '',
-              not_ownership: [],
-            },
-            is_flexible: {
-              bandwidth: false,
-              reliability: false,
-              delay: false,
-              utilization: false,
-              priority: false,
-              ownership: false,
-              not_ownership: false,
-            },
-          }
-        };
+          is_flexible: {
+            bandwidth: false,
+            reliability: false,
+            delay: false,
+            utilization: false,
+            priority: false,
+            ownership: false,
+            not_ownership: false,
+          },
+        },
+        secondary_constraints: {
+          undesired_links: [],
+          spf_attribute: '',
+          spf_max_path_cost: '',
+          minimum_flexible_hits: '',
+          metrics: {
+            bandwidth: '', utilization: '', priority: '',
+            delay: '', reliability: '', ownership: '',
+            not_ownership: [],
+          },
+          is_flexible: {
+            bandwidth: false,
+            reliability: false,
+            delay: false,
+            utilization: false,
+            priority: false,
+            ownership: false,
+            not_ownership: false,
+          },
+        }
+      };
     },
     viewPanel() {
-        var _this = this;
-        // Clear panel
-        this.hideInfoPanel();
-        // Wait 50ms to clear the panel.
-        setTimeout(function(){
-            _this.showInfoPanel();
-        }, 50);
+      var _this = this;
+      // Clear panel
+      this.hideInfoPanel();
+      // Wait 50ms to clear the panel.
+      setTimeout(function () {
+        _this.showInfoPanel();
+      }, 50);
     },
     hideInfoPanel() {
-        this.$kytos.eventBus.$emit("hideInfoPanel");
+      this.$kytos.eventBus.$emit("hideInfoPanel");
     },
     showInfoPanel() {
-        let listConnections = {
-            component: 'kytos-mef_eline-k-info-panel-list_connections',
-            content: {},
-            icon: "desktop",
-            maximized: true,
-            title: "View Connections",
-            subtitle: "by kytos/mef_eline"
-        };
-        this.$kytos.eventBus.$emit("showInfoPanel", listConnections);
+      let listConnections = {
+        component: 'kytos-mef_eline-k-info-panel-list_connections',
+        content: {},
+        icon: "desktop",
+        maximized: true,
+        title: "View Connections",
+        subtitle: "by kytos/mef_eline"
+      };
+      this.$kytos.eventBus.$emit("showInfoPanel", listConnections);
     },
     set_default_values() {
       this.circuit_name = "";
       this.endpoint_a = "";
       this.endpoint_name_a = "Endpoint name:";
       this.tag_type_a = "vlan",
-      this.tag_value_a = "";
+        this.tag_value_a = "";
       this.endpoint_z = "";
       this.endpoint_name_z = "Endpoint name:";
       this.tag_type_z = "vlan",
-      this.tag_value_z = "";
+        this.tag_value_z = "";
       this.service_level = "";
       this.sb_priority = "";
       this.queue_id = "";
       this.enable_int = [],
-      this.link_options = [];
+        this.link_options = [];
 
       this.init_path_constraints();
       // Clear select and dropdown components
@@ -448,123 +399,127 @@ module.exports = {
       });
     },
     post_success(data) {
-        let notification = {
-            icon: 'gear',
-            title: 'Circuit Created',
-            description: 'Circuit with id: ' + data.circuit_id + ' | name: ' + this.circuit_name + ' was created.'
-        }
-    
-        this.$kytos.eventBus.$emit("setNotification" , notification);
-        // Clear fields if the POST is a success
-        this.set_default_values();
+      let notification = {
+        icon: 'gear',
+        title: 'Circuit Created',
+        description: 'Circuit with id: ' + data.circuit_id + ' | name: ' + this.circuit_name + ' was created.'
+      }
+
+      this.$kytos.eventBus.$emit("setNotification", notification);
+      // Clear fields if the POST is a success
+      this.set_default_values();
     },
     post_error(data) {
-        let notification = {
-            icon: 'gear',
-            title: 'Circuit Not Created (' + data.status + '):',
-            description: data.responseJSON.description
-        }
-    
-        this.$kytos.eventBus.$emit("setNotification" , notification);
+      let notification = {
+        icon: 'gear',
+        title: 'Circuit Not Created (' + data.status + '):',
+        description: data.responseJSON.description
+      }
+
+      this.$kytos.eventBus.$emit("setNotification", notification);
     },
-    request_circuit () {
-        var _this = this;
-        var request = {
-            "name" : this.circuit_name,
-            "dynamic_backup_path": true,
-            "enabled": true,
-            "uni_a": {"interface_id": this.endpoint_a},
-            "uni_z": {"interface_id": this.endpoint_z}
-        }
-        
-        if (this.tag_type_a != "" && this.tag_value_a != "") {
-            request.uni_a['tag'] = {tag_type: this.tag_type_a,
-                                    value: JSON.parse(this.tag_value_a)}
-        }
-        if (this.tag_type_z != "" && this.tag_value_z != "") {
-            request.uni_z['tag'] = {tag_type: this.tag_type_z,
-                                    value: JSON.parse(this.tag_value_z)}
-        }
-        if (this.service_level !== undefined && this.service_level !== "") {
-            request.service_level = parseInt(this.service_level)
-        }
-        if (this.sb_priority !== undefined && this.sb_priority !== "") {
-            request.sb_priority = parseInt(this.sb_priority)
-        }
-        if (this.queue_id !== undefined && this.queue_id !== "") {
-            request.queue_id = parseInt(this.queue_id)
-        }
-        if (this.enable_int.includes('enable')) {
-          request.metadata = {telemetry_request: {}}
-        }
+    request_circuit() {
+      var _this = this;
+      var request = {
+        "name": this.circuit_name,
+        "dynamic_backup_path": true,
+        "enabled": true,
+        "uni_a": { "interface_id": this.endpoint_a },
+        "uni_z": { "interface_id": this.endpoint_z }
+      }
 
-        ['primary_constraints', 'secondary_constraints'].forEach(_type => {
-          request[_type] = {};
+      if (this.tag_type_a != "" && this.tag_value_a != "") {
+        request.uni_a['tag'] = {
+          tag_type: this.tag_type_a,
+          value: JSON.parse(this.tag_value_a)
+        }
+      }
+      if (this.tag_type_z != "" && this.tag_value_z != "") {
+        request.uni_z['tag'] = {
+          tag_type: this.tag_type_z,
+          value: JSON.parse(this.tag_value_z)
+        }
+      }
+      if (this.service_level !== undefined && this.service_level !== "") {
+        request.service_level = parseInt(this.service_level)
+      }
+      if (this.sb_priority !== undefined && this.sb_priority !== "") {
+        request.sb_priority = parseInt(this.sb_priority)
+      }
+      if (this.queue_id !== undefined && this.queue_id !== "") {
+        request.queue_id = parseInt(this.queue_id)
+      }
+      if (this.enable_int.includes('enable')) {
+        request.metadata = { telemetry_request: {} }
+      }
 
-          // mandatory and flexible metrics. Filter empty values.
-          let _flexible_metrics = {};
-          let _mandatory_metrics = {};
-          ['bandwidth', 'utilization', 'priority', 'delay', 'reliability', 'ownership', 'not_ownership'].forEach(_m => {
-            if(this.form_constraints[_type].metrics[_m] !== '') {
-              if (this.form_constraints[_type].is_flexible[_m]) {
-                _flexible_metrics[_m] = this.form_constraints[_type].metrics[_m];
-              } else {
-                _mandatory_metrics[_m] = this.form_constraints[_type].metrics[_m];
-              }
+      ['primary_constraints', 'secondary_constraints'].forEach(_type => {
+        request[_type] = {};
+
+        // mandatory and flexible metrics. Filter empty values.
+        let _flexible_metrics = {};
+        let _mandatory_metrics = {};
+        ['bandwidth', 'utilization', 'priority', 'delay', 'reliability', 'ownership', 'not_ownership'].forEach(_m => {
+          if (this.form_constraints[_type].metrics[_m] !== '') {
+            if (this.form_constraints[_type].is_flexible[_m]) {
+              _flexible_metrics[_m] = this.form_constraints[_type].metrics[_m];
+            } else {
+              _mandatory_metrics[_m] = this.form_constraints[_type].metrics[_m];
             }
-          });
-          if(_flexible_metrics != {}) {
-            request[_type].flexible_metrics = _flexible_metrics;
-          }
-          if(_mandatory_metrics != {}) {
-            request[_type].mandatory_metrics = _mandatory_metrics;
-          }
-
-          // Dropdown forms
-          if(this.form_constraints[_type].undesired_links) {
-            request[_type].undesired_links = this.form_constraints[_type].undesired_links.filter(item => typeof(item) == "string");
-          }
-          if(this.form_constraints[_type].spf_attribute) {
-            request[_type].spf_attribute = this.form_constraints[_type].spf_attribute;
-          }
-
-          // Input forms
-          if(this.form_constraints[_type].spf_max_path_cost) {
-            request[_type].spf_max_path_cost = parseInt(this.form_constraints[_type].spf_max_path_cost);
-          }
-          if(this.form_constraints[_type].minimum_flexible_hits) {
-            request[_type].minimum_flexible_hits = parseInt(this.form_constraints[_type].minimum_flexible_hits);
           }
         });
-        
-        let circuit_request = $.ajax({
-                                url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/",
-                                type:"POST",
-                                data: JSON.stringify(request),
-                                dataType: "json",
-                                contentType: "application/json; charset=utf-8"
-                            });
-        circuit_request.done(this.post_success);
-        circuit_request.fail(this.post_error);
+        if (_flexible_metrics != {}) {
+          request[_type].flexible_metrics = _flexible_metrics;
+        }
+        if (_mandatory_metrics != {}) {
+          request[_type].mandatory_metrics = _mandatory_metrics;
+        }
+
+        // Dropdown forms
+        if (this.form_constraints[_type].undesired_links) {
+          request[_type].undesired_links = this.form_constraints[_type].undesired_links.filter(item => typeof (item) == "string");
+        }
+        if (this.form_constraints[_type].spf_attribute) {
+          request[_type].spf_attribute = this.form_constraints[_type].spf_attribute;
+        }
+
+        // Input forms
+        if (this.form_constraints[_type].spf_max_path_cost) {
+          request[_type].spf_max_path_cost = parseInt(this.form_constraints[_type].spf_max_path_cost);
+        }
+        if (this.form_constraints[_type].minimum_flexible_hits) {
+          request[_type].minimum_flexible_hits = parseInt(this.form_constraints[_type].minimum_flexible_hits);
+        }
+      });
+
+      let circuit_request = $.ajax({
+        url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/",
+        type: "POST",
+        data: JSON.stringify(request),
+        dataType: "json",
+        contentType: "application/json; charset=utf-8"
+      });
+      circuit_request.done(this.post_success);
+      circuit_request.fail(this.post_error);
     },
-    fetch_dpids: function() {
-        var self = this // create a closure to access component in the callback below
-        dataUrl = "/api/kytos/topology/v3/interfaces"
-        // Autocomplete usage example.
-        fetch(dataUrl).then(response => response.json())
-                    .then(data => {
-                        dpids = []
-                        for ( const [key,value] of Object.entries( data.interfaces ) ) {
-                            let item = key;
-                            if(value.name) {
-                                item = value.name + " - " + item;
-                            }
-                            dpids.push(item);
-                        }
-                        self.dpids = dpids;
-                    });
+    fetch_dpids: function () {
+      var self = this // create a closure to access component in the callback below
+      let dataUrl = "/api/kytos/topology/v3/interfaces"
+      // Autocomplete usage example.
+      fetch(dataUrl).then(response => response.json())
+        .then(data => {
+          let dpids = []
+          for (const [key, value] of Object.entries(data.interfaces)) {
+            let item = key;
+            if (value.name) {
+              item = value.name + " - " + item;
+            }
+            dpids.push(item);
+          }
+          self.dpids = dpids;
+        });
     },
-    load_topology: function() {
+    load_topology: function () {
       var _this = this;
 
       $.ajax({
@@ -572,39 +527,39 @@ module.exports = {
         dataType: "json",
         url: this.$kytos_server_api + "kytos/topology/v3",
 
-        success: function(data) {
+        success: function (data) {
           let _link = data['topology']['links']
           _this.link_options = [];
 
-          $.each(_link, function(key, value){
-            if (value.metadata.link_name !== undefined && value.metadata.link_name.length !== 0){
-              _this.link_options.push({value:value.id, description:value.metadata.link_name})
+          $.each(_link, function (key, value) {
+            if (value.metadata.link_name !== undefined && value.metadata.link_name.length !== 0) {
+              _this.link_options.push({ value: value.id, description: value.metadata.link_name })
             } else {
-              _this.link_options.push({value:value.id, description:value.id});
+              _this.link_options.push({ value: value.id, description: value.id });
             }
           });
         }
       });
     },
-    onblur_dpid: function() {
-        /**
-        * Update dpid values on event onblur triggered in dpids fields.
-        * It split the value selected from autocomplete list.
-        * It is expected the value as "NAME - DPID".
-        **/
-        let dpid_a = this.endpoint_a;
-        if(dpid_a.lastIndexOf(' ') > 0) {
-            let splitted_dpid = dpid_a.split(' ');
-            this.endpoint_name_a = splitted_dpid[0];
-            this.endpoint_a = splitted_dpid[2];
-        }
-        
-        let dpid_z = this.endpoint_z;
-        if(dpid_z.lastIndexOf(' ') > 0) {
-            let splitted_dpid = dpid_z.split(' ');
-            this.endpoint_name_z = splitted_dpid[0];
-            this.endpoint_z = splitted_dpid[2];
-        }
+    onblur_dpid: function () {
+      /**
+      * Update dpid values on event onblur triggered in dpids fields.
+      * It split the value selected from autocomplete list.
+      * It is expected the value as "NAME - DPID".
+      **/
+      let dpid_a = this.endpoint_a;
+      if (dpid_a.lastIndexOf(' ') > 0) {
+        let splitted_dpid = dpid_a.split(' ');
+        this.endpoint_name_a = splitted_dpid[0];
+        this.endpoint_a = splitted_dpid[2];
+      }
+
+      let dpid_z = this.endpoint_z;
+      if (dpid_z.lastIndexOf(' ') > 0) {
+        let splitted_dpid = dpid_z.split(' ');
+        this.endpoint_name_z = splitted_dpid[0];
+        this.endpoint_z = splitted_dpid[2];
+      }
     },
   },
   mounted() { // when the Vue app is booted up, this is run automatically.
@@ -615,44 +570,86 @@ module.exports = {
 }
 </script>
 <style>
-  .scroll {overflow-y: auto; height:calc(100vh - 60px);}
-  .mef-field-label {
-    padding-left: 2.3em;
-    color: #737373;
-    height: 1.1em;
-    padding-top: 0.4em;
-  }
-  #endpoint-a-input .autocomplete-result-list,
-  #endpoint-z-input .autocomplete-result-list {
-    width: 100% !important;
-    outline: 0;
-    border: 1px #515151 solid;
-    border-radius: 3px;
-  }
-  .autocomplete-result-list li {
-    white-space: nowrap;
-  }
-  .metric {width:100%; overflow: hidden; display:flex;flex-wrap: wrap;}
-  .metric-label {
-    width:50%;
-    color: #b3b3b3;
-    font-size: .78em;
-  }
-  .metric-dropdown {width:100%;}
-  .metric-dropdown .k-dropdown {height: 20px; width:100%; display:flex;flex-wrap: wrap;}
-  .metric-dropdown .k-dropdown .k-dropdown__title {width:40%; padding: 4px 0 0 0;}
-  .metric-dropdown .k-dropdown .k-dropdown__select {width:60%;}
-  .metric-field {width:100%; display:flex; }
-  .metric-field label {width:60%; }
-  .metric-field label ~.k-input-wrap {width:40%; }
-  .metric-field label ~.k-input-wrap input {width:50px; }
-  
+.scroll {
+  overflow-y: auto;
+  height: calc(100vh - 60px);
+}
 
-  .metric-field  .k-input-wrap:hover  * {
-    background: #515151;
-  }
-  .metric-field  .k-input-wrap:hover input  * {
-    background: #515151;
-  }
-  
+.mef-field-label {
+  padding-left: 2.3em;
+  color: #737373;
+  height: 1.1em;
+  padding-top: 0.4em;
+}
+
+#endpoint-a-input .autocomplete-result-list,
+#endpoint-z-input .autocomplete-result-list {
+  width: 100% !important;
+  outline: 0;
+  border: 1px #515151 solid;
+  border-radius: 3px;
+}
+
+.autocomplete-result-list li {
+  white-space: nowrap;
+}
+
+.metric {
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.metric-label {
+  width: 50%;
+  color: #b3b3b3;
+  font-size: .78em;
+}
+
+.metric-dropdown {
+  width: 100%;
+}
+
+.metric-dropdown .k-dropdown {
+  height: 20px;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.metric-dropdown .k-dropdown .k-dropdown__title {
+  width: 40%;
+  padding: 4px 0 0 0;
+}
+
+.metric-dropdown .k-dropdown .k-dropdown__select {
+  width: 60%;
+}
+
+.metric-field {
+  width: 100%;
+  display: flex;
+}
+
+.metric-field label {
+  width: 60%;
+}
+
+.metric-field label~.k-input-wrap {
+  width: 40%;
+}
+
+.metric-field label~.k-input-wrap input {
+  width: 50px;
+}
+
+
+.metric-field .k-input-wrap:hover * {
+  background: #515151;
+}
+
+.metric-field .k-input-wrap:hover input * {
+  background: #515151;
+}
 </style>
