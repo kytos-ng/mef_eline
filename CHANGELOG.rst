@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.4] - 2024-10-24
+***********************
+
+Fixed
+=====
+- [backport] Fixed ``node_name`` not showing in the EVC list and EVC details on the web interface.
+
 [2023.2.3] - 2024-10-07
 ***********************
 
