@@ -18,7 +18,7 @@
           </div>
         </div>
       </div>
-      <div class="mef-table no-compact">
+      <div v-if="flag_loading == false" class="mef-table no-compact">
         <div class="mef-circuit-table">
          <table class="table">
             <template v-for="(column, cindex) in basics"> 
@@ -242,7 +242,9 @@
           </div>
         </template>
       </div>
-
+      <div v-else class="loading">
+        <p>Loading EVC</p>
+      </div>
       <div class="mef-bottom-buttons">
           <k-button tooltip="List installed EVCs" title="< Back to list" :on_click="showInfoPanel">
           </k-button>
@@ -287,6 +289,7 @@ module.exports = {
   },
   data(){
     return {
+        flag_loading: false,
         component_key: 0,
         circuit: {},  // EVC data
         dpids: [],  // DPIDs - used for autocomplete
@@ -575,7 +578,6 @@ module.exports = {
 
           let dpid_b = path_step['endpoint_b']['id'];
           data_b = this.getEndpointData(dpid_b);
-
           let _item = {
             'DPID': [dpid_a, dpid_b],
             'Node': [data_a['node_name'], data_b['node_name']],
@@ -589,59 +591,61 @@ module.exports = {
       }
       return _path;
     },
-    loadDpidNames: function() {
+    loadDpidNames: async function() {
       /**
       * Call REST endpoint with switch and interface attributes and metadata.
       */
-      let _dpid_names = {};
-      let _interface_data = {};
       var _this = this;
-
-      var request = $.ajax({
-        url: this.$kytos_server_api + "kytos/topology/v3/switches",
-        type:"GET",
-        data: JSON.stringify(),
-        dataType: "json",
-        contentType: "application/json; charset=utf-8"
-      });
-      request.done(function(data) {
-        let switches = data.switches;
-        $.each(switches, function(i , sw) {
-          if(sw.metadata.node_name) {
-            _dpid_names[sw.dpid] = sw.metadata.node_name;
-          }
-          if(sw.interfaces) {
-            $.each(sw.interfaces, function(j , interface) {
-              // store interface name data 
-              let metadata = interface.metadata;
-              _interface_data[interface.id] = {
-                "name": interface.name,
-                "link_name": (metadata && "link_name" in metadata) ? interface.metadata.link_name : "",
-                "port_name": (metadata && "port_name" in metadata) ? interface.metadata.port_name : ""
-              };
-
-              // store autocomplete dpids
-              let value = interface.id;
-              if(interface.name) {
-                value = interface.name + " - " + value;
+      return new Promise((resolve, reject) => {
+          $.ajax({
+          url: this.$kytos_server_api + "kytos/topology/v3/switches",
+          type:"GET",
+          data: JSON.stringify(),
+          dataType: "json",
+          contentType: "application/json; charset=utf-8",
+          success: function(data){
+            let _dpid_names = {};
+            let _interface_data = {};
+            let switches = data.switches;
+            $.each(switches, function(i , sw) {
+              if(sw.metadata.node_name) {
+                _dpid_names[sw.dpid] = sw.metadata.node_name;
               }
-              if(!_this.dpids.includes(value)) {
-                _this.dpids.push(value);
+              if(sw.interfaces) {
+                $.each(sw.interfaces, function(j , interface) {
+                  // store interface name data 
+                  let metadata = interface.metadata;
+                  _interface_data[interface.id] = {
+                    "name": interface.name,
+                    "link_name": (metadata && "link_name" in metadata) ? interface.metadata.link_name : "",
+                    "port_name": (metadata && "port_name" in metadata) ? interface.metadata.port_name : ""
+                  };
+                  // store autocomplete dpids
+                  let value = interface.id;
+                  if(interface.name) {
+                    value = interface.name + " - " + value;
+                  }
+                  if(!_this.dpids.includes(value)) {
+                    _this.dpids.push(value);
+                  }
+                });
               }
             });
+            _this.dpids.sort();
+            _this.dpid_names = _dpid_names;
+            _this.interface_data = _interface_data;
+            resolve()
+          },
+          error: function(jqXHR, textStatus){
+            let notification = {
+              title: 'Error loading EVC names.',
+              description: "Request failed: " + textStatus
+            }
+            _this.$kytos.eventBus.$emit("setNotification" , notification);
+            reject()
           }
         });
-        _this.dpids.sort();
-        _this.dpid_names = _dpid_names;
-        _this.interface_data = _interface_data;
-      });
-      request.fail(function( jqXHR, textStatus ) {
-        let notification = {
-          title: 'Error loading EVC names.',
-          description: "Request failed: " + textStatus
-        }
-        _this.$kytos.$emit("setNotification" , notification);
-      });
+      })
     },
 
     buildPathConstraintsView: function(data) {
@@ -899,18 +903,21 @@ module.exports = {
         _this.$kytos.$emit("setNotification" , notification);
       });
     },
-  },
-  beforeMount() {
+    initialize: async function(){
+      this.flag_loading = true
       // Load DPID attributes and metadata
-      this.loadDpidNames();
+      await this.loadDpidNames();
       // load topology links
       this.load_topology();
+      this.loadEVC(this.content.id);
+      this.flag_loading = false
+    },
   },
   mounted() {
     let _this = this;
     if(this.content && this.content.id) {
       // Load EVC
-      this.loadEVC(this.content.id);
+      this.initialize();
 
       // Make the panel fill the screen except the left menu width
       $('.k-info-panel:has(.mef_circuit_container)').addClass('mef-k-info-panel');
@@ -1030,6 +1037,11 @@ module.exports = {
     padding-top: 8px;
     padding-bottom: 8px;
     text-align: left;
+  }
+  .mef_circuit_container .loading {
+    margin-top: 10px;
+    color: #ccc;
+    font-size: 0.8rem;
   }
   .mef-circuit-table {
       width: 250px;

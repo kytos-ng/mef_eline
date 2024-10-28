@@ -138,7 +138,6 @@ module.exports = {
       /**
        * Call mef_eline REST endpoint to load EVC list.
        */
-      this.flag_loading = true;
       this.component_key = 0;
       var tableRows = [];
       var _this = this;
@@ -180,50 +179,51 @@ module.exports = {
         });
 
         _this.data_rows = tableRows;
-        _this.forceRerender(); 
-        _this.flag_loading = false;
+        _this.forceRerender();
       });
 
       request.fail(function( jqXHR, textStatus ) {
         alert( "Request failed: " + textStatus );
-        _this.flag_loading = false;
       });
       
       return tableRows;
     },
-    loadDpidNames: function() {
+    loadDpidNames: async function() {
       /**
       * Call REST endpoint with switch and interface attributes and metadata.
       */
-      let _dpid_names = {};
-      let _interface_names = {};
       var _this = this;
-
-      var request = $.ajax({
-        url: this.$kytos_server_api + "kytos/topology/v3/switches",
-        type:"GET",
-        data: JSON.stringify(),
-        dataType: "json",
-        contentType: "application/json; charset=utf-8"
-      });
-      request.done(function(data) {
-        let switches = data.switches;
-        $.each(switches, function(i , sw) {
-          if(sw.metadata.node_name) {
-            _dpid_names[sw.dpid] = sw.metadata.node_name;
-          }
-          if(sw.interfaces) {
-            $.each(sw.interfaces, function(j , interface) {
-              _interface_names[interface.id] = interface.name;
+      return new Promise((resolve, reject) => {
+          $.ajax({
+          url: this.$kytos_server_api + "kytos/topology/v3/switches",
+          type:"GET",
+          data: JSON.stringify(),
+          dataType: "json",
+          contentType: "application/json; charset=utf-8",
+          success: function(data){
+            let _dpid_names = {};
+            let _interface_names = {};
+            let switches = data.switches;
+            $.each(switches, function(i , sw) {
+              if(sw.metadata.node_name) {
+                _dpid_names[sw.dpid] = sw.metadata.node_name;
+              }
+              if(sw.interfaces) {
+                $.each(sw.interfaces, function(j , interface) {
+                  _interface_names[interface.id] = interface.name;
+                });
+              }
             });
+            _this.dpid_names = _dpid_names
+            _this.interface_names = _interface_names;
+            resolve()
+          },
+          error: function(jqXHR, textStatus){
+            alert( "Request failed: " + textStatus );
+            reject()
           }
         });
-        _this.dpid_names = _dpid_names;
-        _this.interface_names = _interface_names;
-      });
-      request.fail(function( jqXHR, textStatus ) {
-        alert( "Request failed: " + textStatus );
-      });
+      })
     },
     getEndpointData: function(endpoint) {
       /**
@@ -240,6 +240,14 @@ module.exports = {
         "port": port,
         "interface_name": interface_name
       };
+    },
+    initialize: async function(){
+      this.flag_loading = true;
+        // Load DPID attributes and metadata
+      await this.loadDpidNames();
+        // Load EVCs
+      this.listEVCs();
+      this.flag_loading = false;
     }
   },
   computed: {
@@ -279,10 +287,7 @@ module.exports = {
     },
   },
   created() {
-      // Load DPID attributes and metadata
-    this.loadDpidNames();
-      // Load EVCs
-    this.listEVCs();
+    this.initialize()
     // Make the panel fill the screen except the left menu width
     $('.k-info-panel:has(.mef_container)').addClass('mef-k-info-panel');
 
