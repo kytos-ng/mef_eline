@@ -9,7 +9,7 @@ from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.exceptions import InvalidPath
 
 
-class Path(list, GenericEntity):
+class Path(list[Link], GenericEntity):
     """Class to represent a Path."""
 
     def __eq__(self, other=None):
@@ -38,6 +38,7 @@ class Path(list, GenericEntity):
         for link in self:
             tag_value = link.get_next_available_tag(controller, link.id)
             tag = TAG('vlan', tag_value)
+            link.remove_metadata("s_vlan")
             link.add_metadata("s_vlan", tag)
 
     def make_vlans_available(self, controller):

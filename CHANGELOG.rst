@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.5] - 2024-10-29
+***********************
+
+Fixed
+=====
+- Fixed ``primary_path`` metadata persitent in ``current_path`` and deploying flows with its ``SVLAN``
+
 [2023.2.4] - 2024-10-24
 ***********************
 
