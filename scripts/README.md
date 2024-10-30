@@ -74,7 +74,7 @@ EVC_IDS='d33539656d8b40,095e1d6f43c745' priority python3 scripts/002_unset_spf_a
 
 ### Change ``tag_type`` from integer to string type
 
-[`003_vlan_type_string.py`](./003_vlan_type_string.py) is a script to change every ``tag_type`` instance from integer to string type. These istances are found in evcs collection from MongoDB.
+[`003_vlan_type_string.py`](./003_vlan_type_string.py) is a script to change every ``tag_type`` instance from integer to string type. These instances are found in evcs collection from MongoDB.
 
 ```
     VLAN = 1 to 'vlan'
@@ -108,7 +108,33 @@ CMD=update_database python3 scripts/003_vlan_type_string.py
 ```
 `update_database` changes the value of every outdated TAG from integer to their respective string value.
 
-<details><summary><h3>Redeploy symmetric UNI vlans EVPLs </h3></summary>
+### Update default queue id fron `None` to -1
+
+[`004_update_default_queue.py`](./003_vlan_type_string.py) is a script to update every evc using the old default ``queue_id`` of ``None`` to ``-1``. The default value was changes in `2023.2`.
+
+#### Pre-requisites
+
+- Make sure MongoDB replica set is up and running.
+- Export the following MongnoDB variables accordingly in case your running outside of a container
+
+```
+export MONGO_USERNAME=
+export MONGO_PASSWORD=
+export MONGO_DBNAME=napps
+export MONGO_HOST_SEEDS="mongo1:27017,mongo2:27018,mongo3:27099"
+```
+
+#### How to use
+
+The following command will update all DB entries using the old ``queue_id`` of ``None`` to the new value of ``-1``:
+
+```
+python3 scripts/004_update_default_queue.py
+```
+
+This command takes no additional parameters.
+
+### Redeploy symmetric UNI vlans EVPLs
 
 [`redeploy_evpls_same_vlans.py`](./redeploy_evpls_same_vlans.py) is a CLI script to list and redeploy symmetric (same vlan on both UNIs) EVPLs.
 
@@ -207,7 +233,3 @@ python scripts/redeploy_evpls_same_vlans.py update --batch_size 10 --batch_sleep
 2023-11-01 16:23:17,555 - INFO - Sleeping for 5...
 
 ```
-</details>
-
-
-</details>
