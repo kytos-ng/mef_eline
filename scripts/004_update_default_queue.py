@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from napps.kytos.mef_eline.controllers import ELineController
+from kytos.core.db import Mongo
 
 
-def update_default_queue_id():
-    controller = ELineController()
-    db = controller.db
+def update_default_queue_id(mongo: Mongo):
+    db = mongo.client[mongo.db_name]
     return db.evcs.update_many(
         {"queue_id": None, "archived": False},
         { "$set": { "queue_id": -1 }}
@@ -14,7 +13,8 @@ def update_default_queue_id():
 
 def main() -> None:
     """Main function."""
-    count = update_default_queue_id()
+    mongo = Mongo()
+    count = update_default_queue_id(mongo)
     print(f"Change default queue_id from None to -1 updated: {count}")
 
 
