@@ -319,6 +319,13 @@ module.exports = {
     },
   },
   methods: {
+    parse_check: function (val) {
+      try { return JSON.parse(val) }
+      catch (e) {
+        if (e instanceof SyntaxError) { return val }
+        else { throw e }
+      }
+    },
     get_spf_attribute_options: function() {
       /**
        * Method to build option items for spf attribute.
@@ -486,11 +493,11 @@ module.exports = {
         
         if (this.tag_type_a != "" && this.tag_value_a != "") {
             request.uni_a['tag'] = {tag_type: this.tag_type_a,
-                                    value: JSON.parse(this.tag_value_a)}
+                                    value: this.parse_check(this.tag_value_a)}
         }
         if (this.tag_type_z != "" && this.tag_value_z != "") {
             request.uni_z['tag'] = {tag_type: this.tag_type_z,
-                                    value: JSON.parse(this.tag_value_z)}
+                                    value: this.parse_check(this.tag_value_z)}
         }
         if (this.service_level !== undefined && this.service_level !== "") {
             request.service_level = parseInt(this.service_level)
