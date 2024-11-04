@@ -307,6 +307,13 @@ module.exports = {
     }
   },
   methods: {
+    parse_check: function (val) {
+      try { return JSON.parse(val) }
+      catch (e) {
+        if (e instanceof SyntaxError) { return val }
+        else { throw e }
+      }
+    },
     queue_options: function(queue) {
       let _result = [
         {value: -1, description:"default", selected: (queue.value == -1)},
@@ -807,13 +814,13 @@ module.exports = {
       if(this.endpoints_data["VLAN"][0]["value"]) {
         payload["uni_a"]["tag"] = {
           tag_type: this.TAG_TYPE_VLAN,
-          value: JSON.parse(this.endpoints_data["VLAN"][0]["value"])
+          value: this.parse_check(this.endpoints_data["VLAN"][0]["value"])
         };
       }
       if(this.endpoints_data["VLAN"][1]["value"]) {
         payload["uni_z"]["tag"] = {
           tag_type: this.TAG_TYPE_VLAN,
-          value: JSON.parse(this.endpoints_data["VLAN"][1]["value"])
+          value: this.parse_check(this.endpoints_data["VLAN"][1]["value"])
         };
       }
 
