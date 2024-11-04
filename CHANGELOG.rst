@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2024.1.6] - 2024-11-04
+***********************
+
+Fixed
+=======
+- UI: fixed issue where non-JSON data was being parsed as JSON data.
+
 [2024.1.5] - 2024-10-07
 ***********************
 
