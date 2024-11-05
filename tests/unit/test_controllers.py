@@ -32,7 +32,8 @@ class TestControllers():
             "priority": 100,
             "active": False,
             "enabled": True,
-            "circuit_scheduler": []
+            "circuit_scheduler": [],
+            "take_last": False,
         }
 
     def test_bootstrap_indexes(self):

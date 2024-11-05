@@ -690,6 +690,8 @@ components:
         request_time:
           type: string
           format: date-time
+        take_last:
+          type: boolean
 
     UpdateCircuit: # Can be referenced via '#/components/schemas/UpdateCircuit'
       type: object
@@ -761,6 +763,8 @@ components:
         metadata:
           type: object
         enabled:
+          type: boolean
+        take_last:
           type: boolean
 
     Tag: # Can be referenced via '#/components/schemas/Tag'

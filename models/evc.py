@@ -157,6 +157,7 @@ class EVCBase(GenericEntity):
         self.backup_links_cache = set()
         self.affected_by_link_at = get_time("0001-01-01T00:00:00")
         self.old_path = Path([])
+        self.take_last = kwargs.get("take_last", False)
 
         self.lock = Lock()
 
@@ -431,6 +432,7 @@ class EVCBase(GenericEntity):
         evc_dict["secondary_constraints"] = self.secondary_constraints
         evc_dict["flow_removed_at"] = self.flow_removed_at
         evc_dict["updated_at"] = self.updated_at
+        evc_dict["take_last"] = self.take_last
 
         if keys:
             selected = {}
@@ -847,7 +849,7 @@ class EVCDeploy(EVCBase):
         tag_errors = []
         if self.should_deploy(use_path):
             try:
-                use_path.choose_vlans(self._controller)
+                use_path.choose_vlans(self._controller, self.take_last)
             except KytosNoTagAvailableError as e:
                 tag_errors.append(str(e))
                 use_path = None
@@ -856,7 +858,7 @@ class EVCDeploy(EVCBase):
                 if use_path is None:
                     continue
                 try:
-                    use_path.choose_vlans(self._controller)
+                    use_path.choose_vlans(self._controller, self.take_last)
                     break
                 except KytosNoTagAvailableError as e:
                     tag_errors.append(str(e))
@@ -886,6 +888,7 @@ class EVCDeploy(EVCBase):
             return False
         self.activate()
         self.current_path = use_path
+        self.take_last = not self.take_last
         self.sync()
         log.info(f"{self} was deployed.")
         return True
@@ -932,7 +935,7 @@ class EVCDeploy(EVCBase):
             if not use_path:
                 continue
             try:
-                use_path.choose_vlans(self._controller)
+                use_path.choose_vlans(self._controller, not self.take_last)
                 break
             except KytosNoTagAvailableError as e:
                 tag_errors.append(str(e))

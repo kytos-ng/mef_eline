@@ -33,7 +33,8 @@ class TestDBModels():
             "active": False,
             "enabled": False,
             "circuit_scheduler": [],
-            "queue_id": None
+            "queue_id": None,
+            "take_last": False,
         }
         self.evc_update = {
             "uni_a": {
@@ -55,7 +56,7 @@ class TestDBModels():
             "sb_priority": 81,
             "enabled": False,
             "circuit_scheduler": [],
-            "queue_id": None
+            "queue_id": None,
         }
 
     def test_evcbasedoc(self):
@@ -71,6 +72,7 @@ class TestDBModels():
         assert not evc.active
         assert not evc.enabled
         assert not evc.circuit_scheduler
+        assert not evc.take_last
 
     def test_evcupdatedoc(self):
         """Test EVCUpdateDoc model"""
