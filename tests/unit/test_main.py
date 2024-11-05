@@ -1682,7 +1682,27 @@ class TestMain:
             "endpoint_b": {"id": "b"}
         }
         with pytest.raises(ValueError):
-            self.napp._link_from_dict(link_dict)
+            self.napp._link_from_dict(link_dict, "current_path")
+
+    def test_link_from_dict_vlan_metadata(self):
+        """Test that link_from_dict only accepts vlans for current_path
+         and failover_path."""
+        intf = MagicMock(id="01:1")
+        self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
+        link_dict = {
+            'id': 'mock_link',
+            'endpoint_a': {'id': '00:00:00:00:00:00:00:01:4'},
+            'endpoint_b': {'id': '00:00:00:00:00:00:00:05:2'},
+            'metadata': {'s_vlan': {'tag_type': 'vlan', 'value': 1}}
+        }
+        link = self.napp._link_from_dict(link_dict, "current_path")
+        assert link.metadata.get('s_vlan', None)
+
+        link = self.napp._link_from_dict(link_dict, "failover_path")
+        assert link.metadata.get('s_vlan', None)
+
+        link = self.napp._link_from_dict(link_dict, "primary_path")
+        assert link.metadata.get('s_vlan', None) is None
 
     def test_uni_from_dict_non_existent_intf(self):
         """Test _link_from_dict non existent intf."""
