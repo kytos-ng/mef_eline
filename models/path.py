@@ -9,7 +9,7 @@ from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.exceptions import InvalidPath
 
 
-class Path(list, GenericEntity):
+class Path(list[Link], GenericEntity):
     """Class to represent a Path."""
 
     def __eq__(self, other=None):

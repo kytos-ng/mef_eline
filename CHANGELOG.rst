@@ -6,6 +6,17 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.6] - 2024-11-05
+***********************
+
+Changed
+=======
+- ``primary_path``, ``backup_path``, ``primary_links`` and ``backup_links`` now only accept endpoint IDs in the API request content.
+
+Fixed
+=====
+- Fixed ``current_path`` taking the ``s_vlan`` from ``primary_path`` without checking in the interface for availability
+
 [2023.2.5] - 2024-11-04
 ***********************
 
