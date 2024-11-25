@@ -1776,13 +1776,12 @@ class LinkProtection(EVCDeploy):
                     f"Activated {self} due to successful "
                     f"deployment triggered by {interface}"
                 )
-                log.info(msg)
             else:
                 msg = (
                     f"Couldn't activate {self} due to unsuccessful "
                     f"deployment triggered by {interface}"
                 )
-                log.info(msg)
+            log.info(msg)
             return True
         return False
 
