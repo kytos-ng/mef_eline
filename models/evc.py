@@ -1764,6 +1764,28 @@ class LinkProtection(EVCDeploy):
             for interface in interfaces
         }
 
+    def try_to_handle_uni_as_link_up(self, interface: Interface) -> bool:
+        """Try to handle UNI as link_up to trigger deployment."""
+        if (
+            self.current_path.status != EntityStatus.UP
+            and not self.is_intra_switch()
+        ):
+            succeeded = self.handle_link_up(interface)
+            if succeeded:
+                msg = (
+                    f"Activated {self} due to successful "
+                    f"deployment triggered by {interface}"
+                )
+                log.info(msg)
+            else:
+                msg = (
+                    f"Couldn't activate {self} due to unsuccessful "
+                    f"deployment triggered by {interface}"
+                )
+                log.info(msg)
+            return True
+        return False
+
     def handle_interface_link_up(self, interface: Interface):
         """
         Handler for interface link_up events
@@ -1780,6 +1802,9 @@ class LinkProtection(EVCDeploy):
         ]
         if down_interfaces:
             return
+        if self.try_to_handle_uni_as_link_up(interface):
+            return
+
         interface_dicts = {
             interface.id: {
                 'status': interface.status.value,
