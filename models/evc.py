@@ -876,7 +876,8 @@ class EVCDeploy(EVCBase):
             )
         if self.current_path.status != EntityStatus.UP:
             raise ActivationError(
-                f"Won't be able to activate {self} due to current_path not UP"
+                f"Won't be able to activate {self} due to current_path "
+                f"status {self.current_path.status}"
             )
         self.activate()
         return True
@@ -939,12 +940,13 @@ class EVCDeploy(EVCBase):
             )
             self.remove_current_flows(use_path, sync=True)
             return False
+
+        self.current_path = use_path
         msg = f"{self} was deployed."
         try:
             self.try_to_activate()
         except ActivationError as exc:
             msg = f"{msg} {str(exc)}"
-        self.current_path = use_path
         self.sync()
         log.info(msg)
         return True
