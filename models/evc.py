@@ -22,7 +22,8 @@ from kytos.core.link import Link
 from kytos.core.retry import before_sleep
 from kytos.core.tag_ranges import range_difference
 from napps.kytos.mef_eline import controllers, settings
-from napps.kytos.mef_eline.exceptions import (DuplicatedNoTagUNI,
+from napps.kytos.mef_eline.exceptions import (ActivationError,
+                                              DuplicatedNoTagUNI,
                                               EVCPathNotInstalled,
                                               FlowModException, InvalidPath)
 from napps.kytos.mef_eline.utils import (check_disabled_component,
@@ -826,6 +827,61 @@ class EVCDeploy(EVCBase):
 
         return False
 
+    @staticmethod
+    def is_uni_interface_active(
+        *interfaces: Interface
+    ) -> tuple[bool, dict]:
+        """Whether UNIs are active and their status & status_reason."""
+        active = True
+        bad_interfaces = [
+            interface
+            for interface in interfaces
+            if interface.status != EntityStatus.UP
+        ]
+        if bad_interfaces:
+            active = False
+            interfaces = bad_interfaces
+        return active, {
+            interface.id: {
+                'status': interface.status.value,
+                'status_reason': interface.status_reason,
+            }
+            for interface in interfaces
+        }
+
+    def try_to_activate(self) -> bool:
+        """Try to activate the EVC."""
+        if self.is_intra_switch():
+            return self._try_to_activate_intra_evc()
+        return self._try_to_activate_inter_evc()
+
+    def _try_to_activate_intra_evc(self) -> bool:
+        """Try to activate intra EVC."""
+        intf_a, intf_z = self.uni_a.interface, self.uni_z.interface
+        is_active, reason = self.is_uni_interface_active(intf_a, intf_z)
+        if not is_active:
+            raise ActivationError(
+                f"Won't be able to activate {self} due to UNIs: {reason}"
+            )
+        self.activate()
+        return True
+
+    def _try_to_activate_inter_evc(self) -> bool:
+        """Try to activate inter EVC."""
+        intf_a, intf_z = self.uni_a.interface, self.uni_z.interface
+        is_active, reason = self.is_uni_interface_active(intf_a, intf_z)
+        if not is_active:
+            raise ActivationError(
+                f"Won't be able to activate {self} due to UNIs: {reason}"
+            )
+        if self.current_path.status != EntityStatus.UP:
+            raise ActivationError(
+                f"Won't be able to activate {self} due to current_path "
+                f"status {self.current_path.status}"
+            )
+        self.activate()
+        return True
+
     # pylint: disable=too-many-branches, too-many-statements
     def deploy_to_path(self, path=None):
         """Install the flows for this circuit.
@@ -884,10 +940,15 @@ class EVCDeploy(EVCBase):
             )
             self.remove_current_flows(use_path, sync=True)
             return False
-        self.activate()
+
         self.current_path = use_path
+        msg = f"{self} was deployed."
+        try:
+            self.try_to_activate()
+        except ActivationError as exc:
+            msg = f"{msg} {str(exc)}"
         self.sync()
-        log.info(f"{self} was deployed.")
+        log.info(msg)
         return True
 
     def try_setup_failover_path(self, wait=settings.DEPLOY_EVCS_INTERVAL):
@@ -1742,27 +1803,26 @@ class LinkProtection(EVCDeploy):
         active, _ = self.is_uni_interface_active(interface_a, interface_z)
         return active
 
-    @staticmethod
-    def is_uni_interface_active(
-        *interfaces: Interface
-    ) -> tuple[bool, dict]:
-        """Determine whether a UNI should be active"""
-        active = True
-        bad_interfaces = [
-            interface
-            for interface in interfaces
-            if interface.status != EntityStatus.UP
-        ]
-        if bad_interfaces:
-            active = False
-            interfaces = bad_interfaces
-        return active, {
-            interface.id: {
-                'status': interface.status.value,
-                'status_reason': interface.status_reason,
-            }
-            for interface in interfaces
-        }
+    def try_to_handle_uni_as_link_up(self, interface: Interface) -> bool:
+        """Try to handle UNI as link_up to trigger deployment."""
+        if (
+            self.current_path.status != EntityStatus.UP
+            and not self.is_intra_switch()
+        ):
+            succeeded = self.handle_link_up(interface)
+            if succeeded:
+                msg = (
+                    f"Activated {self} due to successful "
+                    f"deployment triggered by {interface}"
+                )
+            else:
+                msg = (
+                    f"Couldn't activate {self} due to unsuccessful "
+                    f"deployment triggered by {interface}"
+                )
+            log.info(msg)
+            return True
+        return False
 
     def handle_interface_link_up(self, interface: Interface):
         """
@@ -1780,6 +1840,9 @@ class LinkProtection(EVCDeploy):
         ]
         if down_interfaces:
             return
+        if self.try_to_handle_uni_as_link_up(interface):
+            return
+
         interface_dicts = {
             interface.id: {
                 'status': interface.status.value,
@@ -1787,14 +1850,19 @@ class LinkProtection(EVCDeploy):
             }
             for interface in interfaces
         }
-        self.activate()
-        log.info(
-            f"Activating {self}. Interfaces: "
-            f"{interface_dicts}."
-        )
-        emit_event(self._controller, "uni_active_updated",
-                   content=map_evc_event_content(self))
-        self.sync()
+        try:
+            self.try_to_activate()
+            log.info(
+                f"Activating {self}. Interfaces: "
+                f"{interface_dicts}."
+            )
+            emit_event(self._controller, "uni_active_updated",
+                       content=map_evc_event_content(self))
+            self.sync()
+        except ActivationError as exc:
+            # On this ctx, no ActivationError isn't expected since the
+            # activation pre-requisites states were checked, so handled as err
+            log.error(f"ActivationError: {str(exc)} when handling {interface}")
 
     def handle_interface_link_down(self, interface):
         """

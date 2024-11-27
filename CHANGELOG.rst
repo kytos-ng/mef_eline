@@ -6,6 +6,14 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2024.1.7] - 2024-11-27
+***********************
+
+Fixed
+=====
+- Try to handle uni interface up as link up for inter-EVCs
+- EVCs activation now take into account UNIs statuses before trying to activate
+
 [2024.1.6] - 2024-11-04
 ***********************
 
