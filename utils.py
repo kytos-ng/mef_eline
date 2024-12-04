@@ -28,7 +28,7 @@ def emit_event(controller, name, context="kytos/mef_eline", content=None,
 
 
 def merge_flow_dicts(
-    dst: dict[str, list], *srcs: list[dict[str, list]]
+    dst: dict[str, list], *srcs: dict[str, list]
 ) -> dict[str, list]:
     """Merge srcs dict flows into dst."""
     for src in srcs:
