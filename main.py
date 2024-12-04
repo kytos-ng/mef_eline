@@ -838,7 +838,7 @@ class Main(KytosNApp):
             clear_failover = list[EVC]()
             clear_old_path = list[EVC]()
             evcs_to_update = list[EVC]()
-            
+
             for evc in self.get_evcs_by_svc_level():
                 with ExitStack() as sub_stack:
                     sub_stack.enter_context(evc.lock)
@@ -896,6 +896,8 @@ class Main(KytosNApp):
                 )
                 clear_old_path.append(evc)
 
+            # TODO: Maybe move all write operations to the end of this func.
+
             if failover_swap_ready:
                 emit_event(
                     self.controller, "failover_link_down",
@@ -921,6 +923,8 @@ class Main(KytosNApp):
             clear_old_path_ready = list[EVC]()
             clear_old_path_event_contents = {}
 
+            # TODO: Make it so that if switch to old_path fails, redeploy instead of switching to failover path.
+
             for evc in clear_old_path:
                 try:
                     del_flows = prepare_delete_flow(
@@ -929,6 +933,7 @@ class Main(KytosNApp):
                             evc._prepare_nni_flows(evc.old_path)
                         )
                     )
+                # pylint: disable=broad-except
                 except Exception:
                     err = traceback.format_exc().replace("\n", ", ")
                     log.error(f"Fail to remove {evc} old_path: {err}")
@@ -956,9 +961,9 @@ class Main(KytosNApp):
                 )
                 evcs_to_update.extend(clear_old_path_ready)
 
-
             # Handle redeploys
-            # I think this uses a separate syncing mechanism here, so don't push to DB.
+            # This uses a separate syncing mechanism here, so don't push to DB.
+            # TODO: replace with bulk update mechanism
 
             for evc in redeploy:
                 result = evc.handle_link_down()
@@ -972,14 +977,12 @@ class Main(KytosNApp):
                     content=map_evc_event_content(evc)
                 )
 
-
             # Push update to DB
 
             if evcs_to_update:
                 self.mongo_controller.update_evcs(
                     [evc.as_dict() for evc in evcs_to_update]
                 )
-
 
     @listen_to("kytos/mef_eline.evc_affected_by_link_down")
     def on_evc_affected_by_link_down(self, event):
