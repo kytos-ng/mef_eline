@@ -541,7 +541,7 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         current_handle_link_up = evc.handle_link_up(primary_path[0])
         assert deploy_mocked.call_count == 0
         assert deploy_to_path_mocked.call_count == 1
-        deploy_to_path_mocked.assert_called_once_with(evc.primary_path)
+        deploy_to_path_mocked.assert_called_once_with(evc.primary_path, None)
         assert current_handle_link_up
 
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.deploy")
@@ -609,7 +609,7 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         assert get_best_path_mocked.call_count == 0
         assert deploy_mocked.call_count == 0
         assert deploy_to_path_mocked.call_count == 1
-        deploy_to_path_mocked.assert_called_once_with(evc.backup_path)
+        deploy_to_path_mocked.assert_called_once_with(evc.backup_path, None)
         assert current_handle_link_up
 
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.deploy_to_path")
@@ -681,7 +681,7 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
 
         assert get_best_path_mocked.call_count == 0
         assert deploy_to_path_mocked.call_count == 1
-        deploy_to_path_mocked.assert_called_once_with()
+        deploy_to_path_mocked.assert_called_once_with(old_path_dict=None)
         assert current_handle_link_up
 
     async def test_handle_link_up_case_5(self):
@@ -895,7 +895,7 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         expected = (False, interfaces)
         assert actual == expected
 
-    async def test_handle_interface_link(self):
+    async def test_handle_interface_link(self, monkeypatch):
         """
         Test Interface Link Up
         """
@@ -905,8 +905,11 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         interface_a.enable()
         interface_b = self.evc.uni_z.interface
         interface_b.enable()
+        emit_mock = MagicMock()
+        monkeypatch.setattr("napps.kytos.mef_eline.models.evc.emit_event",
+                            emit_mock)
 
-        self.evc.activate = MagicMock()
+        self.evc.try_to_activate = MagicMock()
         self.evc.deactivate = MagicMock()
         self.evc.sync = MagicMock()
 
@@ -915,7 +918,7 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
 
         self.evc.handle_interface_link_up(interface_a)
 
-        self.evc.activate.assert_not_called()
+        self.evc.try_to_activate.assert_not_called()
         self.evc.sync.assert_not_called()
 
         # Test deactivating
@@ -937,7 +940,9 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         # Test activating
         interface_a.activate()
 
+        self.evc.try_to_handle_uni_as_link_up = MagicMock()
+        self.evc.try_to_handle_uni_as_link_up.return_value = False
         self.evc.handle_interface_link_up(interface_a)
 
-        self.evc.activate.assert_called_once()
+        self.evc.try_to_activate.assert_called_once()
         assert self.evc.sync.call_count == 2

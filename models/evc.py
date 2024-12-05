@@ -572,7 +572,7 @@ class EVCDeploy(EVCBase):
             return True
         return False
 
-    def deploy_to_backup_path(self):
+    def deploy_to_backup_path(self, old_path_dict: dict = None):
         """Deploy the backup path into the datapaths of this circuit.
 
         If the backup_path attribute is valid and up, this method will try to
@@ -588,17 +588,17 @@ class EVCDeploy(EVCBase):
 
         success = False
         if self.backup_path.status is EntityStatus.UP:
-            success = self.deploy_to_path(self.backup_path)
+            success = self.deploy_to_path(self.backup_path, old_path_dict)
 
         if success:
             return True
 
         if self.dynamic_backup_path or self.is_intra_switch():
-            return self.deploy_to_path()
+            return self.deploy_to_path(old_path_dict=old_path_dict)
 
         return False
 
-    def deploy_to_primary_path(self):
+    def deploy_to_primary_path(self, old_path_dict: dict = None):
         """Deploy the primary path into the datapaths of this circuit.
 
         If the primary_path attribute is valid and up, this method will try to
@@ -610,10 +610,10 @@ class EVCDeploy(EVCBase):
             return True
 
         if self.primary_path.status is EntityStatus.UP:
-            return self.deploy_to_path(self.primary_path)
+            return self.deploy_to_path(self.primary_path, old_path_dict)
         return False
 
-    def deploy(self):
+    def deploy(self, old_path_dict: dict = None):
         """Deploy EVC to best path.
 
         Best path can be the primary path, if available. If not, the backup
@@ -622,9 +622,9 @@ class EVCDeploy(EVCBase):
         if self.archived:
             return False
         self.enable()
-        success = self.deploy_to_primary_path()
+        success = self.deploy_to_primary_path(old_path_dict)
         if not success:
-            success = self.deploy_to_backup_path()
+            success = self.deploy_to_backup_path(old_path_dict)
 
         if success:
             emit_event(self._controller, "deployed",
@@ -705,18 +705,30 @@ class EVCDeploy(EVCBase):
         if sync:
             self.sync()
 
-    def remove_current_flows(self, current_path=None, force=True,
-                             sync=True):
+    def remove_current_flows(
+        self,
+        current_path=None,
+        force=True,
+        sync=True,
+        return_path=False,
+    ) -> dict[str, int]:
         """Remove all flows from current path."""
-        switches = set()
+        switches, old_path_dict = set(), {}
+        current_path = self.current_path if not current_path else current_path
+        if not current_path and not self.is_intra_switch():
+            return {}
 
-        switches.add(self.uni_a.interface.switch)
-        switches.add(self.uni_z.interface.switch)
-        if not current_path:
-            current_path = self.current_path
+        if return_path:
+            for link in current_path:
+                s_vlan = link.metadata.get("s_vlan")
+                if s_vlan:
+                    old_path_dict[link.id] = s_vlan.value
+
         for link in current_path:
             switches.add(link.endpoint_a.switch)
             switches.add(link.endpoint_b.switch)
+        switches.add(self.uni_a.interface.switch)
+        switches.add(self.uni_z.interface.switch)
 
         match = {
             "cookie": self.get_cookie(),
@@ -735,10 +747,12 @@ class EVCDeploy(EVCBase):
             current_path.make_vlans_available(self._controller)
         except KytosTagError as err:
             log.error(f"Error when removing current path flows: {err}")
+            return old_path_dict
         self.current_path = Path([])
         self.deactivate()
         if sync:
             self.sync()
+        return old_path_dict
 
     def remove_path_flows(self, path=None, force=True):
         """Remove all flows from path."""
@@ -873,7 +887,7 @@ class EVCDeploy(EVCBase):
         return True
 
     # pylint: disable=too-many-branches, too-many-statements
-    def deploy_to_path(self, path=None):
+    def deploy_to_path(self, path=None, old_path_dict: dict = None):
         """Install the flows for this circuit.
 
         Procedures to deploy:
@@ -890,9 +904,11 @@ class EVCDeploy(EVCBase):
         """
         self.remove_current_flows()
         use_path = path
+        if not old_path_dict:
+            old_path_dict = {}
         if self.should_deploy(use_path):
             try:
-                use_path.choose_vlans(self._controller)
+                use_path.choose_vlans(self._controller, old_path_dict)
             except KytosNoTagAvailableError:
                 use_path = None
         else:
@@ -900,7 +916,7 @@ class EVCDeploy(EVCBase):
                 if use_path is None:
                     continue
                 try:
-                    use_path.choose_vlans(self._controller)
+                    use_path.choose_vlans(self._controller, old_path_dict)
                     break
                 except KytosNoTagAvailableError:
                     pass
