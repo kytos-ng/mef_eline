@@ -405,19 +405,19 @@ components:
         primary_links:
           type: array
           items:
-            $ref: '#/components/schemas/NewLink'
+            $ref: '#/components/schemas/Link'
         backup_links:
           type: array
           items:
-            $ref: '#/components/schemas/NewLink'
+            $ref: '#/components/schemas/Link'
         primary_path:
           type: array
           items:
-            $ref: '#/components/schemas/NewLink'
+            $ref: '#/components/schemas/Link'
         backup_path:
           type: array
           items:
-            $ref: '#/components/schemas/NewLink'
+            $ref: '#/components/schemas/Link'
         primary_constraints:
           $ref: '#/components/schemas/PathConstraints'
         secondary_constraints:
@@ -494,9 +494,17 @@ components:
         id:
           type: string
         endpoint_a:
-          $ref: '#/components/schemas/Endpoint'
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: string
         endpoint_b:
-          $ref: '#/components/schemas/Endpoint'
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: string
 
     Path: # Can be referenced via '#/components/schemas/Path'
       type: object
@@ -621,11 +629,11 @@ components:
         primary_links:
           type: array
           items:
-            $ref: '#/components/schemas/Path'
+            $ref: '#/components/schemas/Link'
         backup_links:
           type: array
           items:
-            $ref: '#/components/schemas/Path'
+            $ref: '#/components/schemas/Link'
 
         current_path:
           type: array
@@ -638,11 +646,11 @@ components:
         primary_path:
           type: array
           items:
-            $ref: '#/components/schemas/NewLink'
+            $ref: '#/components/schemas/Link'
         backup_path:
           type: array
           items:
-            $ref: '#/components/schemas/NewLink'
+            $ref: '#/components/schemas/Link'
         primary_constraints:
           $ref: '#/components/schemas/PathConstraints'
         secondary_constraints:
