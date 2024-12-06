@@ -939,7 +939,10 @@ class Main(KytosNApp):
             clear_old_path_flows = {}
             clear_old_path_event_contents = {}
 
+            clear_old_path_reservations = list[EVC]()
+
             for modified_evc_id in flow_modifications:
+                evc = evc_dict[modified_evc_id]
                 if "swap_to_failover" in flow_modifications[modified_evc_id]:
                     swap_to_failover_flows = merge_flow_dicts(
                         swap_to_failover_flows,
@@ -954,7 +957,8 @@ class Main(KytosNApp):
                     )
                     clear_old_path_event_contents[modified_evc_id] =\
                         event_contents[modified_evc_id]["clear_old_path"]
-                evcs_to_update.append(evc_dict[modified_evc_id])
+                    clear_old_path_reservations.append(evc)
+                evcs_to_update.append(evc)
 
             if swap_to_failover_flows:
                 emit_event(
@@ -978,6 +982,12 @@ class Main(KytosNApp):
                     "failover_old_path",
                     content=clear_old_path_event_contents
                 )
+
+            # Clear out vlan reservations of old_path
+
+            for evc in clear_old_path_reservations:
+                evc.old_path.make_vlans_available(self.controller)
+                evc.old_path = Path([])
 
             # Handle redeploys
             # This uses a separate syncing mechanism here, so don't push to DB.
