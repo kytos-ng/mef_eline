@@ -72,6 +72,7 @@ class Main(KytosNApp):
         self._lock_interfaces = defaultdict(Lock)
         self.table_group = {"epl": 0, "evpl": 0}
         self._lock = Lock()
+        self.multi_evc_lock = Lock()
         self.execute_as_loop(settings.DEPLOY_EVCS_INTERVAL)
 
         self.load_all_evcs()
@@ -832,7 +833,7 @@ class Main(KytosNApp):
         log.info("Event handle_link_down %s", link)
 
         with ExitStack() as exit_stack:
-            exit_stack.enter_context(self._lock)
+            exit_stack.enter_context(self.multi_evc_lock)
             swap_to_failover = list[EVC]()
             redeploy = list[EVC]()
             clear_failover = list[EVC]()
