@@ -825,6 +825,97 @@ class Main(KytosNApp):
         """Change circuit when link is down or under_mantenance."""
         self.handle_link_down(event)
 
+    def prepare_swap_to_failover(self, evc: EVC):
+        """Prepare an evc for switching to failover."""
+        install_flows = {}
+        try:
+            install_flows = evc.get_failover_flows()
+            evc.old_path = evc.current_path
+            evc.current_path = evc.failover_path
+            evc.failover_path = Path([])
+        except Exception:
+            err = traceback.format_exc().replace("\n", ", ")
+            log.error(
+                "Ignore Failover path for "
+                f"{evc} due to error: {err}"
+            )
+        return install_flows
+    
+    def execute_swap_to_failover(self, event_contents, install_flows):
+        """Process changes needed to commit a swap to failover."""
+        emit_event(
+            self.controller, "failover_link_down",
+            content=deepcopy(event_contents)
+        )
+        send_flow_mods_event(
+            self.controller,
+            install_flows,
+            "install"
+        )
+
+    def prepare_clear_old_path(self, evc: EVC):
+        """Prepare an evc for clearing the old path."""
+        del_flows = {}
+        try:
+            del_flows = prepare_delete_flow(
+                merge_flow_dicts(
+                    evc._prepare_uni_flows(evc.old_path, skip_in=True),
+                    evc._prepare_nni_flows(evc.old_path)
+                )
+            )
+        except Exception:
+            err = traceback.format_exc().replace("\n", ", ")
+            log.error(f"Fail to remove {evc} old_path: {err}")
+        return del_flows
+    
+    def execute_clear_old_path(self, evcs: list[EVC], event_contents, delete_flows):
+        """Process changes needed to commit clearing the old path"""
+        send_flow_mods_event(
+            self.controller,
+            delete_flows,
+            'delete'
+        )
+        emit_event(
+            self.controller,
+            "failover_old_path",
+            content=event_contents
+        )
+        for evc in evcs:
+            evc.old_path.make_vlans_available(self.controller)
+            evc.old_path = Path([])
+
+    def prepare_undeploy(self, evc: EVC):
+        """Prepare an evc for undeploying."""
+        del_flows = {}
+        try:
+            del_flows = prepare_delete_flow(
+                merge_flow_dicts(
+                    evc._prepare_uni_flows(evc.current_path, skip_in=True),
+                    evc._prepare_nni_flows(evc.current_path),
+                    evc._prepare_nni_flows(evc.failover_path)
+                )
+            )
+        except Exception:
+            # TODO: Add an error message here.
+            pass
+        return del_flows
+
+    def execute_undeploy(self, evcs: list[EVC], remove_flows):
+        """Process changes needed to commit an undeploy"""
+        send_flow_mods_event(
+            self.controller,
+            remove_flows,
+            'delete'
+        )
+
+        for evc in evcs:
+            evc.current_path.make_vlans_available(self.controller)
+            evc.failover_path.make_vlans_available(self.controller)
+            evc.current_path = Path([])
+            evc.failover_path = Path([])
+
+        # TODO: Add code for sending out the event for a redeploy
+
     # pylint: disable=too-many-branches
     # pylint: disable=too-many-locals
     def handle_link_down(self, event):
@@ -835,7 +926,7 @@ class Main(KytosNApp):
         with ExitStack() as exit_stack:
             exit_stack.enter_context(self.multi_evc_lock)
             swap_to_failover = list[EVC]()
-            redeploy = list[EVC]()
+            undeploy = list[EVC]()
             clear_failover = list[EVC]()
             clear_old_path = list[EVC]()
             evc_dict = dict[str, EVC]()
@@ -859,7 +950,7 @@ class Main(KytosNApp):
                         not evc.failover_path or
                         evc.is_failover_path_affected_by_link(link)
                     )):
-                        redeploy.append(evc)
+                        undeploy.append(evc)
                     elif all((
                         not evc.is_affected_by_link(link),
                         evc.failover_path,
@@ -874,28 +965,20 @@ class Main(KytosNApp):
             # Swap from current path to failover path
 
             for evc in swap_to_failover:
-                try:
-                    new_flows = evc.get_failover_flows()
-                    evc.old_path = evc.current_path
-                    evc.current_path = evc.failover_path
-                    evc.failover_path = Path([])
-                # pylint: disable=broad-except
-                except Exception:
-                    err = traceback.format_exc().replace("\n", ", ")
-                    log.error(
-                        "Ignore Failover path for "
-                        f"{evc} due to error: {err}"
+                new_flows = self.prepare_swap_to_failover(evc)
+                if new_flows:
+                    flow_modifications[evc.id]["swap_to_failover"] =\
+                        new_flows
+                    event_contents[evc.id]["swap_to_failover"] =\
+                        map_evc_event_content(
+                            evc,
+                            flows=deepcopy(new_flows)
                     )
+                    clear_old_path.append(evc)
+                else:
                     del flow_modifications[evc.id]
                     del event_contents[evc.id]
-                    redeploy.append(evc)
-                    continue
-                flow_modifications[evc.id]["swap_to_failover"] = new_flows
-                event_contents[evc.id]["swap_to_failover"] = map_evc_event_content(
-                    evc,
-                    flows=deepcopy(new_flows)
-                )
-                clear_old_path.append(evc)
+                    undeploy.append(evc)
 
             for evc in clear_failover:
                 evc.old_path = evc.failover_path
@@ -905,18 +988,14 @@ class Main(KytosNApp):
             # Clear out old flows
 
             for evc in clear_old_path:
-                try:
-                    del_flows = prepare_delete_flow(
-                        merge_flow_dicts(
-                            evc._prepare_uni_flows(evc.old_path, skip_in=True),
-                            evc._prepare_nni_flows(evc.old_path)
-                        )
+                del_flows = self.prepare_clear_old_path(evc)
+                if del_flows:
+                    flow_modifications[evc.id]["clear_old_path"] = new_flows
+                    event_contents[evc.id]["clear_old_path"] = map_evc_event_content(
+                        evc,
+                        removed_flows=deepcopy(del_flows)
                     )
-                    evc.old_path = Path([])
-                # pylint: disable=broad-except
-                except Exception:
-                    err = traceback.format_exc().replace("\n", ", ")
-                    log.error(f"Fail to remove {evc} old_path: {err}")
+                else:
                     if "swap_to_failover" in flow_modifications[evc.id]:
                         evc.failover_path = evc.current_path
                         evc.current_path = evc.old_path
@@ -925,13 +1004,7 @@ class Main(KytosNApp):
                     evc.old_path = Path([])
                     del flow_modifications[evc.id]
                     del event_contents[evc.id]
-                    redeploy.append(evc)
-                    continue
-                flow_modifications[evc.id]["clear_old_path"] = new_flows
-                event_contents[evc.id]["clear_old_path"] = map_evc_event_content(
-                    evc,
-                    removed_flows=deepcopy(del_flows)
-                )
+                    undeploy.append(evc)
 
             swap_to_failover_flows = {}
             swap_to_failover_event_contents = {}
@@ -961,49 +1034,41 @@ class Main(KytosNApp):
                 evcs_to_update.append(evc)
 
             if swap_to_failover_flows:
-                emit_event(
-                    self.controller, "failover_link_down",
-                    content=deepcopy(swap_to_failover_event_contents)
-                )
-                send_flow_mods_event(
-                    self.controller,
-                    swap_to_failover_flows,
-                    'install'
+                self.execute_swap_to_failover(
+                    swap_to_failover_event_contents,
+                    swap_to_failover_flows
                 )
 
             if clear_old_path_flows:
-                send_flow_mods_event(
-                    self.controller,
-                    clear_old_path_flows,
-                    'delete'
+                self.execute_clear_old_path(
+                    clear_old_path_reservations,
+                    clear_old_path_event_contents,
+                    clear_old_path_flows
                 )
-                emit_event(
-                    self.controller,
-                    "failover_old_path",
-                    content=clear_old_path_event_contents
-                )
-
-            # Clear out vlan reservations of old_path
-
-            for evc in clear_old_path_reservations:
-                evc.old_path.make_vlans_available(self.controller)
-                evc.old_path = Path([])
 
             # Handle redeploys
             # This uses a separate syncing mechanism here, so don't push to DB.
             # TODO: replace with bulk update mechanism
 
-            for evc in redeploy:
-                result = evc.handle_link_down()
-                event_name = "error_redeploy_link_down"
-                if result:
-                    log.info(f"{evc} redeployed due to link down {link.id}")
-                    event_name = "redeployed_link_down"
-                emit_event(
-                    self.controller,
-                    event_name,
-                    content=map_evc_event_content(evc)
-                )
+            undeploy_flows = {}
+            undeploy_ready = list[EVC]()
+
+            
+            # Just undeploy the evc,
+            # then call the redeploy process later on?
+
+            for evc in undeploy:
+                del_flows = self.prepare_undeploy(evc)
+                if del_flows:
+                    undeploy_flows = merge_flow_dicts(
+                        undeploy_flows,
+                        del_flows
+                    )
+                    undeploy_ready.append(evc)
+
+            if undeploy_ready:
+                self.execute_undeploy(undeploy_ready, undeploy_flows)
+                evcs_to_update.extend(undeploy_ready)
 
             # Push update to DB
 
