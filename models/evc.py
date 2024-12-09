@@ -710,6 +710,7 @@ class EVCDeploy(EVCBase):
 
     def remove_current_flows(
         self,
+        current_path=None,
         force=True,
         sync=True,
         return_path=False
@@ -717,8 +718,8 @@ class EVCDeploy(EVCBase):
         """Remove all flows from current path or path intended for
          current path if exists."""
         switches, old_path_dict = set(), {}
-
-        if not self.current_path and not self.is_intra_switch():
+        current_path = self.current_path if not current_path else current_path
+        if not current_path and not self.is_intra_switch():
             return {}
 
         if return_path:
@@ -727,7 +728,6 @@ class EVCDeploy(EVCBase):
                 if s_vlan:
                     old_path_dict[link.id] = s_vlan.value
 
-        current_path = self.current_path
         for link in current_path:
             switches.add(link.endpoint_a.switch.id)
             switches.add(link.endpoint_b.switch.id)
@@ -751,7 +751,6 @@ class EVCDeploy(EVCBase):
             current_path.make_vlans_available(self._controller)
         except KytosTagError as err:
             log.error(f"Error removing {self} current_path: {err}")
-            return old_path_dict
         self.current_path = Path([])
         self.deactivate()
         if sync:

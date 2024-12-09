@@ -6,7 +6,8 @@ import pytest
 from kytos.lib.helpers import get_controller_mock
 
 from kytos.core.common import EntityStatus
-from kytos.core.exceptions import KytosNoTagAvailableError
+from kytos.core.exceptions import (KytosNoTagAvailableError,
+                                   KytosTagtypeNotSupported)
 from kytos.core.interface import Interface
 from kytos.core.switch import Switch
 from httpx import TimeoutException
@@ -895,6 +896,61 @@ class TestEVC():
 
         send_flow_mods_mocked.side_effect = FlowModException("error")
         evc.remove_current_flows()
+        log_error_mock.assert_called()
+
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
+    @patch("napps.kytos.mef_eline.models.evc.log.error")
+    def test_remove_current_flows_error(self, *args):
+        """Test remove current flows with KytosTagError from vlans."""
+        (log_error_mock, __, _) = args
+        uni_a = get_uni_mocked(
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
+        )
+        uni_z = get_uni_mocked(
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
+        )
+
+        switch_a = Switch("00:00:00:00:00:01")
+        switch_b = Switch("00:00:00:00:00:02")
+        switch_c = Switch("00:00:00:00:00:03")
+        current_path = MagicMock()
+        current_path.return_value = [
+            get_link_mocked(
+                switch_a=switch_a,
+                switch_b=switch_b,
+                endpoint_a_port=9,
+                endpoint_b_port=10,
+                metadata={"s_vlan": 5},
+            ),
+            get_link_mocked(
+                switch_a=switch_b,
+                switch_b=switch_c,
+                endpoint_a_port=11,
+                endpoint_b_port=12,
+                metadata={"s_vlan": 6},
+            )
+        ]
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "active": True,
+            "enabled": True,
+            "primary_links": [],
+        }
+        evc = EVC(**attributes)
+        current_path.make_vlans_available.side_effect = (
+            KytosTagtypeNotSupported("")
+        )
+        evc.remove_current_flows(current_path)
         log_error_mock.assert_called()
 
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
