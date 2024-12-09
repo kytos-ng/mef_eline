@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2024.1.9] - 2024-12-09
+***********************
+
+Added
+=====
+- Added added paramenter support for redeployment, ``PATCH v2/evc/{evc_id}/redeploy?try_avoid_same_s_vlan=true``. By default it will try to avoid ``s_vlan`` from ``current_path`` links.
+
 [2024.1.8] - 2024-12-05
 ***********************
 
