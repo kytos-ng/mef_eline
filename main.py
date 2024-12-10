@@ -66,7 +66,7 @@ class Main(KytosNApp):
 
         # dictionary of EVCs created. It acts as a circuit buffer.
         # Every create/update/delete must be synced to mongodb.
-        self.circuits = {}
+        self.circuits = dict[str, EVC]()
 
         self._intf_events = defaultdict(dict)
         self._lock_interfaces = defaultdict(Lock)
@@ -913,8 +913,13 @@ class Main(KytosNApp):
             evc.failover_path.make_vlans_available(self.controller)
             evc.current_path = Path([])
             evc.failover_path = Path([])
-
-        # TODO: Add code for sending out the event for a redeploy
+            evc.deactivate()
+            emit_event(
+                self.controller,
+                "need_redeploy",
+                content={"evc_id": evc.id}
+            )
+            log.info(f"{evc} scheduled for redeploy")
 
     # pylint: disable=too-many-branches
     # pylint: disable=too-many-locals
@@ -1076,6 +1081,29 @@ class Main(KytosNApp):
                 self.mongo_controller.update_evcs(
                     [evc.as_dict() for evc in evcs_to_update]
                 )
+
+    @listen_to("kytos/mef_eline.need_redeploy")
+    def on_evc_need_redeploy(self, event):
+        """Redeploy evcs that need to be redeployed."""
+        self.handle_evc_need_redeploy(event)
+
+    def handle_evc_need_redeploy(self, event):
+        """Redeploy evcs that need to be redeployed."""
+        evc = self.circuits.get(event.content["evc_id"])
+        if evc is None:
+            return
+        with evc.lock:
+            if not evc.is_enabled() or evc.is_active():
+                return
+            result = evc.deploy_to_path()
+            # if result:
+            #     evc.setup_failover_path()
+        event_name = "error_redeploy_link_down"
+        if result:
+            log.info(f"{evc} redeployed")
+            event_name = "redeployed_link_down"
+        emit_event(self.controller, event_name,
+                   content=map_evc_event_content(evc))
 
     @listen_to("kytos/mef_eline.evc_affected_by_link_down")
     def on_evc_affected_by_link_down(self, event):
