@@ -995,7 +995,7 @@ class Main(KytosNApp):
             for evc in clear_old_path:
                 del_flows = self.prepare_clear_old_path(evc)
                 if del_flows:
-                    flow_modifications[evc.id]["clear_old_path"] = new_flows
+                    flow_modifications[evc.id]["clear_old_path"] = del_flows
                     event_contents[evc.id]["clear_old_path"] = map_evc_event_content(
                         evc,
                         removed_flows=deepcopy(del_flows)
