@@ -5,7 +5,6 @@ import httpx
 from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
                       wait_combine, wait_fixed, wait_random)
 
-
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
 from kytos.core.interface import UNI, Interface, TAGRange
