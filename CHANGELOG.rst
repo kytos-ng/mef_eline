@@ -13,6 +13,7 @@ Added
 Fixed
 =======
 - UI: fixed issue where non-JSON data was being parsed as JSON data.
+- Fixed inconsistencies with link down behaviour. Flows and vlan reservations should now be properly cleared on link down.
 
 Changed
 =======
