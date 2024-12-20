@@ -91,7 +91,7 @@
                     <k-input 
                     title="Southbound priority:"
                     v-model:value="form_constraints[constraint].spf_max_path_cost"
-                    :action="function(val) {form_constraints[constraint].spf_max_path_cost = parseInt(val)}"></k-input>
+                    :action="function(val) {form_constraints[constraint].spf_max_path_cost = parseInt(val)||''}"></k-input>
                   </div>
                 </div>
 
@@ -101,7 +101,7 @@
                     <k-input 
                     :title="constraint_titles['minimum_flexible_hits']"
                     v-model:value="form_constraints[constraint].minimum_flexible_hits"
-                    :action="function(val) {form_constraints[constraint].minimum_flexible_hits = parseInt(val)}"></k-input>
+                    :action="function(val) {form_constraints[constraint].minimum_flexible_hits = parseInt(val)||''}"></k-input>
                   </div>
                 </div>
 
