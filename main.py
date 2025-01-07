@@ -127,7 +127,7 @@ class Main(KytosNApp):
         for circuit in self.get_evcs_by_svc_level(enable_filter=False):
             if self.should_be_checked(circuit):
                 circuits_to_check.append(circuit)
-            circuit.try_setup_failover_path()
+            circuit.try_setup_failover_path(warn_if_not_path=False)
         circuits_checked = EVCDeploy.check_list_traces(circuits_to_check)
         for circuit in circuits_to_check:
             is_checked = circuits_checked.get(circuit.id)
