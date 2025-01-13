@@ -26,6 +26,19 @@ def emit_event(controller, name, context="kytos/mef_eline", content=None,
     controller.buffers.app.put(event, timeout=timeout)
 
 
+def merge_flow_dicts(
+    dst: dict[str, list], *srcs: dict[str, list]
+) -> dict[str, list]:
+    """Merge srcs dict flows into dst."""
+    for src in srcs:
+        for k, v in src.items():
+            if k not in dst:
+                dst[k] = v
+            else:
+                dst[k].extend(v)
+    return dst
+
+
 async def aemit_event(controller, name, content):
     """Send an asynchronous event"""
     event = KytosEvent(name=name, content=content)
@@ -145,3 +158,40 @@ def make_uni_list(list_circuits: list) -> list:
                 (circuit.uni_z.interface, tag_z)
             )
     return uni_list
+
+
+def send_flow_mods_event(
+    controller, flow_dict: dict[str, list], action: str, force=True
+):
+    """Send flow mods to be deleted or install to flow_manager
+     through an event"""
+    for dpid, flows in flow_dict.items():
+        emit_event(
+            controller,
+            context="kytos.flow_manager",
+            name=f"flows.{action}",
+            content={
+                "dpid": dpid,
+                "flow_dict": {"flows": flows},
+                "force": force,
+            },
+        )
+
+
+def prepare_delete_flow(evc_flows: dict[str, list[dict]]):
+    """Create flow mods suited for flow deletion."""
+    dpid_flows: dict[str, list[dict]] = {}
+
+    if not evc_flows:
+        return dpid_flows
+
+    for dpid, flows in evc_flows.items():
+        dpid_flows.setdefault(dpid, [])
+        for flow in flows:
+            dpid_flows[dpid].append({
+                "cookie": flow["cookie"],
+                "match": flow["match"],
+                "owner": "mef_eline",
+                "cookie_mask": int(0xffffffffffffffff)
+            })
+    return dpid_flows
