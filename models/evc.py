@@ -1764,6 +1764,10 @@ class LinkProtection(EVCDeploy):
                             and interface),
                 lambda me: (me.deploy_to_primary_path(), 'redeploy')
             ),
+            (
+                lambda me: interface and me.backup_path.status == EntityStatus.UP,
+                lambda me: (me.deploy_to_backup_path(), 'redeploy')
+            ),
             # We tried to deploy(primary_path) without success.
             # And in this case is up by some how. Nothing to do.
             (
