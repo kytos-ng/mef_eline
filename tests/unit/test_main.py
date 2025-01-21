@@ -2115,64 +2115,6 @@ class TestMain:
             }
         )
 
-    def test_cleanup_evcs_old_path(self, monkeypatch):
-        """Test handle_cleanup_evcs_old_path method."""
-        current_path, map_evc_content, emit_event = [
-            MagicMock(), MagicMock(), MagicMock()
-        ]
-        send_flows, merge_flows, create_flows = [
-            MagicMock(), MagicMock(), MagicMock()
-        ]
-        monkeypatch.setattr(
-            "napps.kytos.mef_eline.main.map_evc_event_content",
-            map_evc_content
-        )
-        monkeypatch.setattr(
-            "napps.kytos.mef_eline.main.emit_event",
-            emit_event
-        )
-        monkeypatch.setattr(
-            "napps.kytos.mef_eline.main.send_flow_mods_event",
-            send_flows
-        )
-        monkeypatch.setattr(
-            "napps.kytos.mef_eline.main.merge_flow_dicts",
-            merge_flows
-        )
-        monkeypatch.setattr(
-            "napps.kytos.mef_eline.main.prepare_delete_flow",
-            create_flows
-        )
-        merge_flows.return_value = ['1', '2']
-        evc1 = create_autospec(EVC, id="1", old_path=["1"],
-                               current_path=current_path, lock=MagicMock())
-        evc2 = create_autospec(EVC, id="2", old_path=["2"],
-                               current_path=current_path, lock=MagicMock())
-        evc3 = create_autospec(EVC, id="3", old_path=[],
-                               current_path=[], lock=MagicMock())
-
-        event = KytosEvent(name="e1", content={"evcs": [evc1, evc2, evc3]})
-        assert evc1.old_path
-        assert evc2.old_path
-        self.napp.handle_cleanup_evcs_old_path(event)
-        evc1._prepare_nni_flows.assert_called_with(["1"])
-        evc1._prepare_uni_flows.assert_called_with(["1"], skip_in=True)
-        evc2._prepare_nni_flows.assert_called_with(["2"])
-        evc2._prepare_uni_flows.assert_called_with(["2"], skip_in=True)
-        evc3._prepare_nni_flows.assert_not_called()
-        evc3._prepare_uni_flows.assert_not_called()
-        assert create_flows.call_count == 4
-        assert emit_event.call_count == 1
-        assert emit_event.call_args[0][1] == "failover_old_path"
-        assert map_evc_content.call_args[1]['removed_flows'] == ['1', '2']
-        assert len(emit_event.call_args[1]["content"]) == 2
-        assert send_flows.call_count == 1
-        assert send_flows.call_args[0][1] == ['1', '2']
-        assert send_flows.call_args[0][2] == 'delete'
-        assert merge_flows.call_count == 4
-        assert not evc1.old_path
-        assert not evc2.old_path
-
     async def test_add_metadata(self):
         """Test method to add metadata"""
         self.napp.controller.loop = asyncio.get_running_loop()

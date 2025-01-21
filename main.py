@@ -1144,50 +1144,6 @@ class Main(KytosNApp):
             return
         evc.try_setup_failover_path()
 
-    @listen_to("kytos/mef_eline.cleanup_evcs_old_path")
-    def on_cleanup_evcs_old_path(self, event):
-        """Handle cleanup evcs old path."""
-        self.handle_cleanup_evcs_old_path(event)
-
-    def handle_cleanup_evcs_old_path(self, event):
-        """Handle cleanup evcs old path."""
-        evcs = event.content.get("evcs", [])
-        event_contents: dict[str, dict] = defaultdict(list)
-        total_flows = {}
-        for evc in evcs:
-            if not evc.old_path:
-                continue
-            with evc.lock:
-                removed_flows = {}
-                try:
-                    nni_flows = prepare_delete_flow(
-                        evc._prepare_nni_flows(evc.old_path)
-                    )
-                    uni_flows = prepare_delete_flow(
-                        evc._prepare_uni_flows(evc.old_path, skip_in=True)
-                    )
-                    removed_flows = merge_flow_dicts(
-                        nni_flows, uni_flows
-                    )
-                # pylint: disable=broad-except
-                except Exception:
-                    err = traceback.format_exc().replace("\n", ", ")
-                    log.error(f"Fail to remove {evc} old_path: {err}")
-                    continue
-                if removed_flows:
-                    total_flows = merge_flow_dicts(total_flows, removed_flows)
-                    content = map_evc_event_content(
-                        evc,
-                        removed_flows=deepcopy(removed_flows),
-                        current_path=evc.current_path.as_dict(),
-                    )
-                    event_contents[evc.id] = content
-                    evc.old_path = Path([])
-        if event_contents:
-            send_flow_mods_event(self.controller, total_flows, 'delete')
-            emit_event(self.controller, "failover_old_path",
-                       content=event_contents)
-
     @listen_to("kytos/topology.topology_loaded")
     def on_topology_loaded(self, event):  # pylint: disable=unused-argument
         """Load EVCs once the topology is available."""

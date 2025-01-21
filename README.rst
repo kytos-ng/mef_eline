@@ -61,7 +61,6 @@ Subscribed
 - ``kytos/flow_manager.flow.removed``
 - ``kytos/of_multi_table.enable_table``
 - ``kytos/mef_eline.evc_affected_by_link_down``
-- ``kytos/mef_eline.cleanup_evcs_old_path``
 - ``kytos/mef_eline.redeployed_link_up``
 - ``kytos/mef_eline.redeployed_link_down``
 - ``kytos/mef_eline.deployed``
@@ -103,17 +102,6 @@ Event reporting an error with redeploying a circuit with a link down event.
     "enabled": evc._enabled,
     "uni_a": evc.uni_a.as_dict(),
     "uni_z": evc.uni_z.as_dict()
-  }
-
-kytos/mef_eline.cleanup_evcs_old_path
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Event reporting the old circuit's path after a link down event.
-
-.. code-block:: python3
-
-  {
-    "evcs": evcs_with_failover + check_failover
   }
 
 kytos/mef_eline.evcs_affected_by_link_down
