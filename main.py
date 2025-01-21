@@ -1008,6 +1008,7 @@ class Main(KytosNApp):
                     event_contents[evc.id]["clear_old_path"] =\
                         map_evc_event_content(
                             evc,
+                            current_path=evc.current_path.as_dict(),
                             removed_flows=deepcopy(del_flows)
                     )
                 elif evc.id in flow_modifications:
