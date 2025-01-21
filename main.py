@@ -989,9 +989,7 @@ class Main(KytosNApp):
                             flows=deepcopy(new_flows)
                     )
                     clear_old_path.append(evc)
-                elif evc.id in flow_modifications:
-                    del flow_modifications[evc.id]
-                    del event_contents[evc.id]
+                else:
                     undeploy.append(evc)
 
             for evc in clear_failover:
@@ -1011,16 +1009,17 @@ class Main(KytosNApp):
                             current_path=evc.current_path.as_dict(),
                             removed_flows=deepcopy(del_flows)
                     )
-                elif evc.id in flow_modifications:
-                    if "swap_to_failover" in flow_modifications[evc.id]:
-                        evc.failover_path = evc.current_path
-                        evc.current_path = evc.old_path
-                    else:
-                        evc.failover_path = evc.old_path
-                    evc.old_path = Path([])
-                    del flow_modifications[evc.id]
-                    del event_contents[evc.id]
+                else:
                     undeploy.append(evc)
+                    if evc.id in flow_modifications:
+                        if "swap_to_failover" in flow_modifications[evc.id]:
+                            evc.failover_path = evc.current_path
+                            evc.current_path = evc.old_path
+                        else:
+                            evc.failover_path = evc.old_path
+                        evc.old_path = Path([])
+                        del flow_modifications[evc.id]
+                        del event_contents[evc.id]
 
             swap_to_failover_flows = {}
             swap_to_failover_event_contents = {}
