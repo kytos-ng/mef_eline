@@ -1100,8 +1100,6 @@ class Main(KytosNApp):
             if not evc.is_enabled() or evc.is_active():
                 return
             result = evc.deploy_to_path()
-            # if result:
-            #     evc.setup_failover_path()
         event_name = "error_redeploy_link_down"
         if result:
             log.info(f"{evc} redeployed")
