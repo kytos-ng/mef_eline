@@ -1737,7 +1737,7 @@ class LinkProtection(EVCDeploy):
             return True
         return False
 
-    def handle_link_up(self, link):
+    def handle_link_up(self, link=None, interface=None):
         """Handle circuit when link up.
 
         Args:
@@ -1756,6 +1756,18 @@ class LinkProtection(EVCDeploy):
             (
                 lambda me: me.primary_path.is_affected_by_link(link),
                 lambda me: (me.deploy_to_primary_path(), 'redeploy')
+            ),
+            # For this special case, it reached this point because interface
+            # was previously confirmed to be a UNI and both UNI are UP
+            (
+                lambda me: (me.primary_path.status == EntityStatus.UP
+                            and interface),
+                lambda me: (me.deploy_to_primary_path(), 'redeploy')
+            ),
+            (
+                lambda me: (me.backup_path.status == EntityStatus.UP
+                            and interface),
+                lambda me: (me.deploy_to_backup_path(), 'redeploy')
             ),
             # We tried to deploy(primary_path) without success.
             # And in this case is up by some how. Nothing to do.
@@ -1840,7 +1852,7 @@ class LinkProtection(EVCDeploy):
             self.current_path.status != EntityStatus.UP
             and not self.is_intra_switch()
         ):
-            succeeded = self.handle_link_up(interface)
+            succeeded = self.handle_link_up(interface=interface)
             if succeeded:
                 msg = (
                     f"Activated {self} due to successful "
