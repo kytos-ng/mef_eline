@@ -593,8 +593,8 @@ module.exports = {
                   let metadata = k_interface.metadata;
                   _interface_data[k_interface.id] = {
                     "name": k_interface.name,
-                    "link_name": (metadata && "link_name" in metadata) ? k_interface.metadata.link_name : "",
-                    "port_name": (metadata && "port_name" in metadata) ? k_interface.metadata.port_name : ""
+                    "link_name": (metadata && "link_name" in metadata) ? k_interface.metadata.link_name : (k_interface.link || ""),
+                    "port_name": (metadata && "port_name" in metadata) ? k_interface.metadata.port_name : (k_interface.port_number || "")
                   };
                   // store autocomplete dpids
                   let value = k_interface.id;

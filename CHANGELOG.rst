@@ -22,6 +22,7 @@ Added
 Fixed
 =======
 - UI: fixed issue where non-JSON data was being parsed as JSON data.
+- UI: fixed issue were port numbers were not displaying within the Circuit Details info panel.
 
 Changed
 =======
