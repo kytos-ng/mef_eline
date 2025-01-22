@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Module to test the LinkProtection class."""
 import sys
 from unittest.mock import MagicMock, patch
@@ -831,6 +832,64 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         assert self.evc.deploy_to_primary_path.call_count == 2
         assert self.evc.deploy_to_backup_path.call_count == 2
         assert self.evc.deploy_to_path.call_count == 5
+
+    @patch(DEPLOY_TO_BACKUP_PATH)
+    @patch(DEPLOY_TO_PRIMARY_PATH)
+    async def test_handle_link_up_case_8(
+        self, deploy_primary_mock, deploy_backup_mock
+    ):
+        """Test when UNI is UP and dinamic primary_path from
+        EVC is UP as well."""
+        primary_path = [
+            get_link_mocked(
+                endpoint_a_port=9,
+                endpoint_b_port=10,
+                metadata={"s_vlan": 5},
+                status=EntityStatus.UP,
+            ),
+            get_link_mocked(
+                endpoint_a_port=11,
+                endpoint_b_port=12,
+                metadata={"s_vlan": 6},
+                status=EntityStatus.UP,
+            ),
+        ]
+        backup_path = [
+            get_link_mocked(
+                endpoint_a_port=13,
+                endpoint_b_port=14,
+                metadata={"s_vlan": 5},
+                status=EntityStatus.UP,
+            ),
+            get_link_mocked(
+                endpoint_a_port=11,
+                endpoint_b_port=12,
+                metadata={"s_vlan": 6},
+                status=EntityStatus.DOWN,
+            ),
+        ]
+
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit",
+            "uni_a": get_uni_mocked(is_valid=True),
+            "uni_z": get_uni_mocked(is_valid=True),
+            "primary_path": primary_path,
+            "backup_path": backup_path,
+            "enabled": True,
+            "dynamic_backup_path": True,
+        }
+
+        evc = EVC(**attributes)
+        evc.handle_link_up(interface=evc.uni_a.interface)
+        assert deploy_primary_mock.call_count == 1
+        assert deploy_backup_mock.call_count == 0
+
+        evc.primary_path[0].status = EntityStatus.DOWN
+        evc.backup_path[1].status = EntityStatus.UP
+        evc.handle_link_up(interface=evc.uni_a.interface)
+        assert deploy_primary_mock.call_count == 1
+        assert deploy_backup_mock.call_count == 1
 
     async def test_get_interface_from_switch(self):
         """Test get_interface_from_switch"""

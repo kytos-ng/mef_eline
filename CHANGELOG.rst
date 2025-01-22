@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.9] - 2025-01-22
+***********************
+
+Fixed
+=====
+- Link up from UNI will deploy correctly an EVC when it does not have a path.
+
 [2023.2.8] - 2024-12-05
 ***********************
 
