@@ -562,14 +562,14 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_nni_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_uni_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_direct_uni_flows")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.activate")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.try_to_activate")
     @patch("napps.kytos.mef_eline.models.evc.EVC.should_deploy")
     def test_deploy_successfully(self, *args):
         """Test if all methods to deploy are called."""
         # pylint: disable=too-many-locals
         (
             should_deploy_mock,
-            activate_mock,
+            try_to_activate_mock,
             install_direct_uni_flows_mock,
             install_uni_flows_mock,
             install_nni_flows,
@@ -589,7 +589,7 @@ class TestEVC():
         deployed = evc.deploy_to_path(evc.primary_links)
 
         assert should_deploy_mock.call_count == 1
-        assert activate_mock.call_count == 1
+        assert try_to_activate_mock.call_count == 1
         assert install_uni_flows_mock.call_count == 1
         assert install_nni_flows.call_count == 1
         assert chose_vlans_mock.call_count == 1
@@ -600,7 +600,7 @@ class TestEVC():
         evc = self.create_evc_intra_switch()
         assert evc.deploy_to_path(evc.primary_links) is True
         assert install_direct_uni_flows_mock.call_count == 1
-        assert activate_mock.call_count == 2
+        assert try_to_activate_mock.call_count == 2
         assert log_mock.info.call_count == 2
         log_mock.info.assert_called_with(f"{evc} was deployed.")
 
@@ -827,7 +827,7 @@ class TestEVC():
 
         deployed = evc.deploy_to_backup_path()
 
-        deploy_to_path_mocked.assert_called_once_with()
+        deploy_to_path_mocked.assert_called_once_with(old_path_dict=None)
         assert deployed is True
 
     @patch("httpx.post")
@@ -836,7 +836,7 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.path.Path.choose_vlans")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_nni_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_uni_flows")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.activate")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.try_to_activate")
     @patch("napps.kytos.mef_eline.models.evc.EVC.should_deploy")
     @patch("napps.kytos.mef_eline.models.evc.EVC.discover_new_paths")
     def test_deploy_without_path_case1(self, *args):
@@ -845,7 +845,7 @@ class TestEVC():
         (
             discover_new_paths_mocked,
             should_deploy_mock,
-            activate_mock,
+            try_to_activate_mock_mock,
             install_uni_flows_mock,
             install_nni_flows,
             chose_vlans_mock,
@@ -903,7 +903,7 @@ class TestEVC():
 
         assert should_deploy_mock.call_count == 1
         assert discover_new_paths_mocked.call_count == 1
-        assert activate_mock.call_count == 1
+        assert try_to_activate_mock_mock.call_count == 1
         assert install_uni_flows_mock.call_count == 1
         assert install_nni_flows.call_count == 1
         assert chose_vlans_mock.call_count == 1
