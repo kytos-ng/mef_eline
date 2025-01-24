@@ -11,7 +11,7 @@ from kytos.core.events import KytosEvent
 from kytos.core.exceptions import KytosTagError
 from kytos.core.interface import TAGRange, UNI, Interface
 from napps.kytos.mef_eline.exceptions import InvalidPath
-from napps.kytos.mef_eline.models import EVC
+from napps.kytos.mef_eline.models import EVC, Path
 from napps.kytos.mef_eline.tests.helpers import get_uni_mocked
 
 
@@ -1899,157 +1899,193 @@ class TestMain:
         assert evc_mock.handle_link_up.call_count == 2
         evc_mock.handle_link_up.assert_called_with("abc")
 
-    @pytest.mark.xfail(
-        reason="Hasn't been updated for the latest changes to link down"
-    )
     @patch("time.sleep", return_value=None)
-    @patch("napps.kytos.mef_eline.utils.emit_event")
+    @patch("napps.kytos.mef_eline.main.map_evc_event_content")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_event")
     @patch("napps.kytos.mef_eline.main.emit_event")
     def test_handle_link_down(
-        self, emit_main_mock, emit_utils_mock, _
+        self,
+        emit_main_mock: MagicMock,
+        send_flow_mods_mock: MagicMock,
+        map_evc_mock: MagicMock,
+        _: MagicMock
     ):
         """Test handle_link_down method."""
         uni = create_autospec(UNI)
         evc1 = MagicMock(id="1", service_level=0, creation_time=1,
                          metadata="mock", _active="true", _enabled="true",
                          uni_a=uni, uni_z=uni)
-        evc1.name = "name"
         evc1.is_affected_by_link.return_value = True
         evc1.handle_link_down.return_value = True
-        evc1.failover_path = None
+        evc1.failover_path = Path([])
+        evc1.as_dict.return_value = {"id": "1"}
+
         evc2 = MagicMock(id="2", service_level=6, creation_time=1)
         evc2.is_affected_by_link.return_value = False
         evc2.is_failover_path_affected_by_link.return_value = True
         evc2.as_dict.return_value = {"id": "2"}
+
         evc3 = MagicMock(id="3", service_level=5, creation_time=1,
                          metadata="mock", _active="true", _enabled="true",
                          uni_a=uni, uni_z=uni)
-        evc3.name = "name"
         evc3.is_affected_by_link.return_value = True
         evc3.handle_link_down.return_value = True
-        evc3.failover_path = None
+        evc3.failover_path = Path([])
+        evc3.as_dict.return_value = {"id": "3"}
+
         evc4 = MagicMock(id="4", service_level=4, creation_time=1,
                          metadata="mock", _active="true", _enabled="true",
                          uni_a=uni, uni_z=uni)
-        evc4.name = "name"
         evc4.is_affected_by_link.return_value = True
         evc4.is_failover_path_affected_by_link.return_value = False
-        evc4.failover_path = ["2"]
         evc4.get_failover_flows.return_value = {
             "2": ["flow1", "flow2"],
             "3": ["flow3", "flow4", "flow5", "flow6"],
         }
         evc4.as_dict.return_value = {"id": "4"}
+
         evc5 = MagicMock(id="5", service_level=7, creation_time=1)
         evc5.is_affected_by_link.return_value = True
         evc5.is_failover_path_affected_by_link.return_value = False
-        evc5.failover_path = ["3"]
         evc5.get_failover_flows.return_value = {
             "4": ["flow7", "flow8"],
             "5": ["flow9", "flow10"],
         }
         evc5.as_dict.return_value = {"id": "5"}
+
         evc6 = MagicMock(id="6", service_level=8, creation_time=1,
                          metadata="mock", _active="true", _enabled="true",
                          uni_a=uni, uni_z=uni)
-        evc6.name = "name"
         evc6.is_affected_by_link.return_value = True
         evc6.is_failover_path_affected_by_link.return_value = False
-        evc6.failover_path = ["3"]
         evc6.get_failover_flows.side_effect = AttributeError("err")
+        evc6.as_dict.return_value = {"id": "6"}
         link = MagicMock(id="123")
         event = KytosEvent(name="test", content={"link": link})
-        self.napp.circuits = {"1": evc1, "2": evc2, "3": evc3, "4": evc4,
-                              "5": evc5, "6": evc6}
+
+        self.napp.prepare_clear_old_path = {
+            evc1: {"1": ["clear_flow1"]},
+            evc2: {"2": ["clear_flow2"]},
+            evc3: {"3": ["clear_flow3"]},
+            evc4: {"4": ["clear_flow4"]},
+            evc5: {"5": ["clear_flow5"]},
+            evc6: {"6": ["clear_flow6"]},
+        }.get
+
+        self.napp.prepare_undeploy = {
+            evc1: {"1": ["undeploy_flow1"]},
+            evc2: {"2": ["undeploy_flow2"]},
+            evc3: {"3": ["undeploy_flow3"]},
+            evc4: {"4": ["undeploy_flow4"]},
+            evc5: {"5": ["undeploy_flow5"]},
+            evc6: {"6": ["undeploy_flow6"]},
+        }.get
+
+        def side_effect(evc, **_):
+            return "event_content" + evc.id
+
+        map_evc_mock.side_effect = side_effect
+
+        self.napp.circuits = {
+            "1": evc1,
+            "2": evc2,
+            "3": evc3,
+            "4": evc4,
+            "5": evc5,
+            "6": evc6
+        }
+
         self.napp.handle_link_down(event)
 
         assert evc5.service_level > evc4.service_level
         # evc5 batched flows should be sent first
-        emit_utils_mock.assert_has_calls([
-            call(
-                self.napp.controller,
-                context="kytos.flow_manager",
-                name="flows.install",
-                content={
-                    "dpid": "4",
-                    "flow_dict": {"flows": ["flow7", "flow8"]},
-                    'force': True,
-                }
-            ),
-            call(
-                self.napp.controller,
-                context="kytos.flow_manager",
-                name="flows.install",
-                content={
-                    "dpid": "5",
-                    "flow_dict": {"flows": ["flow9", "flow10"]},
-                    'force': True,
-                }
-            ),
-            call(
-                self.napp.controller,
-                context="kytos.flow_manager",
-                name="flows.install",
-                content={
-                    "dpid": "2",
-                    "flow_dict": {"flows": ["flow1", "flow2"]},
-                    'force': True,
-                }
-            ),
-            call(
-                self.napp.controller,
-                context="kytos.flow_manager",
-                name="flows.install",
-                content={
-                    "dpid": "3",
-                    "flow_dict": {
-                        "flows": ["flow3", "flow4", "flow5", "flow6"]
+        send_flow_mods_mock.assert_has_calls(
+            [
+                call(
+                    self.napp.controller,
+                    {
+                        "2": ["flow1", "flow2"],
+                        "3": ["flow3", "flow4", "flow5", "flow6"],
+                        "4": ["flow7", "flow8"],
+                        "5": ["flow9", "flow10"],
                     },
-                    'force': True,
-                }
-            )
-        ])
-        event_name = "evc_affected_by_link_down"
+                    "install"
+                ),
+                call(
+                    self.napp.controller,
+                    {
+                        "2": ["clear_flow2"],
+                        "4": ["clear_flow4"],
+                        "5": ["clear_flow5"],
+                    },
+                    "delete"
+                ),
+                call(
+                    self.napp.controller,
+                    {
+                        "3": ["undeploy_flow3"],
+                        "1": ["undeploy_flow1"],
+                        "6": ["undeploy_flow6"],
+                    },
+                    "delete"
+                )
+            ]
+        )
+
+        emit_main_mock.assert_has_calls(
+            [
+                call(
+                    self.napp.controller,
+                    "failover_link_down",
+                    content={
+                        "4": "event_content4",
+                        "5": "event_content5",
+                    }
+                ),
+                call(
+                    self.napp.controller,
+                    "failover_old_path",
+                    content={
+                        "2": "event_content2",
+                        "4": "event_content4",
+                        "5": "event_content5",
+                    }
+                ),
+                call(
+                    self.napp.controller,
+                    "need_redeploy",
+                    content={
+                        "evc_id": "1"
+                    }
+                ),
+                call(
+                    self.napp.controller,
+                    "need_redeploy",
+                    content={
+                        "evc_id": "3"
+                    }
+                ),
+                call(
+                    self.napp.controller,
+                    "need_redeploy",
+                    content={
+                        "evc_id": "6"
+                    }
+                ),
+            ],
+            any_order=True
+        )
+
         assert evc3.service_level > evc1.service_level
         # evc3 should be handled before evc1
-        emit_main_mock.assert_has_calls([
-            call(self.napp.controller, event_name, content={
-                "link": link,
-                "id": "6",
-                "evc_id": "6",
-                "name": "name",
-                "metadata": "mock",
-                "active": "true",
-                "enabled": "true",
-                "uni_a": uni.as_dict(),
-                "uni_z": uni.as_dict(),
-            }),
-            call(self.napp.controller, event_name, content={
-                "link": link,
-                "evc_id": "3",
-                "id": "3",
-                "name": "name",
-                "metadata": "mock",
-                "active": "true",
-                "enabled": "true",
-                "uni_a": uni.as_dict(),
-                "uni_z": uni.as_dict(),
-            }),
-            call(self.napp.controller, event_name, content={
-                "link": link,
-                "evc_id": "1",
-                "id": "1",
-                "name": "name",
-                "metadata": "mock",
-                "active": "true",
-                "enabled": "true",
-                "uni_a": uni.as_dict(),
-                "uni_z": uni.as_dict(),
-            }),
-        ])
-        self.napp.mongo_controller.update_evcs.assert_called_with(
-            [{"id": "5"}, {"id": "4"}, {"id": "2"}]
-        )
+
+        expected_updates = {"1", "2", "3", "4", "5", "6"}
+        args = self.napp.mongo_controller.update_evcs.call_args.args
+        for update in args[0]:
+            expected_updates.remove(update["id"])
+
+        assert not expected_updates
+
         event_name = "failover_link_down"
         assert emit_main_mock.call_args_list[0][0][1] == event_name
 
