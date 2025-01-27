@@ -71,10 +71,10 @@ module.exports = {
                       'mef_lst_sw_a', 'mef_lst_prt_a', 'mef_lst_int_a', 'mef_lst_tag_a',
                       'mef_lst_sw_z', 'mef_lst_prt_z', 'mef_lst_int_z', 'mef_lst_tag_z', 
                       'mef_lst_enabled',
-                      'mef_lst_active'],                         
+                      'mef_lst_active', 'path_types'],                         
       data_headers: ['id', 'Name', 'Switch A', 'Port A', 'Interf. A', 'VLAN A',
                       'Switch Z', 'Port Z', 'Interf. Z', 'VLAN Z',
-                      'Enabled', 'Active'],
+                      'Enabled', 'Active', 'Paths Types'],
       data_rows: [],
       currentSort: 0,
       currentSortDir: [],
@@ -159,7 +159,11 @@ module.exports = {
 
             let endpoint_z =  (evc.uni_z) ? evc.uni_z.interface_id : "";
             let endpoint_data_z = _this.getEndpointData(endpoint_z);
-            let tag_z = (evc.uni_z && evc.uni_z.tag) ? evc.uni_z.tag.value : "";  
+            let tag_z = (evc.uni_z && evc.uni_z.tag) ? evc.uni_z.tag.value : "";
+            var path_types = [];
+            evc.dynamic_backup_path && path_types.push("dynamic")
+            evc.primary_path.length && path_types.push("primary")
+            evc.backup_path.length && path_types.push("backup")
 
             let connection = {
               "mef_dpid_id": evc.id,
@@ -173,7 +177,8 @@ module.exports = {
               "mef_lst_int_z": endpoint_data_z.interface_name,
               "mef_lst_tag_z": tag_z, // TAG Vlan to be sorted as int
               "mef_lst_enabled": evc.enabled,
-              "mef_lst_active": evc.active
+              "mef_lst_active": evc.active,
+              "path_types": path_types.toString()
             };
             tableRows.push(connection);
           }
