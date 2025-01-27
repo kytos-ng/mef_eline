@@ -34,7 +34,7 @@ from napps.kytos.mef_eline.utils import (aemit_event, check_disabled_component,
                                          emit_event, get_vlan_tags_and_masks,
                                          map_evc_event_content,
                                          merge_flow_dicts, prepare_delete_flow,
-                                         send_flow_mods_event)
+                                         send_flow_mods_http)
 
 
 # pylint: disable=too-many-public-methods
@@ -848,8 +848,7 @@ class Main(KytosNApp):
             self.controller, "failover_link_down",
             content=deepcopy(event_contents)
         )
-        send_flow_mods_event(
-            self.controller,
+        send_flow_mods_http(
             install_flows,
             "install"
         )
@@ -877,8 +876,7 @@ class Main(KytosNApp):
         delete_flows
     ):
         """Process changes needed to commit clearing the old path"""
-        send_flow_mods_event(
-            self.controller,
+        send_flow_mods_http(
             delete_flows,
             'delete'
         )
@@ -911,8 +909,7 @@ class Main(KytosNApp):
 
     def execute_undeploy(self, evcs: list[EVC], remove_flows):
         """Process changes needed to commit an undeploy"""
-        send_flow_mods_event(
-            self.controller,
+        send_flow_mods_http(
             remove_flows,
             'delete'
         )

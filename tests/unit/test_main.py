@@ -1901,7 +1901,7 @@ class TestMain:
 
     @patch("time.sleep", return_value=None)
     @patch("napps.kytos.mef_eline.main.map_evc_event_content")
-    @patch("napps.kytos.mef_eline.main.send_flow_mods_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
     @patch("napps.kytos.mef_eline.main.emit_event")
     def test_handle_link_down(
         self,
@@ -2002,7 +2002,6 @@ class TestMain:
         send_flow_mods_mock.assert_has_calls(
             [
                 call(
-                    self.napp.controller,
                     {
                         "2": ["flow1", "flow2"],
                         "3": ["flow3", "flow4", "flow5", "flow6"],
@@ -2012,7 +2011,6 @@ class TestMain:
                     "install"
                 ),
                 call(
-                    self.napp.controller,
                     {
                         "2": ["clear_flow2"],
                         "4": ["clear_flow4"],
@@ -2021,7 +2019,6 @@ class TestMain:
                     "delete"
                 ),
                 call(
-                    self.napp.controller,
                     {
                         "3": ["undeploy_flow3"],
                         "1": ["undeploy_flow1"],
