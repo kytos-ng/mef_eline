@@ -161,9 +161,9 @@ module.exports = {
             let endpoint_data_z = _this.getEndpointData(endpoint_z);
             let tag_z = (evc.uni_z && evc.uni_z.tag) ? evc.uni_z.tag.value : "";
             var path_types = [];
-            evc.dynamic_backup_path && path_types.push("dynamic")
-            evc.primary_path.length && path_types.push("primary")
-            evc.backup_path.length && path_types.push("backup")
+            evc.primary_path.length && path_types.push("static_primary")
+            evc.backup_path.length && path_types.push("static_backup")
+            evc.dynamic_backup_path && path_types.push("dynamic_backup_path")
 
             let connection = {
               "mef_dpid_id": evc.id,
