@@ -21,7 +21,7 @@
       <div v-if="flag_loading == false" class="mef-table no-compact">
         <div class="mef-circuit-table">
          <table class="table">
-            <template v-for="(column, cindex) in basics"> 
+            <template v-for="(column, cindex) in basics">
               <tr>
                 <th>{{cindex}}</th>
                 <td>
@@ -36,7 +36,7 @@
         </div>
         <div class="mef-circuit-table" id="mef-flags">
          <table class="table">
-            <template v-for="(column, cindex) in flags"> 
+            <template v-for="(column, cindex) in flags">
               <tr><th>{{cindex}}</th>
               <td>
                 <template v-if="column.editable">
@@ -57,7 +57,7 @@
         </div>
         <div class="mef-circuit-table">
          <table class="table">
-            <template v-for="(column, cindex) in others"> 
+            <template v-for="(column, cindex) in others">
               <tr>
                 <th>{{cindex}}</th>
                 <td>
@@ -75,7 +75,7 @@
         </div>
         <div class="mef-circuit-table">
          <table class="table">
-            <template v-for="(column, cindex) in dates"> 
+            <template v-for="(column, cindex) in dates">
               <tr><th>{{cindex}}</th><td>{{column}}</td></tr>
             </template>
           </table>
@@ -157,8 +157,8 @@
                     <table class="table" id="mef-constraints-spf">
                       <tr>
                         <th>{{constraint_labels['spf_attribute']}}</th>
-                        <td> 
-                          <k-dropdown :options="get_spf_attribute_options(p_constraint_index)" 
+                        <td>
+                          <k-dropdown :options="get_spf_attribute_options(p_constraint_index)"
                            v-model:value=p_constraint.spf_attribute></k-dropdown>
                         </td>
                       </tr>
@@ -239,10 +239,17 @@
         <p>Loading EVC</p>
       </div>
       <div class="mef-bottom-buttons">
-        <k-button tooltip="List installed EVCs" title="< Back to list" @click="showInfoPanel">
-        </k-button>
-        <k-button tooltip="Redeploy EVC" title="Redeploy EVC" @click="redeployEvc">
-        </k-button>
+        <div class="left-bottom-buttons">
+          <k-button tooltip="List installed EVCs" title="< Back to list" @click="showInfoPanel">
+          </k-button>
+        </div>
+        <div class="right-bottom-buttons">
+          <k-checkbox style="background: none;" title="Try to avoid previous VLAN"
+                      :action="toggle_avoid" :checked=true
+          ></k-checkbox>
+          <k-button tooltip="Redeploy EVC" title="Redeploy EVC" @click="redeployEvc">
+          </k-button>
+        </div>
       </div>
       <k-modal
         message="Delete EVC?"
@@ -251,7 +258,6 @@
         v-model:show-modal="showDelModal">
       </k-modal>
     </div>
-    
 </template>
 <script>
 module.exports = {
@@ -285,6 +291,7 @@ module.exports = {
         constraint_descriptions: {}, // constraint mouse over description
         link_options: [], // constraint link dropdown options
         form_constraints: {}, // constraint data vue object synchronization
+        avoid_vlan: false, // Try to avoid previous s_vlan when redeploying. false so it is true by default.
     }
   },
   methods: {
@@ -378,7 +385,7 @@ module.exports = {
         dataType: "json",
         contentType: "application/json; charset=utf-8"
       });
-      
+
       request.done(function(data) {
         _this.buidEvcView(data);
         _this.forceRerender();
@@ -448,7 +455,7 @@ module.exports = {
         this.endpoints_data["Interface"][0]["value"] = splitted_dpid[0];
         this.endpoints_data["DPID"][0]["value"] = splitted_dpid[2];
       }
-      
+
       let dpid_z = this.endpoints_data["DPID"][1]["value"];
       if(dpid_z.lastIndexOf(' ') > 0) {
         let splitted_dpid = dpid_z.split(' ');
@@ -459,7 +466,7 @@ module.exports = {
     buidEvcView: function(data) {
       /**
       * Build new EVC object for exibition.
-      * Parameter: 
+      * Parameter:
       *   data: evc json from mef_eline
       */
       this.circuit = data;
@@ -471,25 +478,25 @@ module.exports = {
 
       this.endpoints_data = {
         'DPID': [
-         {'value': uni_a, 'editable':true, 'name':'uni_a'}, 
+         {'value': uni_a, 'editable':true, 'name':'uni_a'},
          {'value': uni_z, 'editable':true, 'name':'uni_z'}],
-        'Node': [ 
-         {'value': uni_a_data['node_name']}, 
+        'Node': [
+         {'value': uni_a_data['node_name']},
          {'value': uni_z_data['node_name']}],
-        'Interface': [ 
-         {'value': uni_a_data['interface_name']}, 
+        'Interface': [
+         {'value': uni_a_data['interface_name']},
          {'value': uni_z_data['interface_name']}],
-        'Port':[ 
-         {'value': uni_a_data['port_name']}, 
+        'Port':[
+         {'value': uni_a_data['port_name']},
          {'value': uni_z_data['port_name']}]
       };
 
       // Tag is optional, but can be edited
-      let tag_a = {'value': this.circuit['uni_a']['tag'] ? JSON.stringify(this.circuit['uni_a']['tag']['value']) : "", 
-                   'editable':true, 
+      let tag_a = {'value': this.circuit['uni_a']['tag'] ? JSON.stringify(this.circuit['uni_a']['tag']['value']) : "",
+                   'editable':true,
                    'name':'tag_a'};
-      let tag_z = {'value': this.circuit['uni_z']['tag'] ? JSON.stringify(this.circuit['uni_z']['tag']['value']) : "", 
-                   'editable':true, 
+      let tag_z = {'value': this.circuit['uni_z']['tag'] ? JSON.stringify(this.circuit['uni_z']['tag']['value']) : "",
+                   'editable':true,
                   'name':'tag_z'};
       this.endpoints_data['VLAN'] = [tag_a, tag_z];
 
@@ -520,7 +527,7 @@ module.exports = {
       this.links = {"Primary links": data['primary_links'],
                     "Backup links": data['backup_links']
                    };
-      
+
       this.circuit_scheduler = data['circuit_scheduler'];
 
       this.constraints = {
@@ -581,18 +588,18 @@ module.exports = {
                 _dpid_names[sw.dpid] = sw.metadata.node_name;
               }
               if(sw.interfaces) {
-                $.each(sw.interfaces, function(j , interface) {
-                  // store interface name data 
-                  let metadata = interface.metadata;
-                  _interface_data[interface.id] = {
-                    "name": interface.name,
-                    "link_name": (metadata && "link_name" in metadata) ? interface.metadata.link_name : "",
-                    "port_name": (metadata && "port_name" in metadata) ? interface.metadata.port_name : ""
+                $.each(sw.interfaces, function(j , k_interface) {
+                  // store interface name data
+                  let metadata = k_interface.metadata;
+                  _interface_data[k_interface.id] = {
+                    "name": k_interface.name,
+                    "link_name": (metadata && "link_name" in metadata) ? k_interface.metadata.link_name : (k_interface.link || ""),
+                    "port_name": (metadata && "port_name" in metadata) ? k_interface.metadata.port_name : (k_interface.port_number || "")
                   };
                   // store autocomplete dpids
-                  let value = interface.id;
-                  if(interface.name) {
-                    value = interface.name + " - " + value;
+                  let value = k_interface.id;
+                  if(k_interface.name) {
+                    value = k_interface.name + " - " + value;
                   }
                   if(!_this.dpids.includes(value)) {
                     _this.dpids.push(value);
@@ -619,7 +626,7 @@ module.exports = {
 
     buildPathConstraintsView: function(data) {
       /**
-      * Build path constraint data for exibition 
+      * Build path constraint data for exibition
       * (primary and secondary constraints paths).
       * Parameter:
       *   constraints_data: json with path constraint data
@@ -657,7 +664,7 @@ module.exports = {
           'spf_max_path_cost': data['spf_max_path_cost'],
           'minimum_flexible_hits': data['minimum_flexible_hits'],
         };
-        
+
         if(data['mandatory_metrics']) {
           _constraint.mandatory_metrics = {
             'bandwidth': data['mandatory_metrics']['bandwidth'],
@@ -674,7 +681,7 @@ module.exports = {
             'delay': '', 'reliability': '', 'ownership': '',
             'not_ownership': [],
           };
-        } 
+        }
         if(data['flexible_metrics']) {
           _constraint.flexible_metrics = {
             'bandwidth': data['flexible_metrics']['bandwidth'],
@@ -717,7 +724,7 @@ module.exports = {
         link_name = ("link_name" in _data) ? _data["link_name"] : "";
         port_name = ("port_name" in _data) ? _data["port_name"] : "";
       }
-      
+
       let result = {
         "dpid": dpid,
         "node_name": node_name,
@@ -735,7 +742,8 @@ module.exports = {
       let id = this.basics["ID"]["value"];
       let name = this.basics["Name"]["value"];
       var request = $.ajax({
-        url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + id + "/redeploy",
+        url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + id + "/redeploy" +
+             '?try_avoid_same_s_vlan=' + this.avoid_vlan.toString(),
         type:"PATCH",
         contentType: "application/json; charset=utf-8"
       });
@@ -765,7 +773,7 @@ module.exports = {
       let payload = {
         name: this.basics["Name"]["value"],
         enabled: this.flags["Enabled"]["value"],
-        dynamic_backup_path: this.flags["Dynamic backup path"]["value"],                
+        dynamic_backup_path: this.flags["Dynamic backup path"]["value"],
         sb_priority: parseInt(this.others["Southbound priority"]["value"]) || null,
         bandwidth: parseInt(this.others["Bandwidth"]["value"]) || 0,
         queue_id: parseInt(this.others["Queue"]["value"]),
@@ -777,7 +785,7 @@ module.exports = {
           interface_id: this.endpoints_data["DPID"][1]["value"],
         },
       };
-      
+
       // Tag is optional
       if(this.endpoints_data["VLAN"][0]["value"]) {
         payload["uni_a"]["tag"] = {
@@ -793,7 +801,7 @@ module.exports = {
       }
 
       ['primary_constraints', 'secondary_constraints'].forEach(_type => {
-        let _constraint_payload = {}; 
+        let _constraint_payload = {};
         // Dropdown forms
         if(this.constraints[_type].undesired_links !== undefined && this.constraints[_type].undesired_links.length > 0) {
           _constraint_payload.undesired_links = [].concat(
@@ -848,7 +856,6 @@ module.exports = {
         });
         payload[_type] = _constraint_payload;
       });
-      $payload = payload;
 
       var request = $.ajax({
         url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + id,
@@ -881,6 +888,9 @@ module.exports = {
       this.loadEVC(this.content.id);
       this.flag_loading = false
     },
+    toggle_avoid: function(){
+      this.avoid_vlan = !this.avoid_vlan
+    },
   },
   mounted() {
     let _this = this;
@@ -890,7 +900,7 @@ module.exports = {
 
       // Make the panel fill the screen except the left menu width
       $('.k-info-panel:has(.mef_circuit_container)').addClass('mef-k-info-panel');
-      
+
       this.$kytos.dpids = this.dpids;
     }
     ['primary_constraints', 'secondary_constraints'].forEach( s => {
@@ -928,7 +938,7 @@ module.exports = {
 <style>
   /* Import icons */
   @import "https://fonts.googleapis.com/icon?family=Material+Icons";
-  
+
   .mef-k-info-panel {
     width: calc(100% - 300px);
   }
@@ -987,7 +997,7 @@ module.exports = {
   .mef_circuit_container table {
     border-collapse: collapse;
     width: 100%;
-    
+
   }
   .mef_circuit_container tr:nth-child(even) {
       background-color: #2d2d2d;
@@ -1027,7 +1037,7 @@ module.exports = {
     margin-top:4px;
   }
   .mef-circuit-table-constraints {
-    clear:both; 
+    clear:both;
     width:540px;
   }
   .mef-circuit-table-constraints #mef-constraints-spf {
@@ -1044,6 +1054,16 @@ module.exports = {
     clear: both;
     justify-content: space-between;
   }
+  .left-bottom-buttons {
+    align-self: flex-end;
+  }
+  .right-bottom-buttons {
+    border: 2px solid #515151;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+  }
   #mef-flags {
     clear:both;
   }
@@ -1059,7 +1079,7 @@ module.exports = {
     width:520px;
   }
   .mef-circuit-table-path {
-    clear:both; 
+    clear:both;
     width:540px;
   }
   #mef-unis .autocomplete-result-list {

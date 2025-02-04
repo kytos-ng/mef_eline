@@ -129,7 +129,7 @@ class Main(KytosNApp):
         for circuit in self.get_evcs_by_svc_level(enable_filter=False):
             if self.should_be_checked(circuit):
                 circuits_to_check.append(circuit)
-            circuit.try_setup_failover_path()
+            circuit.try_setup_failover_path(warn_if_not_path=False)
         circuits_checked = EVCDeploy.check_list_traces(circuits_to_check)
         for circuit in circuits_to_check:
             is_checked = circuits_checked.get(circuit.id)
@@ -554,6 +554,13 @@ class Main(KytosNApp):
     def redeploy(self, request: Request) -> JSONResponse:
         """Endpoint to force the redeployment of an EVC."""
         circuit_id = request.path_params["circuit_id"]
+        try_avoid_same_s_vlan = request.query_params.get(
+            "try_avoid_same_s_vlan", "true"
+        )
+        try_avoid_same_s_vlan = try_avoid_same_s_vlan.lower()
+        if try_avoid_same_s_vlan not in {"true", "false"}:
+            msg = "Parameter try_avoid_same_s_vlan has an invalid value."
+            raise HTTPException(400, detail=msg)
         log.debug("redeploy /v2/evc/%s/redeploy", circuit_id)
         try:
             evc = self.circuits[circuit_id]
@@ -565,9 +572,12 @@ class Main(KytosNApp):
         deployed = False
         if evc.is_enabled():
             with evc.lock:
-                evc.remove_current_flows(sync=False)
+                path_dict = evc.remove_current_flows(
+                    sync=False,
+                    return_path=try_avoid_same_s_vlan == "true"
+                )
                 evc.remove_failover_flows(sync=True)
-                deployed = evc.deploy()
+                deployed = evc.deploy(path_dict)
         if deployed:
             result = {"response": f"Circuit {circuit_id} redeploy received."}
             status = 202

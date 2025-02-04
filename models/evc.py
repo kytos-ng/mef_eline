@@ -22,7 +22,8 @@ from kytos.core.link import Link
 from kytos.core.retry import before_sleep
 from kytos.core.tag_ranges import range_difference
 from napps.kytos.mef_eline import controllers, settings
-from napps.kytos.mef_eline.exceptions import (DuplicatedNoTagUNI,
+from napps.kytos.mef_eline.exceptions import (ActivationError,
+                                              DuplicatedNoTagUNI,
                                               EVCPathNotInstalled,
                                               FlowModException, InvalidPath)
 from napps.kytos.mef_eline.utils import (check_disabled_component,
@@ -579,7 +580,7 @@ class EVCDeploy(EVCBase):
             return True
         return False
 
-    def deploy_to_backup_path(self):
+    def deploy_to_backup_path(self, old_path_dict: dict = None):
         """Deploy the backup path into the datapaths of this circuit.
 
         If the backup_path attribute is valid and up, this method will try to
@@ -595,17 +596,17 @@ class EVCDeploy(EVCBase):
 
         success = False
         if self.backup_path.status is EntityStatus.UP:
-            success = self.deploy_to_path(self.backup_path)
+            success = self.deploy_to_path(self.backup_path, old_path_dict)
 
         if success:
             return True
 
         if self.dynamic_backup_path or self.is_intra_switch():
-            return self.deploy_to_path()
+            return self.deploy_to_path(old_path_dict=old_path_dict)
 
         return False
 
-    def deploy_to_primary_path(self):
+    def deploy_to_primary_path(self, old_path_dict: dict = None):
         """Deploy the primary path into the datapaths of this circuit.
 
         If the primary_path attribute is valid and up, this method will try to
@@ -617,10 +618,10 @@ class EVCDeploy(EVCBase):
             return True
 
         if self.primary_path.status is EntityStatus.UP:
-            return self.deploy_to_path(self.primary_path)
+            return self.deploy_to_path(self.primary_path, old_path_dict)
         return False
 
-    def deploy(self):
+    def deploy(self, old_path_dict: dict = None):
         """Deploy EVC to best path.
 
         Best path can be the primary path, if available. If not, the backup
@@ -629,9 +630,9 @@ class EVCDeploy(EVCBase):
         if self.archived:
             return False
         self.enable()
-        success = self.deploy_to_primary_path()
+        success = self.deploy_to_primary_path(old_path_dict)
         if not success:
-            success = self.deploy_to_backup_path()
+            success = self.deploy_to_backup_path(old_path_dict)
 
         if success:
             emit_event(self._controller, "deployed",
@@ -707,14 +708,26 @@ class EVCDeploy(EVCBase):
         if sync:
             self.sync()
 
-    def remove_current_flows(self, force=True, sync=True):
+    def remove_current_flows(
+        self,
+        current_path=None,
+        force=True,
+        sync=True,
+        return_path=False
+    ) -> dict[str, int]:
         """Remove all flows from current path or path intended for
          current path if exists."""
-        switches = set()
+        switches, old_path_dict = set(), {}
+        current_path = self.current_path if not current_path else current_path
+        if not current_path and not self.is_intra_switch():
+            return {}
 
-        if not self.current_path and not self.is_intra_switch():
-            return
-        current_path = self.current_path
+        if return_path:
+            for link in self.current_path:
+                s_vlan = link.metadata.get("s_vlan")
+                if s_vlan:
+                    old_path_dict[link.id] = s_vlan.value
+
         for link in current_path:
             switches.add(link.endpoint_a.switch.id)
             switches.add(link.endpoint_b.switch.id)
@@ -742,6 +755,7 @@ class EVCDeploy(EVCBase):
         self.deactivate()
         if sync:
             self.sync()
+        return old_path_dict
 
     def remove_path_flows(
         self, path=None, force=True
@@ -830,8 +844,63 @@ class EVCDeploy(EVCBase):
 
         return False
 
+    @staticmethod
+    def is_uni_interface_active(
+        *interfaces: Interface
+    ) -> tuple[bool, dict]:
+        """Whether UNIs are active and their status & status_reason."""
+        active = True
+        bad_interfaces = [
+            interface
+            for interface in interfaces
+            if interface.status != EntityStatus.UP
+        ]
+        if bad_interfaces:
+            active = False
+            interfaces = bad_interfaces
+        return active, {
+            interface.id: {
+                'status': interface.status.value,
+                'status_reason': interface.status_reason,
+            }
+            for interface in interfaces
+        }
+
+    def try_to_activate(self) -> bool:
+        """Try to activate the EVC."""
+        if self.is_intra_switch():
+            return self._try_to_activate_intra_evc()
+        return self._try_to_activate_inter_evc()
+
+    def _try_to_activate_intra_evc(self) -> bool:
+        """Try to activate intra EVC."""
+        intf_a, intf_z = self.uni_a.interface, self.uni_z.interface
+        is_active, reason = self.is_uni_interface_active(intf_a, intf_z)
+        if not is_active:
+            raise ActivationError(
+                f"Won't be able to activate {self} due to UNIs: {reason}"
+            )
+        self.activate()
+        return True
+
+    def _try_to_activate_inter_evc(self) -> bool:
+        """Try to activate inter EVC."""
+        intf_a, intf_z = self.uni_a.interface, self.uni_z.interface
+        is_active, reason = self.is_uni_interface_active(intf_a, intf_z)
+        if not is_active:
+            raise ActivationError(
+                f"Won't be able to activate {self} due to UNIs: {reason}"
+            )
+        if self.current_path.status != EntityStatus.UP:
+            raise ActivationError(
+                f"Won't be able to activate {self} due to current_path "
+                f"status {self.current_path.status}"
+            )
+        self.activate()
+        return True
+
     # pylint: disable=too-many-branches, too-many-statements
-    def deploy_to_path(self, path=None):
+    def deploy_to_path(self, path=None, old_path_dict: dict = None):
         """Install the flows for this circuit.
 
         Procedures to deploy:
@@ -848,10 +917,12 @@ class EVCDeploy(EVCBase):
         """
         self.remove_current_flows(sync=False)
         use_path = path or Path([])
+        if not old_path_dict:
+            old_path_dict = {}
         tag_errors = []
         if self.should_deploy(use_path):
             try:
-                use_path.choose_vlans(self._controller)
+                use_path.choose_vlans(self._controller, old_path_dict)
             except KytosNoTagAvailableError as e:
                 tag_errors.append(str(e))
                 use_path = None
@@ -860,7 +931,7 @@ class EVCDeploy(EVCBase):
                 if use_path is None:
                     continue
                 try:
-                    use_path.choose_vlans(self._controller)
+                    use_path.choose_vlans(self._controller, old_path_dict)
                     break
                 except KytosNoTagAvailableError as e:
                     tag_errors.append(str(e))
@@ -887,13 +958,22 @@ class EVCDeploy(EVCBase):
             )
             self.remove_current_flows(use_path, sync=True)
             return False
-        self.activate()
+
         self.current_path = use_path
+        msg = f"{self} was deployed."
+        try:
+            self.try_to_activate()
+        except ActivationError as exc:
+            msg = f"{msg} {str(exc)}"
         self.sync()
-        log.info(f"{self} was deployed.")
+        log.info(msg)
         return True
 
-    def try_setup_failover_path(self, wait=settings.DEPLOY_EVCS_INTERVAL):
+    def try_setup_failover_path(
+        self,
+        wait=settings.DEPLOY_EVCS_INTERVAL,
+        warn_if_not_path=True
+    ):
         """Try setup failover_path whenever possible."""
         if (
                 self.failover_path or not self.current_path
@@ -902,10 +982,10 @@ class EVCDeploy(EVCBase):
             return
         if (now() - self.affected_by_link_at).seconds >= wait:
             with self.lock:
-                self.setup_failover_path()
+                self.setup_failover_path(warn_if_not_path)
 
     # pylint: disable=too-many-statements
-    def setup_failover_path(self):
+    def setup_failover_path(self, warn_if_not_path=True):
         """Install flows for the failover path of this EVC.
 
         Procedures to deploy:
@@ -978,7 +1058,7 @@ class EVCDeploy(EVCBase):
             if tag_errors:
                 msg = self.add_tag_errors(msg, tag_errors)
                 log.error(msg)
-            else:
+            elif warn_if_not_path:
                 log.warning(msg)
             return False
         log.info(f"Failover path for {self} was deployed.")
@@ -1657,7 +1737,7 @@ class LinkProtection(EVCDeploy):
             return True
         return False
 
-    def handle_link_up(self, link):
+    def handle_link_up(self, link=None, interface=None):
         """Handle circuit when link up.
 
         Args:
@@ -1676,6 +1756,18 @@ class LinkProtection(EVCDeploy):
             (
                 lambda me: me.primary_path.is_affected_by_link(link),
                 lambda me: (me.deploy_to_primary_path(), 'redeploy')
+            ),
+            # For this special case, it reached this point because interface
+            # was previously confirmed to be a UNI and both UNI are UP
+            (
+                lambda me: (me.primary_path.status == EntityStatus.UP
+                            and interface),
+                lambda me: (me.deploy_to_primary_path(), 'redeploy')
+            ),
+            (
+                lambda me: (me.backup_path.status == EntityStatus.UP
+                            and interface),
+                lambda me: (me.deploy_to_backup_path(), 'redeploy')
             ),
             # We tried to deploy(primary_path) without success.
             # And in this case is up by some how. Nothing to do.
@@ -1754,27 +1846,26 @@ class LinkProtection(EVCDeploy):
         active, _ = self.is_uni_interface_active(interface_a, interface_z)
         return active
 
-    @staticmethod
-    def is_uni_interface_active(
-        *interfaces: Interface
-    ) -> tuple[bool, dict]:
-        """Determine whether a UNI should be active"""
-        active = True
-        bad_interfaces = [
-            interface
-            for interface in interfaces
-            if interface.status != EntityStatus.UP
-        ]
-        if bad_interfaces:
-            active = False
-            interfaces = bad_interfaces
-        return active, {
-            interface.id: {
-                'status': interface.status.value,
-                'status_reason': interface.status_reason,
-            }
-            for interface in interfaces
-        }
+    def try_to_handle_uni_as_link_up(self, interface: Interface) -> bool:
+        """Try to handle UNI as link_up to trigger deployment."""
+        if (
+            self.current_path.status != EntityStatus.UP
+            and not self.is_intra_switch()
+        ):
+            succeeded = self.handle_link_up(interface=interface)
+            if succeeded:
+                msg = (
+                    f"Activated {self} due to successful "
+                    f"deployment triggered by {interface}"
+                )
+            else:
+                msg = (
+                    f"Couldn't activate {self} due to unsuccessful "
+                    f"deployment triggered by {interface}"
+                )
+            log.info(msg)
+            return True
+        return False
 
     def handle_interface_link_up(self, interface: Interface):
         """
@@ -1792,6 +1883,9 @@ class LinkProtection(EVCDeploy):
         ]
         if down_interfaces:
             return
+        if self.try_to_handle_uni_as_link_up(interface):
+            return
+
         interface_dicts = {
             interface.id: {
                 'status': interface.status.value,
@@ -1799,14 +1893,19 @@ class LinkProtection(EVCDeploy):
             }
             for interface in interfaces
         }
-        self.activate()
-        log.info(
-            f"Activating {self}. Interfaces: "
-            f"{interface_dicts}."
-        )
-        emit_event(self._controller, "uni_active_updated",
-                   content=map_evc_event_content(self))
-        self.sync()
+        try:
+            self.try_to_activate()
+            log.info(
+                f"Activating {self}. Interfaces: "
+                f"{interface_dicts}."
+            )
+            emit_event(self._controller, "uni_active_updated",
+                       content=map_evc_event_content(self))
+            self.sync()
+        except ActivationError as exc:
+            # On this ctx, no ActivationError isn't expected since the
+            # activation pre-requisites states were checked, so handled as err
+            log.error(f"ActivationError: {str(exc)} when handling {interface}")
 
     def handle_interface_link_down(self, interface):
         """

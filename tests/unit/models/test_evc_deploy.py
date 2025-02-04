@@ -6,7 +6,8 @@ import pytest
 from kytos.lib.helpers import get_controller_mock
 
 from kytos.core.common import EntityStatus
-from kytos.core.exceptions import KytosNoTagAvailableError
+from kytos.core.exceptions import (KytosNoTagAvailableError,
+                                   KytosTagtypeNotSupported)
 from kytos.core.interface import Interface
 from kytos.core.switch import Switch
 from httpx import TimeoutException
@@ -14,7 +15,8 @@ from httpx import TimeoutException
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
 
-from napps.kytos.mef_eline.exceptions import (FlowModException,   # NOQA
+from napps.kytos.mef_eline.exceptions import (ActivationError,
+                                              FlowModException,   # NOQA
                                               EVCPathNotInstalled)
 from napps.kytos.mef_eline.models import EVC, EVCDeploy, Path  # NOQA
 from napps.kytos.mef_eline.settings import (ANY_SB_PRIORITY,  # NOQA
@@ -371,7 +373,7 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.path.Path.choose_vlans")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_flows")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_direct_uni_flows")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.activate")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.try_to_activate")
     @patch("napps.kytos.mef_eline.models.evc.EVC.should_deploy")
     def test_deploy_successfully(self, *args):
         """Test if all methods to deploy are called."""
@@ -410,6 +412,71 @@ class TestEVC():
         assert activate_mock.call_count == 2
         assert log_mock.info.call_count == 2
         log_mock.info.assert_called_with(f"{evc} was deployed.")
+
+    def test_try_to_activate_intra_evc(self) -> None:
+        """Test try_to_activate for intra EVC."""
+
+        evc = self.create_evc_intra_switch()
+        assert evc.is_intra_switch()
+        assert not evc.is_active()
+        assert evc.uni_a.interface.status == EntityStatus.DISABLED
+        assert evc.uni_z.interface.status == EntityStatus.DISABLED
+        with pytest.raises(ActivationError) as exc:
+            evc.try_to_activate()
+        assert "Won't be able to activate" in str(exc)
+        assert "due to UNI" in str(exc)
+        assert not evc.is_active()
+
+        evc.uni_a.interface.enable()
+        evc.uni_z.interface.enable()
+        evc.uni_a.interface.activate()
+        evc.uni_z.interface.deactivate()
+        with pytest.raises(ActivationError) as exc:
+            evc.try_to_activate()
+        assert "Won't be able to activate" in str(exc)
+        assert "due to UNI" in str(exc)
+        assert not evc.is_active()
+
+        evc.uni_z.interface.activate()
+
+        assert evc.try_to_activate()
+        assert evc.is_active()
+
+    def test_try_to_activate_inter_evc(self) -> None:
+        """Test try_to_activate for inter EVC."""
+
+        evc = self.create_evc_inter_switch()
+        assert not evc.is_intra_switch()
+        assert not evc.is_active()
+        assert evc.uni_a.interface.status == EntityStatus.DISABLED
+        assert evc.uni_z.interface.status == EntityStatus.DISABLED
+        with pytest.raises(ActivationError) as exc:
+            evc.try_to_activate()
+        assert "Won't be able to activate" in str(exc)
+        assert "due to UNI" in str(exc)
+        assert not evc.is_active()
+
+        evc.uni_a.interface.enable()
+        evc.uni_z.interface.enable()
+        evc.uni_a.interface.activate()
+        evc.uni_z.interface.deactivate()
+        with pytest.raises(ActivationError) as exc:
+            evc.try_to_activate()
+        assert "Won't be able to activate" in str(exc)
+        assert "due to UNI" in str(exc)
+        assert not evc.is_active()
+
+        evc.uni_z.interface.activate()
+
+        with pytest.raises(ActivationError) as exc:
+            evc.try_to_activate()
+        assert "due to current_path status EntityStatus.DISABLED" in str(exc)
+
+        cur_path = MagicMock()
+        setattr(evc, "current_path", cur_path)
+        cur_path.status = EntityStatus.UP
+        assert evc.try_to_activate()
+        assert evc.is_active()
 
     @patch("httpx.post")
     @patch("napps.kytos.mef_eline.models.evc.log")
@@ -628,7 +695,7 @@ class TestEVC():
 
         deployed = evc.deploy_to_backup_path()
 
-        deploy_to_path_mocked.assert_called_once_with()
+        deploy_to_path_mocked.assert_called_once_with(old_path_dict=None)
         assert deployed is True
 
     @patch("httpx.post")
@@ -636,7 +703,7 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.log")
     @patch("napps.kytos.mef_eline.models.path.Path.choose_vlans")
     @patch("napps.kytos.mef_eline.models.evc.EVC._install_flows")
-    @patch("napps.kytos.mef_eline.models.evc.EVC.activate")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.try_to_activate")
     @patch("napps.kytos.mef_eline.models.evc.EVC.should_deploy")
     @patch("napps.kytos.mef_eline.models.evc.EVC.discover_new_paths")
     def test_deploy_without_path_case1(self, *args):
@@ -772,6 +839,20 @@ class TestEVC():
         switch_a = Switch("00:00:00:00:00:01")
         switch_b = Switch("00:00:00:00:00:02")
         switch_c = Switch("00:00:00:00:00:03")
+        link_a_b = get_link_mocked(
+            switch_a=switch_a,
+            switch_b=switch_b,
+            endpoint_a_port=9,
+            endpoint_b_port=10,
+            metadata={"s_vlan": Mock(value=5)},
+        )
+        link_b_c = get_link_mocked(
+            switch_a=switch_b,
+            switch_b=switch_c,
+            endpoint_a_port=11,
+            endpoint_b_port=12,
+            metadata={"s_vlan": Mock(value=6)},
+        )
 
         attributes = {
             "controller": get_controller_mock(),
@@ -780,29 +861,20 @@ class TestEVC():
             "uni_z": uni_z,
             "active": True,
             "enabled": True,
-            "primary_links": [
-                get_link_mocked(
-                    switch_a=switch_a,
-                    switch_b=switch_b,
-                    endpoint_a_port=9,
-                    endpoint_b_port=10,
-                    metadata={"s_vlan": 5},
-                ),
-                get_link_mocked(
-                    switch_a=switch_b,
-                    switch_b=switch_c,
-                    endpoint_a_port=11,
-                    endpoint_b_port=12,
-                    metadata={"s_vlan": 6},
-                ),
-            ],
+            "primary_links": [link_a_b, link_b_c]
+
+        }
+
+        expected_old_path = {
+            link_a_b.id: 5,
+            link_b_c.id: 6
         }
 
         evc = EVC(**attributes)
 
         evc.current_path = evc.primary_links
-        evc.remove_current_flows()
-
+        old_path = evc.remove_current_flows(return_path=True)
+        assert old_path == expected_old_path
         assert send_flow_mods_mocked.call_count == 1
         assert evc.is_active() is False
         flows = [
@@ -825,6 +897,63 @@ class TestEVC():
         send_flow_mods_mocked.side_effect = FlowModException("error")
         evc.remove_current_flows()
         log_error_mock.assert_called()
+
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
+    @patch("napps.kytos.mef_eline.models.evc.log.error")
+    def test_remove_current_flows_error(self, *args):
+        """Test remove current flows with KytosTagError from vlans."""
+        (log_error_mock, __, _) = args
+        uni_a = get_uni_mocked(
+            interface_port=2,
+            tag_value=82,
+            switch_id="switch_uni_a",
+            is_valid=True,
+        )
+        uni_z = get_uni_mocked(
+            interface_port=3,
+            tag_value=83,
+            switch_id="switch_uni_z",
+            is_valid=True,
+        )
+
+        switch_a = Switch("00:00:00:00:00:01")
+        switch_b = Switch("00:00:00:00:00:02")
+        switch_c = Switch("00:00:00:00:00:03")
+        current_path = MagicMock()
+        current_path.return_value = [
+            get_link_mocked(
+                switch_a=switch_a,
+                switch_b=switch_b,
+                endpoint_a_port=9,
+                endpoint_b_port=10,
+                metadata={"s_vlan": 5},
+            ),
+            get_link_mocked(
+                switch_a=switch_b,
+                switch_b=switch_c,
+                endpoint_a_port=11,
+                endpoint_b_port=12,
+                metadata={"s_vlan": 6},
+            )
+        ]
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "active": True,
+            "enabled": True,
+            "primary_links": [],
+        }
+        evc = EVC(**attributes)
+        assert evc.is_active()
+        current_path.make_vlans_available.side_effect = (
+            KytosTagtypeNotSupported("")
+        )
+        evc.remove_current_flows(current_path)
+        log_error_mock.assert_called()
+        assert not evc.is_active()
 
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")

@@ -6,22 +6,37 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+Fixed
+=====
+- Try to handle uni interface up as link up for inter-EVCs
+- EVCs activation now take into account UNIs statuses before trying to activate
+- ``EVC.remove_current_flows()`` had its parameter ``current_path`` used when ``evc.current_path`` fails to install flows.
+- ``evc.current_path`` is deleted when an error with TAG type is raised.
+- Link up from UNI will deploy correctly an EVC when it does not have a path.
+
 Added
 =====
 - Added migration script for updating the default ``queue_id`` from ``None`` to ``-1``
+- Added added paramenter support for redeployment, ``PATCH v2/evc/{evc_id}/redeploy?try_avoid_same_s_vlan=true``. By default it will try to avoid ``s_vlan`` from ``current_path`` links.
+- Added option to opt out from trying to avoid previous ``s_vlan`` when redeploying EVCs.
 
 Fixed
 =======
 - UI: fixed issue where non-JSON data was being parsed as JSON data.
+- UI: fixed issue were port numbers were not displaying within the Circuit Details info panel.
 - Fixed inconsistencies with link down behaviour. Flows and vlan reservations should now be properly cleared on link down.
 
 Changed
 =======
-- The mef_eline modal now uses the modal component
+- UI: Removed the use of this.$set() since it was deprecated
+- UI: changed variable name which was the reserved keyword interface to k_interface
+- UI: changed the interface variable for k_interface since it was a reserved keyword
+- UI: the mef_eline modal now uses the modal component
 - UI: fixed premature submit when pressing Enter during autocomplete on inputs
 - UI: fixed path constraints fields to be collabsed by default when creating EVC to better usability for listing EVCs
 - ``primary_path``, ``backup_path``, ``primary_links`` and ``backup_links`` now only accept endpoint IDs in the API request content.
 - Now when installing or deleting a path, a single request to ``flow_manager`` will be sent per path.
+- UI: Added column ``Path Types`` to ``View Connections`` component to indicate if the EVC has a ``dynamic_backup_path``, ``static_primary`` or ``static_backup`` value.
 
 [2024.1.4] - 2024-09-09
 ***********************

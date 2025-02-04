@@ -146,7 +146,9 @@ class TestMain:
         self.napp.execute_consistency()
         assert evc1.activate.call_count == 1
         assert evc1.sync.call_count == 1
+        evc1.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
         assert evc2.deploy.call_count == 1
+        evc2.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
 
     @patch('napps.kytos.mef_eline.main.settings')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
@@ -828,8 +830,24 @@ class TestMain:
         url = f"{self.base_endpoint}/v2/evc/1/redeploy"
         response = await self.api_client.patch(url)
         evc1.remove_failover_flows.assert_called()
-        evc1.remove_current_flows.assert_called()
+        evc1.remove_current_flows.assert_called_with(
+            sync=False, return_path=True
+        )
         assert response.status_code == 202, response.data
+
+        url = f"{self.base_endpoint}/v2/evc/1/redeploy"
+        url = url + "?try_avoid_same_s_vlan=false"
+        response = await self.api_client.patch(url)
+        evc1.remove_current_flows.assert_called_with(
+            sync=False, return_path=False
+        )
+
+        url = f"{self.base_endpoint}/v2/evc/1/redeploy"
+        url = url + "?try_avoid_same_s_vlan=True"
+        response = await self.api_client.patch(url)
+        evc1.remove_current_flows.assert_called_with(
+            sync=False, return_path=True
+        )
 
     async def test_redeploy_evc_disabled(self):
         """Test endpoint to redeploy an EVC."""

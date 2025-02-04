@@ -33,6 +33,10 @@ class EVCPathNotInstalled(MEFELineException):
     """Exception raised when a path was not installed properly."""
 
 
+class ActivationError(EVCException):
+    """Exception when an EVC couldn't get activated."""
+
+
 class DuplicatedNoTagUNI(MEFELineException):
     """Exception for duplicated no TAG UNI"""
     def __init__(self, msg: str) -> None:

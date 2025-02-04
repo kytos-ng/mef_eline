@@ -64,6 +64,7 @@
            <k-checkbox title="Enable INT" v-model:model="enable_int" :value="'enable'"
                        tooltip="Enable In-band Network Telemetry (INT)"
            ></k-checkbox>
+          </form>
         </k-accordion-item>
 
         <span v-for="constraint in ['primary_constraints', 'secondary_constraints']">
@@ -90,7 +91,7 @@
                     <k-input 
                     title="Southbound priority:"
                     v-model:value="form_constraints[constraint].spf_max_path_cost"
-                    :action="function(val) {form_constraints[constraint].spf_max_path_cost = parseInt(val)}"></k-input>
+                    :action="function(val) {form_constraints[constraint].spf_max_path_cost = parseInt(val)||''}"></k-input>
                   </div>
                 </div>
 
@@ -100,7 +101,7 @@
                     <k-input 
                     :title="constraint_titles['minimum_flexible_hits']"
                     v-model:value="form_constraints[constraint].minimum_flexible_hits"
-                    :action="function(val) {form_constraints[constraint].minimum_flexible_hits = parseInt(val)}"></k-input>
+                    :action="function(val) {form_constraints[constraint].minimum_flexible_hits = parseInt(val)||''}"></k-input>
                   </div>
                 </div>
 
@@ -199,16 +200,11 @@
                     <k-input icon="arrow-right"
                     placeholder='["blue", "red"]'
                     v-model:value="form_constraints[constraint].not_ownership"
-                    :action="function(val){
-                        try{form_constraints[constraint].metrics.not_ownership = JSON.parse(val)}
-                        catch(e){
-                          if(e instanceof SyntaxError){form_constraints[constraint].metrics.not_ownership=val}
-                          else{throw e}}}"></k-input>
+                    :action="function (val) { set_metrics(val, constraint) }"></k-input>
                   </div>
                 </div>
             </k-accordion-item>
         </span>
-        </form>
         <k-button tooltip="Request Circuit" title="Request Circuit"
         icon="gear" @click="request_circuit">
         </k-button>
@@ -309,6 +305,13 @@ module.exports = {
     },
   },
   methods: {
+    set_metrics: function (val, constraint) {
+      try { this.form_constraints[constraint].metrics.not_ownership = JSON.parse(val) }
+      catch (e) {
+        if (e instanceof SyntaxError) { this.form_constraints[constraint].metrics.not_ownership = val }
+        else { throw e }
+      }
+    },
     parse_check: function (val) {
       try { return JSON.parse(val) }
       catch (e) {
@@ -556,11 +559,11 @@ module.exports = {
     },
     fetch_dpids: function() {
         var self = this // create a closure to access component in the callback below
-        dataUrl = "/api/kytos/topology/v3/interfaces"
+        let dataUrl = "/api/kytos/topology/v3/interfaces"
         // Autocomplete usage example.
         fetch(dataUrl).then(response => response.json())
                     .then(data => {
-                        dpids = []
+                        let dpids = []
                         for ( const [key,value] of Object.entries( data.interfaces ) ) {
                             let item = key;
                             if(value.name) {
