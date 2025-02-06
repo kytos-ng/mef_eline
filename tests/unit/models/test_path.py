@@ -286,33 +286,34 @@ class TestDynamicPathManager():
         # pylint: disable=protected-access
         assert DynamicPathManager._clear_path(path) == expected_path
 
-    def test_valid_path_invalid(self):
+    @pytest.mark.parametrize(
+        "invalid_path",
+        [
+            [
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:3",
+                "00:00:00:00:00:00:00:04:2"
+            ],
+            [
+                "00:00:00:00:00:00:00:01:2",
+                "00:00:00:00:00:00:00:02:2",
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:5",
+            ],
+            [
+                "00:00:00:00:00:00:00:02:2",
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:3",
+                "00:00:00:00:00:00:00:04:2"
+            ],
+        ]
+    )
+    def test_valid_path_invalid(self, invalid_path):
         """Test _valid_path for invalid paths."""
-        invalid_a = [
-            "00:00:00:00:00:00:00:02:3",
-            "00:00:00:00:00:00:00:03:2",
-            "00:00:00:00:00:00:00:03:3",
-            "00:00:00:00:00:00:00:04:2"
-        ]
-        assert DynamicPathManager._valid_path(invalid_a) is False
-
-        invalid_b = [
-            "00:00:00:00:00:00:00:01:2",
-            "00:00:00:00:00:00:00:02:2",
-            "00:00:00:00:00:00:00:02:3",
-            "00:00:00:00:00:00:00:03:2",
-            "00:00:00:00:00:00:00:03:5",
-        ]
-        assert DynamicPathManager._valid_path(invalid_b) is False
-
-        invalid_c = [
-            "00:00:00:00:00:00:00:02:2",
-            "00:00:00:00:00:00:00:02:3",
-            "00:00:00:00:00:00:00:03:2",
-            "00:00:00:00:00:00:00:03:3",
-            "00:00:00:00:00:00:00:04:2"
-        ]
-        assert DynamicPathManager._valid_path(invalid_c) is False
+        assert DynamicPathManager._valid_path(invalid_path) is False
 
     def test_create_path_invalid(self):
         """Test create_path method"""
