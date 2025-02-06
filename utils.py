@@ -2,10 +2,13 @@
 from typing import Union
 
 import httpx
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_combine, wait_fixed, wait_random)
 
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
 from kytos.core.interface import UNI, Interface, TAGRange
+from kytos.core.retry import before_sleep
 from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.exceptions import DisabledSwitch, FlowModException
 
@@ -182,6 +185,13 @@ def send_flow_mods_event(
         )
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_combine(wait_fixed(3), wait_random(min=2, max=7)),
+    retry=retry_if_exception_type(FlowModException),
+    before_sleep=before_sleep,
+    reraise=True,
+)
 def send_flow_mods_http(
     flow_dict: dict[str, list],
     action: str, force=True
