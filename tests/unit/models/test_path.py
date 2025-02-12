@@ -4,6 +4,7 @@ from unittest.mock import call, patch, Mock, MagicMock
 import pytest
 from napps.kytos.mef_eline import settings
 
+from kytos.core.exceptions import KytosNoTagAvailableError
 from kytos.core.common import EntityStatus
 from kytos.core.link import Link
 from kytos.core.switch import Switch
@@ -119,6 +120,43 @@ class TestPath():
         path_1 = Path(links)
         path_2 = Path(links)
         assert path_1 == path_2
+
+    def test_choose_vlans(self) -> None:
+        """Test choose vlans."""
+        controller = MagicMock()
+        link1 = get_link_mocked(status=EntityStatus.UP)
+        link2 = get_link_mocked(status=EntityStatus.UP)
+        link1.id = "def"
+        link2.id = "abc"
+        links = [link1, link2]
+        path = Path(links)
+        path.make_vlans_available = MagicMock()
+        path.choose_vlans(controller)
+        assert link1.get_next_available_tag.call_count == 1
+        assert link1.add_metadata.call_count == 1
+        assert link2.get_next_available_tag.call_count == 1
+        assert link2.add_metadata.call_count == 1
+        assert not path.make_vlans_available.call_count
+
+    def test_choose_vlans_tags_not_available(self) -> None:
+        """Test choose vlans rollback if tags not available."""
+        controller = MagicMock()
+        link1 = get_link_mocked(status=EntityStatus.UP)
+        link2 = get_link_mocked(status=EntityStatus.UP)
+        link1.id = "def"
+        link2.id = "abc"
+        links = [link1, link2]
+        path = Path(links)
+        path.make_vlans_available = MagicMock()
+        exc = KytosNoTagAvailableError(link2)
+        link2.get_next_available_tag.side_effect = exc
+        with pytest.raises(KytosNoTagAvailableError):
+            path.choose_vlans(controller)
+        assert link1.get_next_available_tag.call_count == 1
+        assert link1.add_metadata.call_count == 1
+        assert link2.get_next_available_tag.call_count == 1
+        assert not link2.add_metadata.call_count
+        assert path.make_vlans_available.call_count == 1
 
     def test_compare_different_paths(self):
         """Test compare paths with different links."""
