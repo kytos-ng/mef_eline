@@ -1,10 +1,13 @@
 """Classes related to paths"""
 import requests
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_combine, wait_fixed, wait_random)
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
 from kytos.core.interface import TAG
 from kytos.core.link import Link
+from kytos.core.retry import before_sleep
 from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.exceptions import InvalidPath
 
@@ -126,7 +129,14 @@ class DynamicPathManager:
         cls.controller = controller
 
     @staticmethod
-    def get_paths(circuit, max_paths=2, **kwargs) -> list[dict]:
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_combine(wait_fixed(3), wait_random(min=0, max=5)),
+        retry=retry_if_exception_type(requests.exceptions.RequestException),
+        before_sleep=before_sleep,
+        reraise=True
+    )
+    def get_paths(circuit, max_paths=2, timeout=30, **kwargs) -> list[dict]:
         """Get a valid path for the circuit from the Pathfinder."""
         endpoint = settings.PATHFINDER_URL
         spf_attribute = kwargs.get("spf_attribute") or settings.SPF_ATTRIBUTE
@@ -137,7 +147,7 @@ class DynamicPathManager:
             "spf_attribute": spf_attribute
         }
         request_data.update(kwargs)
-        api_reply = requests.post(endpoint, json=request_data)
+        api_reply = requests.post(endpoint, timeout=timeout, json=request_data)
 
         if api_reply.status_code != getattr(requests.codes, "ok"):
             log.error(
@@ -167,8 +177,15 @@ class DynamicPathManager:
     @classmethod
     def get_best_paths(cls, circuit, **kwargs):
         """Return the best paths available for a circuit, if they exist."""
-        for path in cls.get_paths(circuit, **kwargs):
-            yield cls.create_path(path["hops"])
+        try:
+            for path in cls.get_paths(circuit, **kwargs):
+                yield cls.create_path(path["hops"])
+        except requests.exceptions.RequestException as err:
+            log.error(
+                f"{circuit} failed to get paths from pathfinder. Error {err}"
+            )
+            return
+            yield
 
     @classmethod
     def get_disjoint_paths(
