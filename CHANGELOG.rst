@@ -6,6 +6,14 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.10] - 2025-01-22
+***********************
+
+Fixed
+=====
+- Parametrized requests timeout when finding paths and when sending flow mods to avoid potentially hanging indefinitely
+
+
 [2023.2.9] - 2025-01-22
 ***********************
 
