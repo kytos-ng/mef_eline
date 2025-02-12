@@ -454,6 +454,7 @@ class TestDynamicPathManager():
         )
         expected_call = call(
             "http://localhost:8181/api/kytos/pathfinder/v3/",
+            timeout=30,
             json={
                 **{
                     "source": circuit.uni_a.interface.id,
@@ -705,6 +706,7 @@ class TestDynamicPathManager():
         max_paths = 10
         expected_call = call(
             "http://localhost:8181/api/kytos/pathfinder/v3/",
+            timeout=30,
             json={
                 **{
                     "source": evc.uni_a.interface.id,
