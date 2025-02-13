@@ -836,14 +836,11 @@ class Main(KytosNApp):
         """Change circuit when link is down or under_mantenance."""
         self.handle_link_down(event)
 
-    def prepare_swap_to_failover(self, evc: EVC):
+    def prepare_swap_to_failover_flow(self, evc: EVC):
         """Prepare an evc for switching to failover."""
         install_flows = {}
         try:
             install_flows = evc.get_failover_flows()
-            temp_path = evc.current_path
-            evc.current_path = evc.failover_path
-            evc.failover_path = temp_path
         # pylint: disable=broad-except
         except Exception:
             err = traceback.format_exc().replace("\n", ", ")
@@ -852,6 +849,13 @@ class Main(KytosNApp):
                 f"{evc} due to error: {err}"
             )
         return install_flows
+
+    def prepare_swap_to_failover_event(self, evc: EVC, install_flow):
+        """Prepare event contents for swap to failover."""
+        return map_evc_event_content(
+            evc,
+            flows=deepcopy(install_flow)
+        )
 
     def execute_swap_to_failover(
         self,
@@ -864,14 +868,11 @@ class Main(KytosNApp):
         not_swapped_evcs = list[EVC]()
 
         for evc in evcs:
-            install_flow = self.prepare_swap_to_failover(evc)
+            install_flow = self.prepare_swap_to_failover_flow(evc)
             if install_flow:
                 install_flows = merge_flow_dicts(install_flows, install_flow)
                 event_contents[evc.id] =\
-                    map_evc_event_content(
-                        evc,
-                        flows=deepcopy(install_flow)
-                )
+                    self.prepare_swap_to_failover_event(evc, install_flow)
                 swapped_evcs.append(evc)
             else:
                 not_swapped_evcs.append(evc)
@@ -881,6 +882,10 @@ class Main(KytosNApp):
                 install_flows,
                 "install"
             )
+            for evc in swapped_evcs:
+                temp_path = evc.current_path
+                evc.current_path = evc.failover_path
+                evc.failover_path = temp_path
             emit_event(
                 self.controller, "failover_link_down",
                 content=deepcopy(event_contents)
@@ -888,13 +893,9 @@ class Main(KytosNApp):
             return swapped_evcs, not_swapped_evcs
         except FlowModException as exc:
             log.error(f"Fail to install failover flows for {evcs}: {exc}")
-            for evc in swapped_evcs:
-                temp_path = evc.current_path
-                evc.current_path = evc.failover_path
-                evc.failover_path = temp_path
             return [], [*swapped_evcs, *not_swapped_evcs]
 
-    def prepare_clear_failover(self, evc: EVC):
+    def prepare_clear_failover_flow(self, evc: EVC):
         """Prepare an evc for clearing the old path."""
         del_flows = {}
         try:
@@ -910,6 +911,14 @@ class Main(KytosNApp):
             log.error(f"Fail to remove {evc} old_path: {err}")
         return del_flows
 
+    def prepare_clear_failover_event(self, evc: EVC, delete_flow):
+        """Prepare event contents for clearing failover."""
+        return map_evc_event_content(
+            evc,
+            current_path=evc.current_path.as_dict(),
+            removed_flows=deepcopy(delete_flow)
+        )
+
     def execute_clear_failover(
         self,
         evcs: list[EVC]
@@ -921,15 +930,11 @@ class Main(KytosNApp):
         not_cleared_evcs = list[EVC]()
 
         for evc in evcs:
-            delete_flow = self.prepare_swap_to_failover(evc)
+            delete_flow = self.prepare_clear_failover_flow(evc)
             if delete_flow:
                 delete_flows = merge_flow_dicts(delete_flows, delete_flow)
                 event_contents[evc.id] =\
-                    map_evc_event_content(
-                        evc,
-                        current_path=evc.current_path.as_dict(),
-                        removed_flows=deepcopy(delete_flow)
-                )
+                    self.prepare_clear_failover_event(evc, delete_flow)
                 cleared_evcs.append(evc)
             else:
                 not_cleared_evcs.append(evc)
@@ -952,7 +957,7 @@ class Main(KytosNApp):
             log.error(f"Failed to delete failover flows for {evcs}: {exc}")
             return [], [*cleared_evcs, *not_cleared_evcs]
 
-    def prepare_undeploy(self, evc: EVC):
+    def prepare_undeploy_flow(self, evc: EVC):
         """Prepare an evc for undeploying."""
         del_flows = {}
         try:
@@ -967,7 +972,6 @@ class Main(KytosNApp):
         except Exception:
             err = traceback.format_exc().replace("\n", ", ")
             log.error(f"Fail to undeploy {evc}: {err}")
-            pass
         return del_flows
 
     def execute_undeploy(self, evcs: list[EVC]):
@@ -977,7 +981,7 @@ class Main(KytosNApp):
         not_undeploy_evcs = list[EVC]()
 
         for evc in evcs:
-            delete_flow = self.prepare_undeploy(evc)
+            delete_flow = self.prepare_undeploy_flow(evc)
             if delete_flow:
                 delete_flows = merge_flow_dicts(delete_flows, delete_flow)
                 undeploy_evcs.append(evc)
