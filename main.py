@@ -1023,7 +1023,7 @@ class Main(KytosNApp):
             swap_to_failover = list[EVC]()
             undeploy = list[EVC]()
             clear_failover = list[EVC]()
-            evcs_to_update = list[EVC]()
+            evcs_to_update = dict[str, EVC]()
 
             for evc in self.get_evcs_by_svc_level():
                 with ExitStack() as sub_stack:
@@ -1057,7 +1057,7 @@ class Main(KytosNApp):
 
             clear_failover.extend(success)
 
-            evcs_to_update.extend(success)
+            evcs_to_update.update((evc.id, evc) for evc in success)
 
             undeploy.extend(failure)
 
@@ -1065,7 +1065,7 @@ class Main(KytosNApp):
 
             success, failure = self.execute_clear_failover(clear_failover)
 
-            evcs_to_update.extend(success)
+            evcs_to_update.update((evc.id, evc) for evc in success)
 
             undeploy.extend(failure)
 
@@ -1073,13 +1073,13 @@ class Main(KytosNApp):
 
             success, failure = self.execute_undeploy(undeploy)
 
-            evcs_to_update.extend(success)
+            evcs_to_update.update((evc.id, evc) for evc in success)
 
             # Push update to DB
 
             if evcs_to_update:
                 self.mongo_controller.update_evcs(
-                    [evc.as_dict() for evc in evcs_to_update]
+                    [evc.as_dict() for evc in evcs_to_update.values()]
                 )
 
     @listen_to("kytos/mef_eline.need_redeploy")

@@ -10,7 +10,7 @@ from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
 from kytos.core.exceptions import KytosTagError
 from kytos.core.interface import TAGRange, UNI, Interface
-from napps.kytos.mef_eline.exceptions import InvalidPath
+from napps.kytos.mef_eline.exceptions import FlowModException, InvalidPath
 from napps.kytos.mef_eline.models import EVC, Path
 from napps.kytos.mef_eline.tests.helpers import get_uni_mocked
 
@@ -1917,192 +1917,377 @@ class TestMain:
         assert evc_mock.handle_link_up.call_count == 2
         evc_mock.handle_link_up.assert_called_with("abc")
 
-    @patch("time.sleep", return_value=None)
-    @patch("napps.kytos.mef_eline.main.map_evc_event_content")
-    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
-    @patch("napps.kytos.mef_eline.main.emit_event")
     def test_handle_link_down(
-        self,
-        emit_main_mock: MagicMock,
-        send_flow_mods_mock: MagicMock,
-        map_evc_mock: MagicMock,
-        _: MagicMock
+        self
     ):
         """Test handle_link_down method."""
-        uni = create_autospec(UNI)
-        evc1 = MagicMock(id="1", service_level=0, creation_time=1,
-                         metadata="mock", _active="true", _enabled="true",
-                         uni_a=uni, uni_z=uni)
+        evc1 = MagicMock(id="1")
         evc1.is_affected_by_link.return_value = True
-        evc1.handle_link_down.return_value = True
-        evc1.failover_path = Path([])
-        evc1.as_dict.return_value = {"id": "1"}
+        evc1.is_failover_path_affected_by_link.return_value = True
 
-        evc2 = MagicMock(id="2", service_level=6, creation_time=1)
-        evc2.is_affected_by_link.return_value = False
-        evc2.is_failover_path_affected_by_link.return_value = True
-        evc2.as_dict.return_value = {"id": "2"}
+        evc2 = MagicMock(id="2")
+        evc2.is_affected_by_link.return_value = True
+        evc2.failover_path = Path([])
 
-        evc3 = MagicMock(id="3", service_level=5, creation_time=1,
-                         metadata="mock", _active="true", _enabled="true",
-                         uni_a=uni, uni_z=uni)
+        default_undeploy = [evc1, evc2]
+
+        evc3 = MagicMock(id="3")
         evc3.is_affected_by_link.return_value = True
-        evc3.handle_link_down.return_value = True
-        evc3.failover_path = Path([])
-        evc3.as_dict.return_value = {"id": "3"}
+        evc3.is_failover_path_affected_by_link.return_value = False
 
-        evc4 = MagicMock(id="4", service_level=4, creation_time=1,
-                         metadata="mock", _active="true", _enabled="true",
-                         uni_a=uni, uni_z=uni)
+        evc4 = MagicMock(id="4")
         evc4.is_affected_by_link.return_value = True
         evc4.is_failover_path_affected_by_link.return_value = False
-        evc4.get_failover_flows.return_value = {
-            "2": ["flow1", "flow2"],
-            "3": ["flow3", "flow4", "flow5", "flow6"],
-        }
-        evc4.as_dict.return_value = {"id": "4"}
 
-        evc5 = MagicMock(id="5", service_level=7, creation_time=1)
-        evc5.is_affected_by_link.return_value = True
-        evc5.is_failover_path_affected_by_link.return_value = False
-        evc5.get_failover_flows.return_value = {
-            "4": ["flow7", "flow8"],
-            "5": ["flow9", "flow10"],
-        }
-        evc5.as_dict.return_value = {"id": "5"}
+        default_swap_to_failover = [evc3, evc4]
 
-        evc6 = MagicMock(id="6", service_level=8, creation_time=1,
-                         metadata="mock", _active="true", _enabled="true",
-                         uni_a=uni, uni_z=uni)
-        evc6.is_affected_by_link.return_value = True
-        evc6.is_failover_path_affected_by_link.return_value = False
-        evc6.get_failover_flows.side_effect = AttributeError("err")
-        evc6.as_dict.return_value = {"id": "6"}
+        evc5 = MagicMock(id="5")
+        evc5.is_affected_by_link.return_value = False
+        evc5.is_failover_path_affected_by_link.return_value = True
+
+        evc6 = MagicMock(id="6")
+        evc6.is_affected_by_link.return_value = False
+        evc6.is_failover_path_affected_by_link.return_value = True
+
+        default_clear_failover = [evc5, evc6]
+
+        self.napp.get_evcs_by_svc_level = MagicMock()
+
+        self.napp.get_evcs_by_svc_level.return_value = [
+            evc1,
+            evc2,
+            evc3,
+            evc4,
+            evc5,
+            evc6,
+        ]
+
+        self.napp.execute_swap_to_failover = MagicMock()
+
+        swap_to_failover_success = [evc3]
+        swap_to_failover_failure = [evc4]
+
+        self.napp.execute_swap_to_failover.return_value =\
+            swap_to_failover_success, swap_to_failover_failure
+
+        self.napp.execute_clear_failover = MagicMock()
+
+        clear_failover_success = [evc5, evc3]
+        clear_failover_failure = [evc6]
+
+        self.napp.execute_clear_failover.return_value =\
+            clear_failover_success, clear_failover_failure
+
+        self.napp.execute_undeploy = MagicMock()
+
+        undeploy_success = [evc1, evc4, evc6]
+        undeploy_failure = [evc2]
+
+        self.napp.execute_undeploy.return_value =\
+            undeploy_success, undeploy_failure
+
         link = MagicMock(id="123")
         event = KytosEvent(name="test", content={"link": link})
 
-        self.napp.prepare_clear_old_path = {
-            evc1: {"1": ["clear_flow1"]},
-            evc2: {"2": ["clear_flow2"]},
-            evc3: {"3": ["clear_flow3"]},
-            evc4: {"4": ["clear_flow4"]},
-            evc5: {"5": ["clear_flow5"]},
-            evc6: {"6": ["clear_flow6"]},
-        }.get
-
-        self.napp.prepare_undeploy = {
-            evc1: {"1": ["undeploy_flow1"]},
-            evc2: {"2": ["undeploy_flow2"]},
-            evc3: {"3": ["undeploy_flow3"]},
-            evc4: {"4": ["undeploy_flow4"]},
-            evc5: {"5": ["undeploy_flow5"]},
-            evc6: {"6": ["undeploy_flow6"]},
-        }.get
-
-        def side_effect(evc, **_):
-            return "event_content" + evc.id
-
-        map_evc_mock.side_effect = side_effect
-
-        self.napp.circuits = {
-            "1": evc1,
-            "2": evc2,
-            "3": evc3,
-            "4": evc4,
-            "5": evc5,
-            "6": evc6
-        }
-
         self.napp.handle_link_down(event)
 
-        assert evc5.service_level > evc4.service_level
-        # evc5 batched flows should be sent first
-        send_flow_mods_mock.assert_has_calls(
-            [
-                call(
-                    {
-                        "2": ["flow1", "flow2"],
-                        "3": ["flow3", "flow4", "flow5", "flow6"],
-                        "4": ["flow7", "flow8"],
-                        "5": ["flow9", "flow10"],
-                    },
-                    "install"
-                ),
-                call(
-                    {
-                        "2": ["clear_flow2"],
-                        "4": ["clear_flow4"],
-                        "5": ["clear_flow5"],
-                    },
-                    "delete"
-                ),
-                call(
-                    {
-                        "3": ["undeploy_flow3"],
-                        "1": ["undeploy_flow1"],
-                        "6": ["undeploy_flow6"],
-                    },
-                    "delete"
-                )
-            ]
+        self.napp.execute_swap_to_failover.assert_called_with(
+            default_swap_to_failover
         )
 
-        emit_main_mock.assert_has_calls(
-            [
-                call(
-                    self.napp.controller,
-                    "failover_link_down",
-                    content={
-                        "4": "event_content4",
-                        "5": "event_content5",
-                    }
-                ),
-                call(
-                    self.napp.controller,
-                    "failover_old_path",
-                    content={
-                        "2": "event_content2",
-                        "4": "event_content4",
-                        "5": "event_content5",
-                    }
-                ),
-                call(
-                    self.napp.controller,
-                    "need_redeploy",
-                    content={
-                        "evc_id": "1"
-                    }
-                ),
-                call(
-                    self.napp.controller,
-                    "need_redeploy",
-                    content={
-                        "evc_id": "3"
-                    }
-                ),
-                call(
-                    self.napp.controller,
-                    "need_redeploy",
-                    content={
-                        "evc_id": "6"
-                    }
-                ),
-            ],
-            any_order=True
+        self.napp.execute_clear_failover.assert_called_with(
+            [*default_clear_failover, *swap_to_failover_success]
         )
 
-        assert evc3.service_level > evc1.service_level
-        # evc3 should be handled before evc1
+        self.napp.execute_undeploy.assert_called_with([
+            *default_undeploy,
+            *swap_to_failover_failure,
+            *clear_failover_failure
+        ])
 
-        expected_updates = {"1", "2", "3", "4", "5", "6"}
-        args = self.napp.mongo_controller.update_evcs.call_args.args
-        for update in args[0]:
-            expected_updates.remove(update["id"])
+        self.napp.mongo_controller.update_evcs.assert_called_with([
+            evc3.as_dict(),
+            evc5.as_dict(),
+            evc1.as_dict(),
+            evc4.as_dict(),
+            evc6.as_dict(),
+        ])
 
-        assert not expected_updates
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_swap_to_failover(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Test execute_swap_to_failover method."""
+        evc1 = MagicMock(id="1")
+        good_path = MagicMock(id="GoodPath")
+        bad_path = MagicMock(id="BadPath")
+        evc1.current_path = bad_path
+        evc1.failover_path = good_path
+        evc2 = MagicMock(id="2")
 
-        event_name = "failover_link_down"
-        assert emit_main_mock.call_args_list[0][0][1] == event_name
+        self.napp.prepare_swap_to_failover_flow = {
+            evc1: {"1": ["Flow1"]},
+            evc2: None
+        }.get
+
+        self.napp.prepare_swap_to_failover_event = {
+            evc1: "FailoverEvent1",
+        }.get
+
+        success, failure = self.napp.execute_swap_to_failover([evc1, evc2])
+
+        assert success == [evc1]
+        assert failure == [evc2]
+
+        send_flow_mods_mock.assert_called_with(
+            {"1": ["Flow1"]},
+            "install"
+        )
+
+        assert evc1.current_path == good_path
+        assert evc1.failover_path == bad_path
+
+        emit_main_mock.assert_called_with(
+            self.napp.controller,
+            "failover_link_down",
+            content={"1": "FailoverEvent1"}
+        )
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_swap_to_failover_exception(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Test handle_link_down method when an exception occurs."""
+        evc1 = MagicMock(id="1")
+        good_path = MagicMock(id="GoodPath")
+        bad_path = MagicMock(id="BadPath")
+        evc1.current_path = bad_path
+        evc1.failover_path = good_path
+        evc2 = MagicMock(id="2")
+
+        self.napp.prepare_swap_to_failover_flow = {
+            evc1: {"1": ["Flow1"]},
+            evc2: None
+        }.get
+
+        self.napp.prepare_swap_to_failover_event = {
+            evc1: "FailoverEvent1",
+        }.get
+
+        send_flow_mods_mock.side_effect = FlowModException(
+            "Flowmod failed to send"
+        )
+
+        success, failure = self.napp.execute_swap_to_failover([evc1, evc2])
+
+        assert success == []
+        assert failure == [evc1, evc2]
+
+        send_flow_mods_mock.assert_called_with(
+            {"1": ["Flow1"]},
+            "install"
+        )
+
+        assert evc1.current_path == bad_path
+        assert evc1.failover_path == good_path
+
+        emit_main_mock.assert_not_called()
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_clear_failover(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Test execute_clear_failover method."""
+        evc1 = MagicMock(id="1")
+        good_path = MagicMock(id="GoodPath")
+        bad_path = MagicMock(id="BadPath")
+        evc1.current_path = good_path
+        evc1.failover_path = bad_path
+        evc2 = MagicMock(id="2")
+
+        self.napp.prepare_clear_failover_flow = {
+            evc1: {"1": ["Flow1"]},
+            evc2: None
+        }.get
+
+        self.napp.prepare_clear_failover_event = {
+            evc1: "FailoverEvent1",
+        }.get
+
+        success, failure = self.napp.execute_clear_failover([evc1, evc2])
+
+        assert success == [evc1]
+        assert failure == [evc2]
+
+        send_flow_mods_mock.assert_called_with(
+            {"1": ["Flow1"]},
+            "delete"
+        )
+
+        assert evc1.current_path == good_path
+        assert not evc1.failover_path
+
+        bad_path.make_vlans_available.assert_called_once_with(
+            self.napp.controller
+        )
+
+        emit_main_mock.assert_called_with(
+            self.napp.controller,
+            "failover_old_path",
+            content={"1": "FailoverEvent1"}
+        )
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_clear_failover_exception(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Test execute_clear_failover method when an exception occurs."""
+        evc1 = MagicMock(id="1")
+        good_path = MagicMock(id="GoodPath")
+        bad_path = MagicMock(id="BadPath")
+        evc1.current_path = good_path
+        evc1.failover_path = bad_path
+        evc2 = MagicMock(id="2")
+
+        self.napp.prepare_clear_failover_flow = {
+            evc1: {"1": ["Flow1"]},
+            evc2: None
+        }.get
+
+        self.napp.prepare_clear_failover_event = {
+            evc1: "FailoverEvent1",
+        }.get
+
+        send_flow_mods_mock.side_effect = FlowModException(
+            "Flowmod failed to send"
+        )
+
+        success, failure = self.napp.execute_clear_failover([evc1, evc2])
+
+        assert success == []
+        assert failure == [evc1, evc2]
+
+        send_flow_mods_mock.assert_called_with(
+            {"1": ["Flow1"]},
+            "delete"
+        )
+
+        assert evc1.current_path == good_path
+        assert evc1.failover_path == bad_path
+
+        emit_main_mock.assert_not_called()
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_undeploy(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Test execute_undeploy method."""
+        evc1 = MagicMock(id="1")
+        bad_path1 = MagicMock(id="GoodPath")
+        bad_path2 = MagicMock(id="BadPath")
+        evc1.current_path = bad_path1
+        evc1.failover_path = bad_path2
+        evc2 = MagicMock(id="2")
+
+        self.napp.prepare_undeploy_flow = {
+            evc1: {"1": ["Flow1"]},
+            evc2: None
+        }.get
+
+        success, failure = self.napp.execute_undeploy([evc1, evc2])
+
+        assert success == [evc1]
+        assert failure == [evc2]
+
+        send_flow_mods_mock.assert_called_with(
+            {"1": ["Flow1"]},
+            "delete"
+        )
+
+        assert not evc1.current_path
+        assert not evc1.failover_path
+
+        assert evc2.current_path
+        assert evc2.failover_path
+
+        bad_path1.make_vlans_available.assert_called_once_with(
+            self.napp.controller
+        )
+        bad_path2.make_vlans_available.assert_called_once_with(
+            self.napp.controller
+        )
+
+        evc1.deactivate.assert_called()
+        evc2.deactivate.assert_not_called()
+
+        emit_main_mock.assert_called_with(
+            self.napp.controller,
+            "need_redeploy",
+            content={"evc_id": "1"}
+        )
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_undeploy_exception(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Test execute_undeploy method method when an exception occurs."""
+        evc1 = MagicMock(id="1")
+        bad_path1 = MagicMock(id="GoodPath")
+        bad_path2 = MagicMock(id="BadPath")
+        evc1.current_path = bad_path1
+        evc1.failover_path = bad_path2
+        evc2 = MagicMock(id="2")
+
+        self.napp.prepare_undeploy_flow = {
+            evc1: {"1": ["Flow1"]},
+            evc2: None
+        }.get
+
+        send_flow_mods_mock.side_effect = FlowModException(
+            "Flowmod failed to send"
+        )
+
+        success, failure = self.napp.execute_undeploy([evc1, evc2])
+
+        assert success == []
+        assert failure == [evc1, evc2]
+
+        send_flow_mods_mock.assert_called_with(
+            {"1": ["Flow1"]},
+            "delete"
+        )
+
+        assert evc1.current_path
+        assert evc1.failover_path
+
+        assert evc2.current_path
+        assert evc2.failover_path
+
+        bad_path1.make_vlans_available.assert_not_called()
+        bad_path2.make_vlans_available.assert_not_called()
+
+        evc1.deactivate.assert_not_called()
+        evc2.deactivate.assert_not_called()
+
+        emit_main_mock.assert_not_called()
 
     @patch("napps.kytos.mef_eline.main.emit_event")
     def test_handle_evc_affected_by_link_down(self, emit_event_mock):
