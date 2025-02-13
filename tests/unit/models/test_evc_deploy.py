@@ -123,7 +123,7 @@ class TestEVC():
         expected_data = {"flows": flow_mods, "force": False}
         assert requests_mock.post.call_count == 1
         requests_mock.post.assert_called_once_with(
-            expected_endpoint, json=expected_data
+            expected_endpoint, json=expected_data, timeout=30
         )
 
     @patch("napps.kytos.mef_eline.models.evc.requests")
@@ -142,7 +142,7 @@ class TestEVC():
         expected_data = {"flows": flow_mods, "force": True}
         assert requests_mock.post.call_count == 1
         requests_mock.post.assert_called_once_with(
-            expected_endpoint, json=expected_data
+            expected_endpoint, json=expected_data, timeout=30
         )
 
     @patch("napps.kytos.mef_eline.models.evc.requests")

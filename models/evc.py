@@ -11,6 +11,8 @@ from uuid import uuid4
 import requests
 from glom import glom
 from requests.exceptions import Timeout
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_combine, wait_fixed, wait_random)
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
@@ -18,6 +20,7 @@ from kytos.core.exceptions import KytosNoTagAvailableError, KytosTagError
 from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI, Interface, TAGRange
 from kytos.core.link import Link
+from kytos.core.retry import before_sleep
 from kytos.core.tag_ranges import range_difference
 from napps.kytos.mef_eline import controllers, settings
 from napps.kytos.mef_eline.exceptions import (ActivationError,
@@ -1270,7 +1273,15 @@ class EVCDeploy(EVCBase):
             self._send_flow_mods(dpid, flows)
 
     @staticmethod
-    def _send_flow_mods(dpid, flow_mods, command='flows', force=False):
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_combine(wait_fixed(3), wait_random(min=0, max=5)),
+        retry=retry_if_exception_type(FlowModException),
+        before_sleep=before_sleep,
+        reraise=True
+    )
+    def _send_flow_mods(dpid, flow_mods, command='flows', force=False,
+                        timeout=30):
         """Send a flow_mod list to a specific switch.
 
         Args:
@@ -1278,13 +1289,17 @@ class EVCDeploy(EVCBase):
             flow_mods(dict): Python dictionary with flow_mods.
             command(str): By default is 'flows'. To remove a flow is 'remove'.
             force(bool): True to send via consistency check in case of errors
+            timeout(int): request timeout
 
         """
 
         endpoint = f"{settings.MANAGER_URL}/{command}/{dpid}"
 
         data = {"flows": flow_mods, "force": force}
-        response = requests.post(endpoint, json=data)
+        try:
+            response = requests.post(endpoint, json=data, timeout=timeout)
+        except requests.exceptions.RequestException as exc:
+            raise FlowModException(str(exc)) from exc
         if response.status_code >= 400:
             raise FlowModException(str(response.text))
 

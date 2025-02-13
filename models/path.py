@@ -1,10 +1,14 @@
 """Classes related to paths"""
 import requests
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_combine, wait_fixed, wait_random)
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
+from kytos.core.exceptions import KytosNoTagAvailableError
 from kytos.core.interface import TAG
 from kytos.core.link import Link
+from kytos.core.retry import before_sleep
 from napps.kytos.mef_eline import settings
 from napps.kytos.mef_eline.exceptions import InvalidPath
 
@@ -34,20 +38,29 @@ class Path(list[Link], GenericEntity):
         return None
 
     def choose_vlans(self, controller, old_path_dict: dict = None):
-        """Choose the VLANs to be used for the circuit."""
+        """Choose the VLANs to be used for the circuit.
+        If any of the links next tag isn't available, it'll release
+        all vlans of the path that have been allocated, all or nothing.
+        """
         old_path_dict = old_path_dict if old_path_dict else {}
-        for link in self:
-            tag_value = link.get_next_available_tag(
-                controller, link.id,
-                try_avoid_value=old_path_dict.get(link.id)
-            )
-            tag = TAG('vlan', tag_value)
-            link.add_metadata("s_vlan", tag)
+        try:
+            for link in self:
+                tag_value = link.get_next_available_tag(
+                    controller, link.id,
+                    try_avoid_value=old_path_dict.get(link.id)
+                )
+                tag = TAG('vlan', tag_value)
+                link.add_metadata("s_vlan", tag)
+        except KytosNoTagAvailableError as exc:
+            self.make_vlans_available(controller)
+            raise exc
 
     def make_vlans_available(self, controller):
         """Make the VLANs used in a path available when undeployed."""
         for link in self:
             tag = link.get_metadata("s_vlan")
+            if not tag:
+                continue
             conflict_a, conflict_b = link.make_tags_available(
                 controller, tag.value, link.id, tag.tag_type,
                 check_order=False
@@ -126,7 +139,14 @@ class DynamicPathManager:
         cls.controller = controller
 
     @staticmethod
-    def get_paths(circuit, max_paths=2, **kwargs) -> list[dict]:
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_combine(wait_fixed(3), wait_random(min=0, max=5)),
+        retry=retry_if_exception_type(requests.exceptions.RequestException),
+        before_sleep=before_sleep,
+        reraise=True
+    )
+    def get_paths(circuit, max_paths=2, timeout=30, **kwargs) -> list[dict]:
         """Get a valid path for the circuit from the Pathfinder."""
         endpoint = settings.PATHFINDER_URL
         spf_attribute = kwargs.get("spf_attribute") or settings.SPF_ATTRIBUTE
@@ -137,7 +157,7 @@ class DynamicPathManager:
             "spf_attribute": spf_attribute
         }
         request_data.update(kwargs)
-        api_reply = requests.post(endpoint, json=request_data)
+        api_reply = requests.post(endpoint, timeout=timeout, json=request_data)
 
         if api_reply.status_code != getattr(requests.codes, "ok"):
             log.error(
@@ -167,8 +187,15 @@ class DynamicPathManager:
     @classmethod
     def get_best_paths(cls, circuit, **kwargs):
         """Return the best paths available for a circuit, if they exist."""
-        for path in cls.get_paths(circuit, **kwargs):
-            yield cls.create_path(path["hops"])
+        try:
+            for path in cls.get_paths(circuit, **kwargs):
+                yield cls.create_path(path["hops"])
+        except requests.exceptions.RequestException as err:
+            log.error(
+                f"{circuit} failed to get paths from pathfinder. Error {err}"
+            )
+            return
+            yield
 
     @classmethod
     def get_disjoint_paths(
