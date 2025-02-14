@@ -1075,6 +1075,9 @@ class Main(KytosNApp):
 
             evcs_to_update.update((evc.id, evc) for evc in success)
 
+            if failure:
+                log.error(f"Failed to handle_link_down for {failure}")
+
             # Push update to DB
 
             if evcs_to_update:
