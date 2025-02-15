@@ -1054,7 +1054,9 @@ class Main(KytosNApp):
             # Swap from current path to failover path
 
             if swap_to_failover:
-                success, failure = self.execute_swap_to_failover(swap_to_failover)
+                success, failure = self.execute_swap_to_failover(
+                    swap_to_failover
+                )
 
                 clear_failover.extend(success)
 
@@ -1078,8 +1080,8 @@ class Main(KytosNApp):
 
                 evcs_to_update.update((evc.id, evc) for evc in success)
 
-            if failure:
-                log.error(f"Failed to handle_link_down for {failure}")
+                if failure:
+                    log.error(f"Failed to handle_link_down for {failure}")
 
             # Push update to DB
 
