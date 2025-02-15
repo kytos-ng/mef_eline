@@ -1053,27 +1053,30 @@ class Main(KytosNApp):
 
             # Swap from current path to failover path
 
-            success, failure = self.execute_swap_to_failover(swap_to_failover)
+            if swap_to_failover:
+                success, failure = self.execute_swap_to_failover(swap_to_failover)
 
-            clear_failover.extend(success)
+                clear_failover.extend(success)
 
-            evcs_to_update.update((evc.id, evc) for evc in success)
+                evcs_to_update.update((evc.id, evc) for evc in success)
 
-            undeploy.extend(failure)
+                undeploy.extend(failure)
 
             # Clear out failover path
 
-            success, failure = self.execute_clear_failover(clear_failover)
+            if clear_failover:
+                success, failure = self.execute_clear_failover(clear_failover)
 
-            evcs_to_update.update((evc.id, evc) for evc in success)
+                evcs_to_update.update((evc.id, evc) for evc in success)
 
-            undeploy.extend(failure)
+                undeploy.extend(failure)
 
             # Undeploy the evc, schedule a redeploy
 
-            success, failure = self.execute_undeploy(undeploy)
+            if undeploy:
+                success, failure = self.execute_undeploy(undeploy)
 
-            evcs_to_update.update((evc.id, evc) for evc in success)
+                evcs_to_update.update((evc.id, evc) for evc in success)
 
             if failure:
                 log.error(f"Failed to handle_link_down for {failure}")
