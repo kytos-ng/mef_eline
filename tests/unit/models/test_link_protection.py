@@ -797,34 +797,19 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         assert deploy_primary_mock.call_count == 1
         assert deploy_backup_mock.call_count == 1
 
-    async def test_get_interface_from_switch(self):
-        """Test get_interface_from_switch"""
-        interface = id_to_interface_mock('00:01:1')
-        interface.switch.interfaces = {1: interface}
-        switches = {
-            '00:01': interface.switch
-        }
-        uni = get_uni_mocked(is_valid=True, switch_dpid='00:01')
-        actual_interface = self.evc.get_interface_from_switch(uni, switches)
-        assert interface == actual_interface
-
     async def test_are_unis_active(self):
         """Test are_unis_active"""
-        interface = id_to_interface_mock('00:01:1')
+        self.evc.uni_a.interface._enabled = True
+        self.evc.uni_z.interface._enabled = True
+        assert self.evc.are_unis_active() is True
 
-        interface.switch.interfaces = {1: interface}
-        switches = {
-            'custom_switch_dpid': interface.switch
-        }
+        self.evc.uni_a.interface._active = False
+        self.evc.uni_z.interface._active = False
+        assert self.evc.are_unis_active() is False
 
-        interface.status = EntityStatus.UP
-        assert self.evc.are_unis_active(switches) is True
-
-        interface.status = EntityStatus.DOWN
-        assert self.evc.are_unis_active(switches) is False
-
-        interface.status = EntityStatus.DISABLED
-        assert self.evc.are_unis_active(switches) is False
+        self.evc.uni_a.interface._enabled = False
+        self.evc.uni_z.interface._enabled = False
+        assert self.evc.are_unis_active() is False
 
     async def test_is_uni_interface_active(self):
         """Test is_uni_interface_active"""

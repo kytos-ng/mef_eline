@@ -1832,17 +1832,10 @@ class LinkProtection(EVCDeploy):
 
         return success
 
-    @staticmethod
-    def get_interface_from_switch(uni: UNI, switches: dict) -> Interface:
-        """Get interface from switch by uni"""
-        switch = switches[uni.interface.switch.dpid]
-        interface = switch.interfaces[uni.interface.port_number]
-        return interface
-
-    def are_unis_active(self, switches: dict) -> bool:
+    def are_unis_active(self) -> bool:
         """Determine whether this EVC should be active"""
-        interface_a = self.get_interface_from_switch(self.uni_a, switches)
-        interface_z = self.get_interface_from_switch(self.uni_z, switches)
+        interface_a = self.uni_a.interface
+        interface_z = self.uni_z.interface
         active, _ = self.is_uni_interface_active(interface_a, interface_z)
         return active
 
