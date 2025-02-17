@@ -10,7 +10,7 @@ from kytos.core.link import Link
 from kytos.core.switch import Switch
 
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member
-# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-public-methods,too-many-lines
 
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
