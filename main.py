@@ -812,10 +812,11 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_up %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            with evc.lock:
-                evc.handle_interface_link_up(
-                    interface
-                )
+            if evc.is_enabled() and not evc.archived:
+                with evc.lock:
+                    evc.handle_interface_link_up(
+                        interface
+                    )
 
     def handle_interface_link_down(self, interface):
         """
@@ -823,10 +824,11 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_down %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            with evc.lock:
-                evc.handle_interface_link_down(
-                    interface
-                )
+            if evc.is_enabled() and not evc.archived:
+                with evc.lock:
+                    evc.handle_interface_link_down(
+                        interface
+                    )
 
     @listen_to("kytos/topology.link_down", pool="dynamic_single")
     def on_link_down(self, event):
@@ -1033,7 +1035,7 @@ class Main(KytosNApp):
         if command != "add":
             return
         evc = self.circuits.get(EVC.get_id_from_cookie(flow.cookie))
-        if evc:
+        if evc and evc.is_enabled() and not evc.archived:
             with evc.lock:
                 evc.remove_current_flows(sync=False)
                 evc.remove_failover_flows(sync=True)
