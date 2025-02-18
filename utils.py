@@ -1,5 +1,5 @@
 """Utility functions."""
-from typing import Union
+from typing import Callable, Union
 
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
@@ -196,3 +196,15 @@ def prepare_delete_flow(evc_flows: dict[str, list[dict]]):
                 "cookie_mask": int(0xffffffffffffffff)
             })
     return dpid_flows
+
+
+def check_interface_on_evc(evc, interface: Interface, operation: Callable):
+    """Check if an interface flap is affecting an evc."""
+    interface_a = evc.uni_a.interface
+    interface_z = evc.uni_z.interface
+    if (operation(evc.is_active()) and
+        interface in (interface_a, interface_z) and
+        operation(interface_a.status != EntityStatus.UP or
+                  interface_z.status != EntityStatus.UP)):
+        return True
+    return False

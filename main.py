@@ -8,6 +8,7 @@ import time
 import traceback
 from collections import defaultdict
 from copy import deepcopy
+from operator import not_
 from threading import Lock
 from typing import Optional
 
@@ -30,7 +31,8 @@ from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
 from napps.kytos.mef_eline.utils import (aemit_event, check_disabled_component,
-                                         emit_event, get_vlan_tags_and_masks,
+                                         check_interface_on_evc, emit_event,
+                                         get_vlan_tags_and_masks,
                                          map_evc_event_content,
                                          merge_flow_dicts, prepare_delete_flow,
                                          send_flow_mods_event)
@@ -812,7 +814,7 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_up %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            if evc.is_enabled() and not evc.archived:
+            if check_interface_on_evc(evc, interface, lambda x: x):
                 with evc.lock:
                     evc.handle_interface_link_up(
                         interface
@@ -824,7 +826,7 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_down %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            if evc.is_enabled() and not evc.archived:
+            if check_interface_on_evc(evc, interface, not_):
                 with evc.lock:
                     evc.handle_interface_link_down(
                         interface
@@ -1035,10 +1037,9 @@ class Main(KytosNApp):
         if command != "add":
             return
         evc = self.circuits.get(EVC.get_id_from_cookie(flow.cookie))
-        if evc and evc.is_enabled() and not evc.archived:
-            with evc.lock:
-                evc.remove_current_flows(sync=False)
-                evc.remove_failover_flows(sync=True)
+        with evc.lock:
+            evc.remove_current_flows(sync=False)
+            evc.remove_failover_flows(sync=True)
 
     def _evc_dict_with_instances(self, evc_dict):
         """Convert some dict values to instance of EVC classes.
