@@ -6,6 +6,14 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+
+[2023.2.11] 2025-02-18
+*********************
+
+Fixed
+=====
+- Fixed inconsistencies with link down behaviour. Flows and vlan reservations should now be properly cleared on link down.
+
 [2023.2.10] - 2025-02-12
 ************************
 
