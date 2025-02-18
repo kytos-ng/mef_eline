@@ -11,6 +11,8 @@ from uuid import uuid4
 import requests
 from glom import glom
 from requests.exceptions import Timeout
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_combine, wait_fixed, wait_random)
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
@@ -18,6 +20,7 @@ from kytos.core.exceptions import KytosNoTagAvailableError, KytosTagError
 from kytos.core.helpers import get_time, now
 from kytos.core.interface import UNI, Interface, TAGRange
 from kytos.core.link import Link
+from kytos.core.retry import before_sleep
 from kytos.core.tag_ranges import range_difference
 from napps.kytos.mef_eline import controllers, settings
 from napps.kytos.mef_eline.exceptions import (ActivationError,
@@ -1270,7 +1273,15 @@ class EVCDeploy(EVCBase):
             self._send_flow_mods(dpid, flows)
 
     @staticmethod
-    def _send_flow_mods(dpid, flow_mods, command='flows', force=False):
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_combine(wait_fixed(3), wait_random(min=0, max=5)),
+        retry=retry_if_exception_type(FlowModException),
+        before_sleep=before_sleep,
+        reraise=True
+    )
+    def _send_flow_mods(dpid, flow_mods, command='flows', force=False,
+                        timeout=30):
         """Send a flow_mod list to a specific switch.
 
         Args:
@@ -1278,13 +1289,17 @@ class EVCDeploy(EVCBase):
             flow_mods(dict): Python dictionary with flow_mods.
             command(str): By default is 'flows'. To remove a flow is 'remove'.
             force(bool): True to send via consistency check in case of errors
+            timeout(int): request timeout
 
         """
 
         endpoint = f"{settings.MANAGER_URL}/{command}/{dpid}"
 
         data = {"flows": flow_mods, "force": force}
-        response = requests.post(endpoint, json=data)
+        try:
+            response = requests.post(endpoint, json=data, timeout=timeout)
+        except requests.exceptions.RequestException as exc:
+            raise FlowModException(str(exc)) from exc
         if response.status_code >= 400:
             raise FlowModException(str(response.text))
 
@@ -1651,11 +1666,12 @@ class LinkProtection(EVCDeploy):
 
         return False
 
-    def handle_link_up(self, link):
+    def handle_link_up(self, link=None, interface=None):
         """Handle circuit when link up.
 
         Args:
             link(Link): Link affected by link.up event.
+            interface(Interface): UNI affected by link.up event.
 
         """
         condition_pairs = [
@@ -1670,6 +1686,18 @@ class LinkProtection(EVCDeploy):
             (
                 lambda me: me.primary_path.is_affected_by_link(link),
                 lambda me: (me.deploy_to_primary_path(), 'redeploy')
+            ),
+            # For this special case, it reached this point because interface
+            # was previously confirmed to be a UNI and both UNI are UP
+            (
+                lambda me: (me.primary_path.status == EntityStatus.UP
+                            and interface),
+                lambda me: (me.deploy_to_primary_path(), 'redeploy')
+            ),
+            (
+                lambda me: (me.backup_path.status == EntityStatus.UP
+                            and interface),
+                lambda me: (me.deploy_to_backup_path(), 'redeploy')
             ),
             # We tried to deploy(primary_path) without success.
             # And in this case is up by some how. Nothing to do.
@@ -1754,7 +1782,7 @@ class LinkProtection(EVCDeploy):
             self.current_path.status != EntityStatus.UP
             and not self.is_intra_switch()
         ):
-            succeeded = self.handle_link_up(interface)
+            succeeded = self.handle_link_up(interface=interface)
             if succeeded:
                 msg = (
                     f"Activated {self} due to successful "
