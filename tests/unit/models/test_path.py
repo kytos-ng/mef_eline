@@ -10,7 +10,7 @@ from kytos.core.link import Link
 from kytos.core.switch import Switch
 
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member
-# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-public-methods,too-many-lines
 
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position
@@ -324,6 +324,65 @@ class TestDynamicPathManager():
         ]
         # pylint: disable=protected-access
         assert DynamicPathManager._clear_path(path) == expected_path
+
+    @pytest.mark.parametrize(
+        "invalid_path",
+        [
+            [
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:3",
+                "00:00:00:00:00:00:00:04:2"
+            ],
+            [
+                "00:00:00:00:00:00:00:01:2",
+                "00:00:00:00:00:00:00:02:2",
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:5",
+            ],
+            [
+                "00:00:00:00:00:00:00:02:2",
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:3",
+                "00:00:00:00:00:00:00:04:2"
+            ],
+            [
+                "00:00:00:00:00:00:00:02:2",
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:3",
+                "00:00:00:00:00:00:00:04:2"
+                "00:00:00:00:00:00:00:04:3"
+            ]
+        ]
+    )
+    def test_valid_path_invalid(self, invalid_path):
+        """Test _valid_path for invalid paths."""
+        assert DynamicPathManager._valid_path(invalid_path) is False
+
+    @pytest.mark.parametrize(
+        "valid_path",
+        [
+            [
+                "00:00:00:00:00:00:00:02:1",
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:3",
+            ],
+            [
+                "00:00:00:00:00:00:00:01:1",
+                "00:00:00:00:00:00:00:01:2",
+                "00:00:00:00:00:00:00:02:2",
+                "00:00:00:00:00:00:00:02:3",
+                "00:00:00:00:00:00:00:03:2",
+                "00:00:00:00:00:00:00:03:5",
+            ],
+        ]
+    )
+    def test_valid_path_valid(self, valid_path):
+        """Test _valid_path for valid paths."""
+        assert DynamicPathManager._valid_path(valid_path) is True
 
     def test_create_path_invalid(self):
         """Test create_path method"""

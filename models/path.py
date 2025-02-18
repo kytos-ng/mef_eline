@@ -168,9 +168,24 @@ class DynamicPathManager:
         return reply_data.get("paths", [])
 
     @staticmethod
-    def _clear_path(path):
+    def _clear_path(path: list[str]) -> list[str]:
         """Remove switches from a path, returning only interfaces."""
         return [endpoint for endpoint in path if len(endpoint) > 23]
+
+    @staticmethod
+    def _valid_path(clean_path: list[str]) -> bool:
+        """Check is a path is valid by verifying a in and out interface.
+         Returns False if the path is invalid."""
+        # if len is not even
+        if len(clean_path) % 2:
+            return False
+
+        # Check interfaces in pairs, they should be from the same switch
+        for i in range(0, len(clean_path), 2):
+            if (clean_path[i].split(":")[:8]
+                    != clean_path[i + 1].split(":")[:8]):
+                return False
+        return True
 
     @classmethod
     def get_best_paths(cls, circuit, **kwargs):
@@ -293,8 +308,7 @@ class DynamicPathManager:
         """Return the path containing only the interfaces."""
         new_path = Path()
         clean_path = cls._clear_path(path)
-
-        if len(clean_path) % 2:
+        if not cls._valid_path(clean_path):
             return None
 
         for link in zip(clean_path[1:-1:2], clean_path[2::2]):
