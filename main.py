@@ -113,7 +113,7 @@ class Main(KytosNApp):
                 and not circuit.lock.locked()
                 and not circuit.has_recent_removed_flow()
                 and not circuit.is_recent_updated()
-                and circuit.are_unis_active(self.controller.switches)
+                and circuit.are_unis_active()
                 # if a inter-switch EVC does not have current_path, it does not
                 # make sense to run sdntrace on it
                 and (circuit.is_intra_switch() or circuit.current_path)
