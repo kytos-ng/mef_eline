@@ -6,9 +6,18 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2024.1.12] - 2025-02-18
+************************
+
+Fixed
+=====
+- Fixed inconsistencies with link down behaviour. Flows and vlan reservations should now be properly cleared on link down.
+
 [2024.1.11] - 2025-02-12
 ************************
 
+Fixed
+=====
 - Fixed Path ``choose_vlans`` to be all or nothing, if a path link fails to allocate a vlan, it'll release the allocated vlans.
 
 [2024.1.10] - 2025-01-22
