@@ -30,8 +30,8 @@ from napps.kytos.mef_eline.exceptions import (DisabledSwitch,
 from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
-from napps.kytos.mef_eline.utils import (aemit_event, check_disabled_component,
-                                         check_interface_on_evc, emit_event,
+from napps.kytos.mef_eline.utils import (_does_uni_affect_evc, aemit_event,
+                                         check_disabled_component, emit_event,
                                          get_vlan_tags_and_masks,
                                          map_evc_event_content,
                                          merge_flow_dicts, prepare_delete_flow,
@@ -814,7 +814,7 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_up %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            if check_interface_on_evc(evc, interface, lambda x: x):
+            if _does_uni_affect_evc(evc, interface, "up"):
                 with evc.lock:
                     evc.handle_interface_link_up(
                         interface
@@ -826,7 +826,7 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_down %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            if check_interface_on_evc(evc, interface, not_):
+            if _does_uni_affect_evc(evc, interface, "down"):
                 with evc.lock:
                     evc.handle_interface_link_down(
                         interface

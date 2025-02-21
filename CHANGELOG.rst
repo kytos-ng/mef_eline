@@ -38,6 +38,7 @@ Changed
 - ``primary_path``, ``backup_path``, ``primary_links`` and ``backup_links`` now only accept endpoint IDs in the API request content.
 - Now when installing or deleting a path, a single request to ``flow_manager`` will be sent per path.
 - UI: Added column ``Path Types`` to ``View Connections`` component to indicate if the EVC has a ``dynamic_backup_path``, ``static_primary`` or ``static_backup`` value.
+- When a link flap happens, now ``mef_eline`` will check on EVC attributes to decide whether to acquire an EVC lock.
 
 [2024.1.4] - 2024-09-09
 ***********************
