@@ -8,7 +8,6 @@ import time
 import traceback
 from collections import defaultdict
 from copy import deepcopy
-from operator import not_
 from threading import Lock
 from typing import Optional
 
