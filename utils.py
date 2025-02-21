@@ -1,5 +1,5 @@
 """Utility functions."""
-from typing import Callable, Union
+from typing import Union
 
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
@@ -198,13 +198,16 @@ def prepare_delete_flow(evc_flows: dict[str, list[dict]]):
     return dpid_flows
 
 
-def check_interface_on_evc(evc, interface: Interface, operation: Callable):
-    """Check if an interface flap is affecting an evc."""
+def _does_uni_affect_evc(evc, interface: Interface, link_event: str) -> bool:
+    """Check if an interface flap is affecting an EVC UNI."""
     interface_a = evc.uni_a.interface
     interface_z = evc.uni_z.interface
-    if (operation(evc.is_active()) and
-        interface in (interface_a, interface_z) and
-        operation(interface_a.status != EntityStatus.UP or
-                  interface_z.status != EntityStatus.UP)):
-        return True
+    interface_affected = interface in (interface_a, interface_z)
+    interface_down = (EntityStatus.DOWN in
+                      (interface_a.status, interface_z.status))
+    if link_event == "up":
+        return (not evc.is_active() and interface_affected
+                and not interface_down)
+    if link_event == "down":
+        return evc.is_active() and interface_affected and interface_down
     return False
