@@ -31,7 +31,7 @@ from napps.kytos.mef_eline.utils import (check_disabled_component,
                                          compare_uni_out_trace, emit_event,
                                          make_uni_list, map_dl_vlan,
                                          map_evc_event_content,
-                                         merge_flow_dicts)
+                                         merge_flow_dicts, _does_uni_affect_evc)
 
 from .path import DynamicPathManager, Path
 
@@ -1866,15 +1866,7 @@ class LinkProtection(EVCDeploy):
         """
         if self.is_active():
             return
-        interfaces = (self.uni_a.interface, self.uni_z.interface)
-        if interface not in interfaces:
-            return
-        down_interfaces = [
-            interface
-            for interface in interfaces
-            if interface.status != EntityStatus.UP
-        ]
-        if down_interfaces:
+        if not _does_uni_affect_evc(self, interface, "up"):
             return
         if self.try_to_handle_uni_as_link_up(interface):
             return
@@ -1884,7 +1876,7 @@ class LinkProtection(EVCDeploy):
                 'status': interface.status.value,
                 'status_reason': interface.status_reason,
             }
-            for interface in interfaces
+            for interface in (self.uni_a.interface, self.uni_z.interface)
         }
         try:
             self.try_to_activate()
@@ -1906,22 +1898,15 @@ class LinkProtection(EVCDeploy):
         """
         if not self.is_active():
             return
-        interfaces = (self.uni_a.interface, self.uni_z.interface)
-        if interface not in interfaces:
-            return
-        down_interfaces = [
-            interface
-            for interface in interfaces
-            if interface.status != EntityStatus.UP
-        ]
-        if not down_interfaces:
+        if not _does_uni_affect_evc(self, interface, 'down'):
             return
         interface_dicts = {
             interface.id: {
                 'status': interface.status.value,
                 'status_reason': interface.status_reason,
             }
-            for interface in down_interfaces
+            for interface in (self.uni_a.interface, self.uni_z.interface)
+            if interface.status != EntityStatus.UP
         }
         self.deactivate()
         log.info(
