@@ -203,8 +203,10 @@ def _does_uni_affect_evc(evc, interface: Interface, link_event: str) -> bool:
     interface_a = evc.uni_a.interface
     interface_z = evc.uni_z.interface
     interface_affected = interface in (interface_a, interface_z)
-    interface_down = (EntityStatus.DOWN in
-                      (interface_a.status, interface_z.status))
+    interface_down = (
+        interface_a.status != EntityStatus.UP
+        or interface_z.status != EntityStatus.UP
+    )
     if link_event == "up":
         return (not evc.is_active() and interface_affected
                 and not interface_down)
