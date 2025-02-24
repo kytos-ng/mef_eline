@@ -1,10 +1,16 @@
 """Utility functions."""
 from typing import Union
 
+import httpx
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_combine, wait_fixed, wait_random)
+
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
 from kytos.core.interface import UNI, Interface, TAGRange
-from napps.kytos.mef_eline.exceptions import DisabledSwitch
+from kytos.core.retry import before_sleep
+from napps.kytos.mef_eline import settings
+from napps.kytos.mef_eline.exceptions import DisabledSwitch, FlowModException
 
 
 def map_evc_event_content(evc, **kwargs) -> dict:
@@ -28,7 +34,7 @@ def emit_event(controller, name, context="kytos/mef_eline", content=None,
 
 
 def merge_flow_dicts(
-    dst: dict[str, list], *srcs: list[dict[str, list]]
+    dst: dict[str, list], *srcs: dict[str, list]
 ) -> dict[str, list]:
     """Merge srcs dict flows into dst."""
     for src in srcs:
@@ -177,6 +183,47 @@ def send_flow_mods_event(
                 "force": force,
             },
         )
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_combine(wait_fixed(3), wait_random(min=2, max=7)),
+    retry=retry_if_exception_type(FlowModException),
+    before_sleep=before_sleep,
+    reraise=True,
+)
+def send_flow_mods_http(
+    flow_dict: dict[str, list],
+    action: str, force=True
+):
+    """
+    Send a flow_mod list to a specific switch.
+
+    Args:
+        dpid(str): The target of flows (i.e. Switch.id).
+        flow_mods(dict): Python dictionary with flow_mods.
+        command(str): By default is 'flows'. To remove a flow is 'remove'.
+        force(bool): True to send via consistency check in case of errors.
+        by_switch(bool): True to send to 'flows_by_switch' request instead.
+    """
+    endpoint = f"{settings.MANAGER_URL}/flows_by_switch/?force={force}"
+
+    formatted_dict = {
+        dpid: {"flows": flows}
+        for (dpid, flows) in flow_dict.items()
+    }
+
+    try:
+        if action == "install":
+            res = httpx.post(endpoint, json=formatted_dict, timeout=30)
+        elif action == "delete":
+            res = httpx.request(
+                "DELETE", endpoint, json=formatted_dict, timeout=30
+            )
+    except httpx.RequestError as err:
+        raise FlowModException(str(err)) from err
+    if res.is_server_error or res.status_code >= 400:
+        raise FlowModException(res.text)
 
 
 def prepare_delete_flow(evc_flows: dict[str, list[dict]]):
