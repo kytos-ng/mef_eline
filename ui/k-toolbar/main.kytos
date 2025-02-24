@@ -218,7 +218,7 @@
   </k-toolbar-item>
 </template>
 <script>
-module.exports = {
+export default {
   data(){
     return {
         circuit_name: "",
@@ -302,6 +302,26 @@ module.exports = {
           x => queue_ids.push({value:x?.toString(), description:String(x)})
       )
       return queue_ids;
+    },
+    onblur_dpid() {
+        /**
+        * Update dpid values on event onblur triggered in dpids fields.
+        * It split the value selected from autocomplete list.
+        * It is expected the value as "NAME - DPID".
+        **/
+        let dpid_a = this.endpoint_a;
+        if(dpid_a.lastIndexOf(' ') > 0) {
+            let splitted_dpid = dpid_a.split(' ');
+            this.endpoint_name_a = splitted_dpid[0];
+            this.endpoint_a = splitted_dpid[2];
+        }
+        
+        let dpid_z = this.endpoint_z;
+        if(dpid_z.lastIndexOf(' ') > 0) {
+            let splitted_dpid = dpid_z.split(' ');
+            this.endpoint_name_z = splitted_dpid[0];
+            this.endpoint_z = splitted_dpid[2];
+        }
     },
   },
   methods: {
@@ -595,26 +615,6 @@ module.exports = {
           });
         }
       });
-    },
-    onblur_dpid: function() {
-        /**
-        * Update dpid values on event onblur triggered in dpids fields.
-        * It split the value selected from autocomplete list.
-        * It is expected the value as "NAME - DPID".
-        **/
-        let dpid_a = this.endpoint_a;
-        if(dpid_a.lastIndexOf(' ') > 0) {
-            let splitted_dpid = dpid_a.split(' ');
-            this.endpoint_name_a = splitted_dpid[0];
-            this.endpoint_a = splitted_dpid[2];
-        }
-        
-        let dpid_z = this.endpoint_z;
-        if(dpid_z.lastIndexOf(' ') > 0) {
-            let splitted_dpid = dpid_z.split(' ');
-            this.endpoint_name_z = splitted_dpid[0];
-            this.endpoint_z = splitted_dpid[2];
-        }
     },
   },
   mounted() { // when the Vue app is booted up, this is run automatically.
