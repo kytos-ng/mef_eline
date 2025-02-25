@@ -31,8 +31,9 @@ from napps.kytos.mef_eline.exceptions import (DisabledSwitch,
 from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
-from napps.kytos.mef_eline.utils import (aemit_event, check_disabled_component,
-                                         emit_event, get_vlan_tags_and_masks,
+from napps.kytos.mef_eline.utils import (_does_uni_affect_evc, aemit_event,
+                                         check_disabled_component, emit_event,
+                                         get_vlan_tags_and_masks,
                                          map_evc_event_content,
                                          merge_flow_dicts, prepare_delete_flow,
                                          send_flow_mods_http)
@@ -815,10 +816,11 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_up %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            with evc.lock:
-                evc.handle_interface_link_up(
-                    interface
-                )
+            if _does_uni_affect_evc(evc, interface, "up"):
+                with evc.lock:
+                    evc.handle_interface_link_up(
+                        interface
+                    )
 
     def handle_interface_link_down(self, interface):
         """
@@ -826,10 +828,11 @@ class Main(KytosNApp):
         """
         log.info("Event handle_interface_link_down %s", interface)
         for evc in self.get_evcs_by_svc_level():
-            with evc.lock:
-                evc.handle_interface_link_down(
-                    interface
-                )
+            if _does_uni_affect_evc(evc, interface, "down"):
+                with evc.lock:
+                    evc.handle_interface_link_down(
+                        interface
+                    )
 
     @listen_to("kytos/topology.link_down", pool="dynamic_single")
     def on_link_down(self, event):
@@ -1187,10 +1190,9 @@ class Main(KytosNApp):
         if command != "add":
             return
         evc = self.circuits.get(EVC.get_id_from_cookie(flow.cookie))
-        if evc:
-            with evc.lock:
-                evc.remove_current_flows(sync=False)
-                evc.remove_failover_flows(sync=True)
+        with evc.lock:
+            evc.remove_current_flows(sync=False)
+            evc.remove_failover_flows(sync=True)
 
     def _evc_dict_with_instances(self, evc_dict):
         """Convert some dict values to instance of EVC classes.

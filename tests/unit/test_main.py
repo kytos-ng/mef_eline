@@ -2508,6 +2508,7 @@ class TestMain:
         event = MagicMock()
         event.content = {'flow': flow, 'error_command': 'add'}
         evc = create_autospec(EVC)
+        evc.archived = False
         evc.remove_current_flows = MagicMock()
         evc.lock = MagicMock()
         self.napp.circuits = {"00000000000011": evc}
