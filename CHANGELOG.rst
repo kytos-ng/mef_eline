@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2024.1.13] - 2025-02-25
+************************
+
+Fixed
+=====
+- Fixed ``handle_need_redeploy`` deploying dynamic paths, rather than primary/backup paths.
+
 [2024.1.12] - 2025-02-18
 ************************
 
