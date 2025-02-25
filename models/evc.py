@@ -1865,8 +1865,6 @@ class LinkProtection(EVCDeploy):
         """
         Handler for interface link_up events
         """
-        if self.is_active():
-            return
         if not _does_uni_affect_evc(self, interface, "up"):
             return
         if self.try_to_handle_uni_as_link_up(interface):
@@ -1897,8 +1895,6 @@ class LinkProtection(EVCDeploy):
         """
         Handler for interface link_down events
         """
-        if not self.is_active():
-            return
         if not _does_uni_affect_evc(self, interface, "down"):
             return
         interface_dicts = {
