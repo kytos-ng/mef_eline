@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 import pymongo
 from pymongo.collection import ReturnDocument
-from pymongo.errors import AutoReconnect
+from pymongo.errors import ConnectionFailure, ExecutionTimeout
 from pymongo.operations import UpdateOne
 from tenacity import retry_if_exception_type, stop_after_attempt, wait_random
 
@@ -26,7 +26,7 @@ from napps.kytos.mef_eline.db.models import EVCBaseDoc, EVCUpdateDoc
         max=int(os.environ.get("MONGO_AUTO_RETRY_WAIT_RANDOM_MAX", "1")),
     ),
     before_sleep=before_sleep,
-    retry=retry_if_exception_type((AutoReconnect,)),
+    retry=retry_if_exception_type((ConnectionFailure, ExecutionTimeout)),
 )
 class ELineController:
     """E-Line Controller"""
