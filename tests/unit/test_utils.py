@@ -1,5 +1,5 @@
 """Module to test the utls.py file."""
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 import pytest
 
 
@@ -9,7 +9,8 @@ from napps.kytos.mef_eline.utils import (check_disabled_component,
                                          compare_endpoint_trace,
                                          compare_uni_out_trace,
                                          get_vlan_tags_and_masks, map_dl_vlan,
-                                         merge_flow_dicts, prepare_delete_flow)
+                                         merge_flow_dicts, prepare_delete_flow,
+                                         _does_uni_affect_evc)
 
 
 # pylint: disable=too-many-public-methods, too-many-lines
@@ -195,3 +196,71 @@ class TestUtils:
             assert (actual_flows['00:01'][i]['match'] ==
                     flow_mod["00:01"][i]['match'])
             assert actual_flows['00:01'][i]['cookie_mask'] == cookie_mask
+
+# pylint: disable=too-many-arguments
+    @pytest.mark.parametrize(
+        "intf_a_status, intf_z_status, is_active, is_uni, event, expected",
+        [
+            # link_DOWN
+            (
+                EntityStatus.DOWN, EntityStatus.DOWN,
+                True, True, 'down', True
+            ),
+            (
+                EntityStatus.UP, EntityStatus.UP,
+                True, True, 'down', False
+            ),
+            (
+                EntityStatus.DOWN, EntityStatus.UP,
+                False, True, 'down', False
+            ),
+            (
+                EntityStatus.UP, EntityStatus.UP,
+                False, True, 'down', False
+            ),
+            (  # Not UNI
+                EntityStatus.DOWN, EntityStatus.DOWN,
+                True, False, 'down', False
+            ),
+            # link_up
+            (
+                EntityStatus.DOWN, EntityStatus.DOWN,
+                True, True, 'up', False
+            ),
+            (
+                EntityStatus.UP, EntityStatus.UP,
+                True, True, 'up', False
+            ),
+            (
+                EntityStatus.DOWN, EntityStatus.UP,
+                False, True, 'up', False
+            ),
+            (
+                EntityStatus.UP, EntityStatus.UP,
+                False, True, 'up', True
+            ),
+            (  # Not UNI
+                EntityStatus.UP, EntityStatus.UP,
+                False, False, 'up', False
+            ),
+        ]
+    )
+    def test_does_uni_affect_evc(
+        self,
+        intf_a_status,
+        intf_z_status,
+        is_active,
+        is_uni,
+        event,
+        expected
+    ):
+        """Test _does_uni_affect_evc when interface."""
+        evc = Mock()
+        evc.uni_a.interface.status = intf_a_status
+        evc.uni_z.interface.status = intf_z_status
+        if is_uni:
+            interface = evc.uni_a.interface
+        else:
+            interface = Mock()
+        evc.is_active.return_value = is_active
+        assert _does_uni_affect_evc(evc, interface, event) is expected
