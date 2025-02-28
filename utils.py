@@ -145,3 +145,20 @@ def make_uni_list(list_circuits: list) -> list:
                 (circuit.uni_z.interface, tag_z)
             )
     return uni_list
+
+
+def _does_uni_affect_evc(evc, interface: Interface, link_event: str) -> bool:
+    """Check if an interface flap is affecting an EVC UNI."""
+    interface_a = evc.uni_a.interface
+    interface_z = evc.uni_z.interface
+    interface_affected = interface in (interface_a, interface_z)
+    interface_down = (
+        interface_a.status != EntityStatus.UP
+        or interface_z.status != EntityStatus.UP
+    )
+    if link_event == "up":
+        return (not evc.is_active() and interface_affected
+                and not interface_down)
+    if link_event == "down":
+        return evc.is_active() and interface_affected and interface_down
+    return False

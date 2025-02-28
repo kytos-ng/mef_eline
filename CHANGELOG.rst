@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [Unreleased]
 ************
 
+[2023.2.11] - 2025-02-27
+************************
+
+Changed
+=======
+-  When a link flap happens, now ``mef_eline`` will check on EVC attributes to decide whether to acquire an EVC lock.
+
 [2023.2.10] - 2025-02-12
 ************************
 
