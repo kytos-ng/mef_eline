@@ -15,6 +15,7 @@ Fixed
 - Link up from UNI will deploy correctly an EVC when it does not have a path.
 - Fixed Path ``choose_vlans`` to be all or nothing, if a path link fails to allocate a vlan, it'll release the allocated vlans.
 - Validate paths from ``pathfinder`` with interface couples, in and out interfaces.
+- DB controller now retries for ``ExecutionTimeout`` and ``ConnectionFailure`` instead of just ``AutoReconnect``
 
 Added
 =====
