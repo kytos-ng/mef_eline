@@ -458,6 +458,12 @@ components:
           type: boolean
         metadata:
           type: object
+        max_paths:
+          type: integer
+          format: int32
+          description: Maximum number of paths to be considered. Default value is 2.
+          minimum: 2
+          maximum: 10
     NewLink: # Can be referenced via '#/components/schemas/NewLink'
       type: object
       required:
@@ -704,6 +710,12 @@ components:
         request_time:
           type: string
           format: date-time
+        max_paths:
+          type: integer
+          format: int32
+          description: Maximum number of paths to be considered. Default value is 2.
+          minimum: 2
+          maximum: 10
 
     UpdateCircuit: # Can be referenced via '#/components/schemas/UpdateCircuit'
       type: object
@@ -776,6 +788,12 @@ components:
           type: object
         enabled:
           type: boolean
+        max_paths:
+          type: integer
+          format: int32
+          description: Maximum number of paths to be considered. Default value is 2.
+          minimum: 2
+          maximum: 10
 
     Tag: # Can be referenced via '#/components/schemas/Tag'
       type: object
