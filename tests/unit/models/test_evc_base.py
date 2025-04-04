@@ -65,7 +65,8 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
             "service_level",
             "circuit_scheduler",
             "metadata",
-            "enabled"
+            "enabled",
+            "max_paths",
         ]
         assert EVC.updatable_attributes == set(expected)
 

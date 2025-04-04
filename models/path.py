@@ -188,10 +188,10 @@ class DynamicPathManager:
         return True
 
     @classmethod
-    def get_best_paths(cls, circuit, **kwargs):
+    def get_best_paths(cls, circuit, max_paths=2, **kwargs):
         """Return the best paths available for a circuit, if they exist."""
         try:
-            for path in cls.get_paths(circuit, **kwargs):
+            for path in cls.get_paths(circuit, max_paths=max_paths, **kwargs):
                 yield cls.create_path(path["hops"])
         except PathFinderException as err:
             log.error(

@@ -71,7 +71,8 @@ class EVCBase(GenericEntity):
         "service_level",
         "circuit_scheduler",
         "metadata",
-        "enabled"
+        "enabled",
+        "max_paths",
     }
 
     # pylint: disable=too-many-statements
@@ -159,6 +160,7 @@ class EVCBase(GenericEntity):
         self.backup_links_cache = set()
         self.affected_by_link_at = get_time("0001-01-01T00:00:00")
         self.old_path = Path([])
+        self.max_paths = kwargs.get("max_paths", 2)
 
         self.lock = Lock()
 
@@ -433,6 +435,7 @@ class EVCBase(GenericEntity):
         evc_dict["secondary_constraints"] = self.secondary_constraints
         evc_dict["flow_removed_at"] = self.flow_removed_at
         evc_dict["updated_at"] = self.updated_at
+        evc_dict["max_paths"] = self.max_paths
 
         if keys:
             selected = {}
@@ -512,7 +515,7 @@ class EVCDeploy(EVCBase):
 
     def discover_new_paths(self):
         """Discover new paths to satisfy this circuit and deploy it."""
-        return DynamicPathManager.get_best_paths(self,
+        return DynamicPathManager.get_best_paths(self, self.max_paths,
                                                  **self.primary_constraints)
 
     def get_failover_path_candidates(self):
@@ -921,6 +924,7 @@ class EVCDeploy(EVCBase):
         if not old_path_dict:
             old_path_dict = {}
         tag_errors = []
+        no_valid_path = False
         if self.should_deploy(use_path):
             try:
                 use_path.choose_vlans(self._controller, old_path_dict)
@@ -930,6 +934,7 @@ class EVCDeploy(EVCBase):
         else:
             for use_path in self.discover_new_paths():
                 if use_path is None:
+                    no_valid_path = True
                     continue
                 try:
                     use_path.choose_vlans(self._controller, old_path_dict)
@@ -946,7 +951,12 @@ class EVCDeploy(EVCBase):
                 use_path = Path()
                 self._install_direct_uni_flows()
             else:
-                msg = f"{self} was not deployed. No available path was found."
+                no_path_msg = "No available path was found."
+                if no_valid_path:
+                    no_path_msg = "No valid path was found, "\
+                                  "try increasing `max_paths`"\
+                                 f" from {self.max_paths}."
+                msg = f"{self} was not deployed. {no_path_msg}"
                 if tag_errors:
                     msg = self.add_tag_errors(msg, tag_errors)
                     log.error(msg)

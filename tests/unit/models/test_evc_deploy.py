@@ -413,6 +413,29 @@ class TestEVC():
         assert log_mock.info.call_count == 2
         log_mock.info.assert_called_with(f"{evc} was deployed.")
 
+    @patch("httpx.post")
+    @patch("napps.kytos.mef_eline.models.evc.log")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.discover_new_paths")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    def test_create_evc_all_paths_invalid(self, *args):
+        """Test create an EVC where all paths are invalid."""
+        (
+            _,
+            discover_new_paths_mock,
+            log_mock,
+            httpx_mock,
+        ) = args
+
+        response = MagicMock(status_code=201, is_server_error=False)
+        httpx_mock.return_value = response
+        evc = self.create_evc_inter_switch()
+
+        discover_new_paths_mock.return_value = iter([None, None])
+        evc.deploy_to_path()
+        msg_expected = "try increasing `max_paths`"
+        assert log_mock.warning.call_count == 1
+        assert msg_expected in log_mock.warning.call_args[0][0]
+
     def test_try_to_activate_intra_evc(self) -> None:
         """Test try_to_activate for intra EVC."""
 

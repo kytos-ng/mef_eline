@@ -1229,7 +1229,8 @@ class Main(KytosNApp):
             # Ex: current_path,
             #     primary_path,
             #     backup_path
-            if "path" in attribute and attribute != "dynamic_backup_path":
+            if (attribute.endswith("path") and
+                    attribute != "dynamic_backup_path"):
                 data[attribute] = Path(
                     [self._link_from_dict(link, attribute) for link in value]
                 )
