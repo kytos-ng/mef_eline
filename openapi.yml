@@ -461,7 +461,8 @@ components:
         max_paths:
           type: integer
           format: int32
-          description: Maximum number of paths to be considered. Default value is 2.
+          description: Maximum number of paths to be considered.
+          default: 2
           minimum: 2
           maximum: 10
     NewLink: # Can be referenced via '#/components/schemas/NewLink'
@@ -713,7 +714,8 @@ components:
         max_paths:
           type: integer
           format: int32
-          description: Maximum number of paths to be considered. Default value is 2.
+          description: Maximum number of paths to be considered.
+          default: 2
           minimum: 2
           maximum: 10
 
@@ -791,7 +793,8 @@ components:
         max_paths:
           type: integer
           format: int32
-          description: Maximum number of paths to be considered. Default value is 2.
+          description: Maximum number of paths to be considered.
+          default: 2
           minimum: 2
           maximum: 10
 
