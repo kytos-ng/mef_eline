@@ -22,6 +22,7 @@ Added
 - Added migration script for updating the default ``queue_id`` from ``None`` to ``-1``
 - Added added paramenter support for redeployment, ``PATCH v2/evc/{evc_id}/redeploy?try_avoid_same_s_vlan=true``. By default it will try to avoid ``s_vlan`` from ``current_path`` links.
 - Added option to opt out from trying to avoid previous ``s_vlan`` when redeploying EVCs.
+- Added option to analyze more paths when EVCs tries to find a valid path. This option is in a new patchable field in EVC document called ``max_paths``.
 
 Fixed
 =======
@@ -42,6 +43,7 @@ Changed
 - UI: Added column ``Path Types`` to ``View Connections`` component to indicate if the EVC has a ``dynamic_backup_path``, ``static_primary`` or ``static_backup`` value.
 - When a link flap happens, now ``mef_eline`` will check on EVC attributes to decide whether to acquire an EVC lock.
 - UI: The method ``onblur_dpid`` was changed to a computed property.
+- Log now will notify if all paths for a ``current_path`` are invalid and suggest to increase ``max_paths``.
 
 [2024.1.4] - 2024-09-09
 ***********************

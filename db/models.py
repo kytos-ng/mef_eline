@@ -139,6 +139,7 @@ class EVCBaseDoc(DocumentBaseModel):
     metadata: Dict = {}
     active: bool
     enabled: bool
+    max_paths: Optional[int] = 2
 
     @staticmethod
     def projection() -> Dict:
@@ -163,6 +164,7 @@ class EVCBaseDoc(DocumentBaseModel):
             "metadata": 1,
             "active": 1,
             "enabled": 1,
+            "max_paths": 1,
             "execution_rounds": {"$ifNull": ["$execution_rounds", 0]},
             "owner": {"$ifNull": ["$owner", None]},
             "queue_id": {"$ifNull": ["$queue_id", None]},
