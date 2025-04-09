@@ -245,14 +245,6 @@ class DynamicPathManager:
         unwanted_links = [
             (link.endpoint_a.id, link.endpoint_b.id) for link in unwanted_path
         ]
-        unwanted_switches = set()
-        for link in unwanted_path:
-            unwanted_switches.add(link.endpoint_a.switch.id)
-            unwanted_switches.add(link.endpoint_b.switch.id)
-        unwanted_switches.discard(circuit.uni_a.interface.switch.id)
-        unwanted_switches.discard(circuit.uni_z.interface.switch.id)
-
-        length_unwanted = (len(unwanted_links) + len(unwanted_switches))
         if not unwanted_links:
             return None
 
@@ -267,11 +259,16 @@ class DynamicPathManager:
             return None
 
         for path in paths:
-            links_n, switches_n = cls.get_shared_components(
-                path, unwanted_links, unwanted_switches
-            )
-            shared_components = links_n + switches_n
-            path["disjointness"] = 1 - shared_components / length_unwanted
+            head = path["hops"][:-1]
+            tail = path["hops"][1:]
+            shared_edges = 0
+            for (endpoint_a, endpoint_b) in unwanted_links:
+                if ((endpoint_a, endpoint_b) in zip(head, tail)) or (
+                    (endpoint_b, endpoint_a) in zip(head, tail)
+                ):
+                    shared_edges += 1
+            path["disjointness"] = 1 - shared_edges / len(unwanted_links)
+
         paths = sorted(paths, key=lambda x: (-x['disjointness'], x['cost']))
         for path in paths:
             if path["disjointness"] == 0:
