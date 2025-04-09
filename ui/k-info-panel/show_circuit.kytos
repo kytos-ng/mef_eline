@@ -512,7 +512,8 @@ export default {
                      'Southbound priority': {'value': data['sb_priority'], 'editable':true, 'name':'sb_priority'},
                      'Bandwidth': {'value': data['bandwidth'], 'editable':true, 'name':'bandwidth'},
                      'Queue': {'value': data['queue_id'], 'name':'queue_id'},
-                     'Service level': {'value': data['service_level'], 'editable':true, 'name':'service_level'}
+                     'Service level': {'value': data['service_level'], 'editable':true, 'name':'service_level'},
+                     'Max paths': {'value': data['max_paths'], 'editable': true, 'name': 'max_paths'},
                     };
       this.dates = {'Request time': data['request_time'],
                     'Creation time': data['creation_time'],
@@ -543,7 +544,7 @@ export default {
       */
       let _path = [];
       if(path_data) {
-        for(key_path in path_data) {
+        for(var key_path in path_data) {
           let path_step = path_data[key_path];
 
           let svlan = ('metadata' in path_step && 's_vlan' in path_step['metadata']) ?
@@ -553,7 +554,7 @@ export default {
           let data_a = this.getEndpointData(dpid_a);
 
           let dpid_b = path_step['endpoint_b']['id'];
-          data_b = this.getEndpointData(dpid_b);
+          let data_b = this.getEndpointData(dpid_b);
           let _item = {
             'DPID': [dpid_a, dpid_b],
             'Node': [data_a['node_name'], data_b['node_name']],
@@ -778,6 +779,7 @@ export default {
         bandwidth: parseInt(this.others["Bandwidth"]["value"]) || 0,
         queue_id: parseInt(this.others["Queue"]["value"]),
         service_level: parseInt(this.others["Service level"]["value"]) || 0,
+        max_paths: parseInt(this.others["Max paths"]["value"]) || 2,
         uni_a: {
           interface_id: this.endpoints_data["DPID"][0]["value"],
         },

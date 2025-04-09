@@ -58,6 +58,11 @@
                     tooltip="Enter the southbound priority"
                     placeholder="southbound priority" icon="arrow-right"></k-input>
 
+            <k-input id="max_paths" v-model:value="max_paths"
+                    title="Paths to consider"
+                    tooltip="Maximum amount of paths to consider for current_path"
+                    placeholder="Paths to consider" icon="arrow-right"></k-input>
+
            <k-dropdown icon="arrow-right" title="QoS Egress Queue" :options="get_queue_ids"
             v-model:value="queue_id"></k-dropdown>
 
@@ -232,6 +237,7 @@ export default {
         tag_value_z: "",
         service_level: "",
         sb_priority: "",
+        max_paths: "2",
         queue_id: "",
         enable_int: [],
         dpids: [""],
@@ -467,6 +473,7 @@ export default {
       this.queue_id = "";
       this.enable_int = [],
       this.link_options = [];
+      this.max_paths = "2";
 
       this.init_path_constraints();
       // Clear select and dropdown components
@@ -504,7 +511,8 @@ export default {
             "dynamic_backup_path": true,
             "enabled": true,
             "uni_a": {"interface_id": this.endpoint_a},
-            "uni_z": {"interface_id": this.endpoint_z}
+            "uni_z": {"interface_id": this.endpoint_z},
+            "max_paths": parseInt(this.max_paths),
         }
         
         if (this.tag_type_a != "" && this.tag_value_a != "") {
