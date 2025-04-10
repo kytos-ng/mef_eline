@@ -992,8 +992,7 @@ class EVCDeploy(EVCBase):
                 ):
             return
         if (now() - self.affected_by_link_at).seconds >= wait:
-            with self.lock:
-                self.setup_failover_path(warn_if_not_path)
+            self.setup_failover_path(warn_if_not_path)
 
     # pylint: disable=too-many-statements
     def setup_failover_path(self, warn_if_not_path=True):
