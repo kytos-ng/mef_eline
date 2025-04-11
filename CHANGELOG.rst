@@ -23,6 +23,7 @@ Added
 - Added added paramenter support for redeployment, ``PATCH v2/evc/{evc_id}/redeploy?try_avoid_same_s_vlan=true``. By default it will try to avoid ``s_vlan`` from ``current_path`` links.
 - Added option to opt out from trying to avoid previous ``s_vlan`` when redeploying EVCs.
 - Added option to analyze more paths when EVCs tries to find a valid path. This option is in a new patchable field in EVC document called ``max_paths``.
+- Added option to UI to set ``max_paths`` when creating and modifying an EVC.
 
 Fixed
 =======
