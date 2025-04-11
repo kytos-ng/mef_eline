@@ -61,7 +61,7 @@
             <k-input id="max_paths" v-model:value="max_paths"
                     title="Max paths to consider|compute"
                     tooltip="Maximum amount of paths to consider for current_path"
-                    placeholder="Max paths to consider|compute" icon="arrow-right"></k-input>
+                    placeholder="Max paths to consider" icon="arrow-right"></k-input>
 
            <k-dropdown icon="arrow-right" title="QoS Egress Queue" :options="get_queue_ids"
             v-model:value="queue_id"></k-dropdown>
