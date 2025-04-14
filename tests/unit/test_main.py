@@ -2515,6 +2515,40 @@ class TestMain:
         self.napp.handle_flow_mod_error(event)
         evc.remove_current_flows.assert_called_once()
 
+    def test_handle_flow_mod_error_return(self):
+        """Test handle_flow_mod_error method with early return."""
+        flow = MagicMock()
+        flow.cookie = 0xaa00000000000011
+        event = MagicMock()
+        event.content = {'flow': flow, 'error_command': 'delete'}
+
+        evc = create_autospec(EVC)
+        evc.archived = False
+        evc.is_enabled.return_value = True
+
+        # Flow command is not 'add'
+        self.napp.circuits = {"00000000000011": evc}
+        self.napp.handle_flow_mod_error(event)
+        assert not evc.remove_current_flows.call_count
+
+        # EVC is not enabled
+        event.content["error_command"] = "add"
+        evc.is_enabled.return_value = False
+        self.napp.handle_flow_mod_error(event)
+        assert not evc.remove_current_flows.call_count
+
+        # EVC is archived
+        evc.is_enabled.return_value = True
+        evc.archived = True
+        self.napp.handle_flow_mod_error(event)
+        assert not evc.remove_current_flows.call_count
+
+        # EVC does not exist in self.circuits
+        evc.archived = False
+        self.napp.circuits = {}
+        self.napp.handle_flow_mod_error(event)
+        assert not evc.remove_current_flows.call_count
+
     @patch("kytos.core.Controller.get_interface_by_id")
     def test_uni_from_dict(self, _get_interface_by_id_mock):
         """Test _uni_from_dict method."""
