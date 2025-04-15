@@ -1190,6 +1190,8 @@ class Main(KytosNApp):
         if command != "add":
             return
         evc = self.circuits.get(EVC.get_id_from_cookie(flow.cookie))
+        if not evc or evc.archived or not evc.is_enabled():
+            return
         with evc.lock:
             evc.remove_current_flows(sync=False)
             evc.remove_failover_flows(sync=True)
