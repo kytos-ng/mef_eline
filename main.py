@@ -108,13 +108,12 @@ class Main(KytosNApp):
             self.execute_consistency()
         log.debug("Finished consistency routine")
 
-    def should_be_checked(self, circuit):
+    def should_be_checked(self, circuit: EVC):
         "Verify if the circuit meets the necessary conditions to be checked"
         # pylint: disable=too-many-boolean-expressions
         if (
                 circuit.is_enabled()
                 and not circuit.is_active()
-                and not circuit.lock.locked()
                 and not circuit.has_recent_removed_flow()
                 and not circuit.is_recent_updated()
                 and circuit.are_unis_active()
@@ -127,26 +126,89 @@ class Main(KytosNApp):
 
     def execute_consistency(self):
         """Execute consistency routine."""
-        circuits_to_check = []
-        for circuit in self.get_evcs_by_svc_level(enable_filter=False):
-            if self.should_be_checked(circuit):
-                circuits_to_check.append(circuit)
-            circuit.try_setup_failover_path(warn_if_not_path=False)
-        circuits_checked = EVCDeploy.check_list_traces(circuits_to_check)
-        for circuit in circuits_to_check:
-            is_checked = circuits_checked.get(circuit.id)
-            if is_checked:
+        with ExitStack() as exit_stack:
+
+            check_if_inactive_is_deployed = set[str]()
+            check_if_active_is_working = set[str]()
+            circuits_to_check = list[EVC]()
+            undeploy = list[EVC]()
+            evcs_to_update = dict[str, EVC]()
+
+            for circuit in self.get_evcs_by_svc_level(enable_filter=False):
+                with ExitStack() as sub_stack:
+                    if not circuit.lock.acquire(blocking=False):
+                        continue
+                    sub_stack.push(circuit.lock)
+                    circuit.try_setup_failover_path(warn_if_not_path=False)
+                    if all((
+                        circuit.is_enabled(),
+                        not circuit.is_active(),
+                        not circuit.has_recent_removed_flow(),
+                        not circuit.is_recent_updated(),
+                        circuit.are_unis_active(),
+                        circuit.is_intra_switch() or circuit.current_path,
+                    )):
+                        check_if_inactive_is_deployed.add(circuit.id)
+                    elif all((
+                        circuit.is_enabled(),
+                        circuit.is_active(),
+                        not circuit.has_recent_removed_flow(),
+                        not circuit.is_recent_updated(),
+                        circuit.are_unis_active(),
+                    )):
+                        check_if_active_is_working.add(circuit.id)
+                    else:
+                        continue
+
+                    circuits_to_check.append(circuit)
+                    exit_stack.push(sub_stack.pop_all())
+
+            circuits_checked = EVCDeploy.check_list_traces(circuits_to_check)
+            for circuit in circuits_to_check:
+                is_checked = circuits_checked.get(circuit.id)
+                if not is_checked:
+                    circuit.execution_rounds += 1
+                    if circuit.execution_rounds > settings.WAIT_FOR_OLD_PATH:
+                        log.info(
+                            f"{circuit} deployed but trace failed - redeploy"
+                        )
+                        undeploy.append(circuit)
+                    continue
+
                 circuit.execution_rounds = 0
-                log.info(f"{circuit} enabled but inactive - activating")
-                with circuit.lock:
+                log.debug(f"{circuit} trace passed!")
+                if circuit.id in check_if_inactive_is_deployed:
+                    log.info(
+                        f"{circuit} deployed but inactive - activating"
+                    )
                     circuit.activate()
-                    circuit.sync()
-            else:
-                circuit.execution_rounds += 1
-                if circuit.execution_rounds > settings.WAIT_FOR_OLD_PATH:
-                    log.info(f"{circuit} enabled but inactive - redeploy")
-                    with circuit.lock:
-                        circuit.deploy()
+                    evcs_to_update[circuit.id] = circuit
+                # if circuit.id in check_if_active_is_working:
+                #     pass
+
+            # NOTE: Perhaps use a swap failover instead?
+            if undeploy:
+                success, failure = self.execute_undeploy(undeploy)
+
+                for evc in success:
+                    evc.execution_rounds = 0
+
+                evcs_to_update.update((evc.id, evc) for evc in success)
+
+                if failure:
+                    log.error(
+                        f"Failed to redeploy on failed trace for {failure}"
+                    )
+
+            if evcs_to_update:
+                evc_dicts = list[dict]()
+                update_time = now()
+                for evc in evcs_to_update.values():
+                    evc.updated_at = update_time
+                    evc_dicts.append(evc.as_dict())
+                self.mongo_controller.update_evcs(
+                    evc_dicts
+                )
 
     def shutdown(self):
         """Execute when your napp is unloaded.
@@ -374,49 +436,52 @@ class Main(KytosNApp):
             log.debug("update result %s %s", result, 404)
             raise HTTPException(404, detail=result) from KeyError
 
-        try:
-            updated_data = self._evc_dict_with_instances(data)
-            self._check_no_tag_duplication(
-                circuit_id, updated_data.get("uni_a"),
-                updated_data.get("uni_z")
-            )
-            enable, redeploy = evc.update(**updated_data)
-        except (ValueError, KytosTagError, ValidationError) as exception:
-            log.debug("update result %s %s", exception, 400)
-            raise HTTPException(400, detail=str(exception)) from exception
-        except DuplicatedNoTagUNI as exception:
-            log.debug("update result %s %s", exception, 409)
-            raise HTTPException(409, detail=str(exception)) from exception
-        except DisabledSwitch as exception:
-            log.debug("update result %s %s", exception, 409)
-            raise HTTPException(
-                    409,
-                    detail=f"Path is not valid: {exception}"
-                ) from exception
-        redeployed = False
-        if evc.is_active():
-            if enable is False:  # disable if active
-                with evc.lock:
-                    evc.remove()
-            elif redeploy is not None:  # redeploy if active
-                with evc.lock:
-                    evc.remove()
-                    redeployed = evc.deploy()
-        else:
-            if enable is True:  # enable if inactive
-                with evc.lock:
-                    redeployed = evc.deploy()
-            elif evc.is_enabled() and redeploy:
-                with evc.lock:
-                    evc.remove()
-                    redeployed = evc.deploy()
-        result = {evc.id: evc.as_dict(), 'redeployed': redeployed}
-        status = 200
+        with evc.lock:
+            try:
+                updated_data = self._evc_dict_with_instances(data)
+                self._check_no_tag_duplication(
+                    circuit_id, updated_data.get("uni_a"),
+                    updated_data.get("uni_z")
+                )
+                enable, redeploy = evc.update(**updated_data)
+            except (ValueError, KytosTagError, ValidationError) as exception:
+                log.debug("update result %s %s", exception, 400)
+                raise HTTPException(400, detail=str(exception)) from exception
+            except DuplicatedNoTagUNI as exception:
+                log.debug("update result %s %s", exception, 409)
+                raise HTTPException(409, detail=str(exception)) from exception
+            except DisabledSwitch as exception:
+                log.debug("update result %s %s", exception, 409)
+                raise HTTPException(
+                        409,
+                        detail=f"Path is not valid: {exception}"
+                    ) from exception
 
-        log.debug("update result %s %s", result, status)
-        emit_event(self.controller, "updated",
-                   content=map_evc_event_content(evc, **data))
-        return JSONResponse(result, status_code=status)
+            redeployed = False
+
+            if evc.is_active():
+                if enable is False:  # disable if active
+                    evc.remove()
+                elif redeploy is not None:  # redeploy if active
+                    evc.remove()
+                    redeployed = evc.deploy()
+            else:
+                if enable is True:  # enable if inactive
+                    redeployed = evc.deploy()
+                elif evc.is_enabled() and redeploy:
+                    evc.remove()
+                    redeployed = evc.deploy()
+
+            result = {evc.id: evc.as_dict(), 'redeployed': redeployed}
+            status = 200
+
+            log.debug("update result %s %s", result, status)
+            emit_event(
+                self.controller,
+                "updated",
+                content=map_evc_event_content(evc, **data)
+            )
+            return JSONResponse(result, status_code=status)
 
     @rest("/v2/evc/{circuit_id}", methods=["DELETE"])
     def delete_circuit(self, request: Request) -> JSONResponse:
@@ -508,8 +573,9 @@ class Main(KytosNApp):
                 detail=f"circuit_id {circuit_id} not found."
             ) from error
 
-        evc.extend_metadata(metadata)
-        evc.sync()
+        with evc.lock:
+            evc.extend_metadata(metadata)
+            evc.sync()
         return JSONResponse("Operation successful", status_code=201)
 
     @rest("/v2/evc/metadata/{key}", methods=["DELETE"])
@@ -548,8 +614,9 @@ class Main(KytosNApp):
                 detail=f"circuit_id {circuit_id} not found."
             ) from error
 
-        evc.remove_metadata(key)
-        evc.sync()
+        with evc.lock:
+            evc.remove_metadata(key)
+            evc.sync()
         return JSONResponse("Operation successful")
 
     @rest("/v2/evc/{circuit_id}/redeploy", methods=["PATCH"])
@@ -572,8 +639,8 @@ class Main(KytosNApp):
                 detail=f"circuit_id {circuit_id} not found"
             ) from KeyError
         deployed = False
-        if evc.is_enabled():
-            with evc.lock:
+        with evc.lock:
+            if evc.is_enabled():
                 path_dict = evc.remove_current_flows(
                     sync=False,
                     return_path=try_avoid_same_s_vlan == "true"
@@ -629,18 +696,19 @@ class Main(KytosNApp):
         # new schedule from dict
         new_schedule = CircuitSchedule.from_dict(schedule_data)
 
-        # If there is no schedule, create the list
-        if not evc.circuit_scheduler:
-            evc.circuit_scheduler = []
+        with evc.lock:
+            # If there is no schedule, create the list
+            if not evc.circuit_scheduler:
+                evc.circuit_scheduler = []
 
-        # Add the new schedule
-        evc.circuit_scheduler.append(new_schedule)
+            # Add the new schedule
+            evc.circuit_scheduler.append(new_schedule)
 
-        # Add schedule job
-        self.sched.add_circuit_job(evc, new_schedule)
+            # Add schedule job
+            self.sched.add_circuit_job(evc, new_schedule)
 
-        # save circuit to mongodb
-        evc.sync()
+            # save circuit to mongodb
+            evc.sync()
 
         result = new_schedule.as_dict()
         status = 201
@@ -667,6 +735,7 @@ class Main(KytosNApp):
         schedule_id = request.path_params["schedule_id"]
         log.debug("update_schedule /v2/evc/schedule/%s", schedule_id)
 
+        # TODO: Potentially not thread safe
         # Try to find a circuit schedule
         evc, found_schedule = self._find_evc_by_schedule_id(schedule_id)
 
@@ -678,17 +747,19 @@ class Main(KytosNApp):
 
         new_schedule = CircuitSchedule.from_dict(data)
         new_schedule.id = found_schedule.id
-        # Remove the old schedule
-        evc.circuit_scheduler.remove(found_schedule)
-        # Append the modified schedule
-        evc.circuit_scheduler.append(new_schedule)
 
-        # Cancel all schedule jobs
-        self.sched.cancel_job(found_schedule.id)
-        # Add the new circuit schedule
-        self.sched.add_circuit_job(evc, new_schedule)
-        # Save EVC to mongodb
-        evc.sync()
+        with evc.lock:
+            # Remove the old schedule
+            evc.circuit_scheduler.remove(found_schedule)
+            # Append the modified schedule
+            evc.circuit_scheduler.append(new_schedule)
+
+            # Cancel all schedule jobs
+            self.sched.cancel_job(found_schedule.id)
+            # Add the new circuit schedule
+            self.sched.add_circuit_job(evc, new_schedule)
+            # Save EVC to mongodb
+            evc.sync()
 
         result = new_schedule.as_dict()
         status = 200
@@ -706,6 +777,7 @@ class Main(KytosNApp):
         """
         schedule_id = request.path_params["schedule_id"]
         log.debug("delete_schedule /v2/evc/schedule/%s", schedule_id)
+        # TODO: This _find_evc_by_schedule, doesn't seem thread safe.
         evc, found_schedule = self._find_evc_by_schedule_id(schedule_id)
 
         # Can not modify circuits deleted and archived
@@ -714,13 +786,16 @@ class Main(KytosNApp):
             log.debug("delete_schedule result %s %s", result, 404)
             raise HTTPException(404, detail=result)
 
-        # Remove the old schedule
-        evc.circuit_scheduler.remove(found_schedule)
+        # TODO: Found_schedule could be removed by another thread,
+        # before this lock is entered.
+        with evc.lock:
+            # Remove the old schedule
+            evc.circuit_scheduler.remove(found_schedule)
 
-        # Cancel all schedule jobs
-        self.sched.cancel_job(found_schedule.id)
-        # Save EVC to mongodb
-        evc.sync()
+            # Cancel all schedule jobs
+            self.sched.cancel_job(found_schedule.id)
+            # Save EVC to mongodb
+            evc.sync()
 
         result = "Schedule removed"
         status = 200
@@ -1089,8 +1164,13 @@ class Main(KytosNApp):
             # Push update to DB
 
             if evcs_to_update:
+                evc_dicts = list[dict]()
+                update_time = now()
+                for evc in evcs_to_update.values():
+                    evc.updated_at = update_time
+                    evc_dicts.append(evc.as_dict())
                 self.mongo_controller.update_evcs(
-                    [evc.as_dict() for evc in evcs_to_update.values()]
+                    evc_dicts
                 )
 
     @listen_to("kytos/mef_eline.need_redeploy")
@@ -1146,7 +1226,8 @@ class Main(KytosNApp):
         evc = self.circuits.get(event.content["evc_id"])
         if not evc:
             return
-        evc.try_setup_failover_path()
+        with evc.lock:
+            evc.try_setup_failover_path()
 
     @listen_to("kytos/topology.topology_loaded")
     def on_topology_loaded(self, event):  # pylint: disable=unused-argument
@@ -1315,6 +1396,8 @@ class Main(KytosNApp):
 
         # pylint: disable=unused-variable
         for c_id, circuit in circuits.items():
+            # TODO: circuit_scheduler not protected by lock.
+            # Could be modified during iteration.
             for schedule in circuit.circuit_scheduler:
                 if schedule.id == schedule_id:
                     found_schedule = schedule
