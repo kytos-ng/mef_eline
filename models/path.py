@@ -42,10 +42,14 @@ class Path(list[Link], GenericEntity):
         If any of the links next tag isn't available, it'll release
         all vlans of the path that have been allocated, all or nothing.
         """
+        if not self:
+            return
         old_path_dict = old_path_dict if old_path_dict else {}
+        topology_napp = controller.napps[("kytos", "topology")]
         try:
             for link in self:
-                tag_value = link.get_next_available_tag(
+                topology_link = topology_napp.links[link.id]
+                tag_value = topology_link.get_next_available_tag(
                     controller, link.id,
                     try_avoid_value=old_path_dict.get(link.id)
                 )
@@ -57,11 +61,15 @@ class Path(list[Link], GenericEntity):
 
     def make_vlans_available(self, controller):
         """Make the VLANs used in a path available when undeployed."""
+        if not self:
+            return
+        topology_napp = controller.napps[("kytos", "topology")]
         for link in self:
             tag = link.get_metadata("s_vlan")
             if not tag:
                 continue
-            conflict_a, conflict_b = link.make_tags_available(
+            topology_link = topology_napp.links[link.id]
+            conflict_a, conflict_b = topology_link.make_tags_available(
                 controller, tag.value, link.id, tag.tag_type,
                 check_order=False
             )
