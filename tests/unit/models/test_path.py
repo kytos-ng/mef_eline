@@ -183,8 +183,7 @@ class TestPath():
             TAG(
                 "vlan",
                 topo_link1.get_next_available_tag(
-                    controller_mock,
-                    link1.id,
+                    "vlan",
                     try_avoid_value=None
                 )
             )
@@ -195,8 +194,7 @@ class TestPath():
             TAG(
                 "vlan",
                 topo_link2.get_next_available_tag(
-                    controller_mock,
-                    link2.id,
+                    "vlan",
                     try_avoid_value=None
                 )
             )
