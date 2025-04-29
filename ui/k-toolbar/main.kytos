@@ -495,17 +495,16 @@ export default {
         // Clear fields if the POST is a success
         this.set_default_values();
     },
-    post_error(data) {
+    post_error(error) {
         let notification = {
             icon: 'gear',
-            title: 'Circuit Not Created (' + data.status + '):',
-            description: data.responseJSON.description
+            title: 'Circuit Not Created (' + error.response.status + '):',
+            description: error.response.data.description
         }
     
         this.$kytos.eventBus.$emit("setNotification" , notification);
     },
     request_circuit () {
-        var _this = this;
         var request = {
             "name" : this.circuit_name,
             "dynamic_backup_path": true,
@@ -574,16 +573,15 @@ export default {
             request[_type].minimum_flexible_hits = parseInt(this.form_constraints[_type].minimum_flexible_hits);
           }
         });
-        
-        let circuit_request = $.ajax({
-                                url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/",
-                                type:"POST",
-                                data: JSON.stringify(request),
-                                dataType: "json",
-                                contentType: "application/json; charset=utf-8"
-                            });
-        circuit_request.done(this.post_success);
-        circuit_request.fail(this.post_error);
+        //Sync Axios
+        this.$http.post(this.$kytos_server_api + "kytos/mef_eline/v2/evc/", request)
+        .then(response => {
+          this.post_success(response.data);
+        })
+        .catch(error => {
+          this.post_error(error);
+          console.error(error);
+        });
     },
     fetch_dpids: function() {
         var self = this // create a closure to access component in the callback below
@@ -602,27 +600,22 @@ export default {
                         self.dpids = dpids;
                     });
     },
-    load_topology: function() {
-      var _this = this;
-
-      $.ajax({
-        async: true,
-        dataType: "json",
-        url: this.$kytos_server_api + "kytos/topology/v3",
-
-        success: function(data) {
-          let _link = data['topology']['links']
-          _this.link_options = [];
-
-          $.each(_link, function(key, value){
-            if (value.metadata.link_name !== undefined && value.metadata.link_name.length !== 0){
-              _this.link_options.push({value:value.id, description:value.metadata.link_name})
-            } else {
-              _this.link_options.push({value:value.id, description:value.id});
-            }
-          });
-        }
-      });
+    //Async Axios
+    async load_topology() {
+      try {
+        const response = await this.$http.get(this.$kytos_server_api + "kytos/topology/v3");
+        let _link = response.data['topology']['links'];
+        this.link_options = [];
+        Object.entries(_link).forEach(([key, value], index) => {
+          if (value.metadata.link_name !== undefined && value.metadata.link_name.length !== 0){
+            this.link_options.push({value:value.id, description: value.metadata.link_name});
+          } else {
+            this.link_options.push({value:value.id, description: value.id});
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
     },
   },
   mounted() { // when the Vue app is booted up, this is run automatically.
