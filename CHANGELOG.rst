@@ -6,6 +6,9 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2025.1.0] - 2025-04-14
+***********************
+
 Fixed
 =====
 - Try to handle uni interface up as link up for inter-EVCs
@@ -23,6 +26,7 @@ Added
 - Added added paramenter support for redeployment, ``PATCH v2/evc/{evc_id}/redeploy?try_avoid_same_s_vlan=true``. By default it will try to avoid ``s_vlan`` from ``current_path`` links.
 - Added option to opt out from trying to avoid previous ``s_vlan`` when redeploying EVCs.
 - Added option to analyze more paths when EVCs tries to find a valid path. This option is in a new patchable field in EVC document called ``max_paths``.
+- Added option to UI to set ``max_paths`` when creating and modifying an EVC.
 
 Fixed
 =======
