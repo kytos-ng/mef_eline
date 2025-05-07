@@ -580,7 +580,6 @@ export default {
         })
         .catch(error => {
           this.post_error(error);
-          console.error(error);
         });
     },
     fetch_dpids: function() {
