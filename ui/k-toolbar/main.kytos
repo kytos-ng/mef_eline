@@ -495,15 +495,6 @@ export default {
         // Clear fields if the POST is a success
         this.set_default_values();
     },
-    post_error(error) {
-        let notification = {
-            icon: 'gear',
-            title: 'Circuit Not Created (' + error.response.status + '):',
-            description: error.response.data.description
-        }
-    
-        this.$kytos.eventBus.$emit("setNotification" , notification);
-    },
     request_circuit () {
         var request = {
             "name" : this.circuit_name,
@@ -579,7 +570,7 @@ export default {
           this.post_success(response.data);
         })
         .catch(error => {
-          this.post_error(error);
+          this.$http_helpers.post_error(this, error, 'Circuit Not Created ({s}):');
         });
     },
     fetch_dpids: function() {
