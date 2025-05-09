@@ -1,5 +1,5 @@
 <template>
-  <k-toolbar-item icon="link" tooltip="Mef-Eline">
+  <k-toolbar-item name="kytos-mef_eline-k-toolbar-main" icon="link" tooltip="Mef-Eline">
     <div class="scroll">
       <k-accordion>
         <k-accordion-item title="Request E-Line Circuit">
