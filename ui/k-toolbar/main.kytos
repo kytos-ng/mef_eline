@@ -570,7 +570,7 @@ export default {
           this.post_success(response.data);
         })
         .catch(error => {
-          this.$http_helpers.post_error(this, error, 'Circuit Not Created ({s}):');
+          this.$http_helpers.post_error(this, error, 'Circuit Not Created');
         });
     },
     fetch_dpids: function() {
