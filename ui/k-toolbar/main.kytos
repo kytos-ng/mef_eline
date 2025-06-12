@@ -1,5 +1,5 @@
 <template>
-  <k-toolbar-item icon="link" tooltip="Mef-Eline">
+  <k-toolbar-item name="kytos-mef_eline-k-toolbar-main" icon="link" tooltip="Mef-Eline">
     <div class="scroll">
       <k-accordion>
         <k-accordion-item title="Request E-Line Circuit">
@@ -57,6 +57,11 @@
                     title="Southbound priority:"
                     tooltip="Enter the southbound priority"
                     placeholder="southbound priority" icon="arrow-right"></k-input>
+
+            <k-input id="max_paths" v-model:value="max_paths"
+                    title="Max paths to consider|compute"
+                    tooltip="Maximum amount of paths to consider for current_path"
+                    placeholder="Max paths to consider" icon="arrow-right"></k-input>
 
            <k-dropdown icon="arrow-right" title="QoS Egress Queue" :options="get_queue_ids"
             v-model:value="queue_id"></k-dropdown>
@@ -232,6 +237,7 @@ export default {
         tag_value_z: "",
         service_level: "",
         sb_priority: "",
+        max_paths: "",
         queue_id: "",
         enable_int: [],
         dpids: [""],
@@ -467,6 +473,7 @@ export default {
       this.queue_id = "";
       this.enable_int = [],
       this.link_options = [];
+      this.max_paths = "";
 
       this.init_path_constraints();
       // Clear select and dropdown components
@@ -488,23 +495,14 @@ export default {
         // Clear fields if the POST is a success
         this.set_default_values();
     },
-    post_error(data) {
-        let notification = {
-            icon: 'gear',
-            title: 'Circuit Not Created (' + data.status + '):',
-            description: data.responseJSON.description
-        }
-    
-        this.$kytos.eventBus.$emit("setNotification" , notification);
-    },
     request_circuit () {
-        var _this = this;
         var request = {
             "name" : this.circuit_name,
             "dynamic_backup_path": true,
             "enabled": true,
             "uni_a": {"interface_id": this.endpoint_a},
-            "uni_z": {"interface_id": this.endpoint_z}
+            "uni_z": {"interface_id": this.endpoint_z},
+            "max_paths": parseInt(this.max_paths) || 2,
         }
         
         if (this.tag_type_a != "" && this.tag_value_a != "") {
@@ -566,16 +564,14 @@ export default {
             request[_type].minimum_flexible_hits = parseInt(this.form_constraints[_type].minimum_flexible_hits);
           }
         });
-        
-        let circuit_request = $.ajax({
-                                url: this.$kytos_server_api + "kytos/mef_eline/v2/evc/",
-                                type:"POST",
-                                data: JSON.stringify(request),
-                                dataType: "json",
-                                contentType: "application/json; charset=utf-8"
-                            });
-        circuit_request.done(this.post_success);
-        circuit_request.fail(this.post_error);
+        //Sync Axios
+        this.$http.post(this.$kytos_server_api + "kytos/mef_eline/v2/evc/", request)
+        .then(response => {
+          this.post_success(response.data);
+        })
+        .catch(error => {
+          this.$http_helpers.post_error(this, error, 'Circuit Not Created');
+        });
     },
     fetch_dpids: function() {
         var self = this // create a closure to access component in the callback below
@@ -594,27 +590,22 @@ export default {
                         self.dpids = dpids;
                     });
     },
-    load_topology: function() {
-      var _this = this;
-
-      $.ajax({
-        async: true,
-        dataType: "json",
-        url: this.$kytos_server_api + "kytos/topology/v3",
-
-        success: function(data) {
-          let _link = data['topology']['links']
-          _this.link_options = [];
-
-          $.each(_link, function(key, value){
-            if (value.metadata.link_name !== undefined && value.metadata.link_name.length !== 0){
-              _this.link_options.push({value:value.id, description:value.metadata.link_name})
-            } else {
-              _this.link_options.push({value:value.id, description:value.id});
-            }
-          });
-        }
-      });
+    //Async Axios
+    async load_topology() {
+      try {
+        const response = await this.$http.get(this.$kytos_server_api + "kytos/topology/v3");
+        let _link = response.data['topology']['links'];
+        this.link_options = [];
+        Object.entries(_link).forEach(([key, value], index) => {
+          if (value.metadata.link_name !== undefined && value.metadata.link_name.length !== 0){
+            this.link_options.push({value:value.id, description: value.metadata.link_name});
+          } else {
+            this.link_options.push({value:value.id, description: value.id});
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
     },
   },
   mounted() { // when the Vue app is booted up, this is run automatically.

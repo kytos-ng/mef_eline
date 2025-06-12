@@ -846,7 +846,7 @@ class Main(KytosNApp):
             install_flows = evc.get_failover_flows()
         # pylint: disable=broad-except
         except Exception:
-            err = traceback.format_exc().replace("\n", ", ")
+            err = traceback.format_exc()
             log.error(
                 "Ignore Failover path for "
                 f"{evc} due to error: {err}"
@@ -910,7 +910,7 @@ class Main(KytosNApp):
             )
         # pylint: disable=broad-except
         except Exception:
-            err = traceback.format_exc().replace("\n", ", ")
+            err = traceback.format_exc()
             log.error(f"Fail to remove {evc} old_path: {err}")
         return del_flows
 
@@ -973,7 +973,7 @@ class Main(KytosNApp):
             )
         # pylint: disable=broad-except
         except Exception:
-            err = traceback.format_exc().replace("\n", ", ")
+            err = traceback.format_exc()
             log.error(f"Fail to undeploy {evc}: {err}")
         return del_flows
 
@@ -1190,6 +1190,8 @@ class Main(KytosNApp):
         if command != "add":
             return
         evc = self.circuits.get(EVC.get_id_from_cookie(flow.cookie))
+        if not evc or evc.archived or not evc.is_enabled():
+            return
         with evc.lock:
             evc.remove_current_flows(sync=False)
             evc.remove_failover_flows(sync=True)
@@ -1229,7 +1231,8 @@ class Main(KytosNApp):
             # Ex: current_path,
             #     primary_path,
             #     backup_path
-            if "path" in attribute and attribute != "dynamic_backup_path":
+            if (attribute.endswith("path") and
+                    attribute != "dynamic_backup_path"):
                 data[attribute] = Path(
                     [self._link_from_dict(link, attribute) for link in value]
                 )
