@@ -6,6 +6,9 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2025.1.1] - 2025-06-23
+***********************
+
 Fixed
 =====
 - ``set_queue`` action is now set before ``output``
