@@ -204,8 +204,10 @@ class TestEVC():
         evc.sb_priority = 1234
         flow_mod = evc._prepare_flow_mod(interface_a, interface_z, 3)
         assert flow_mod["priority"] == 1234
-        assert flow_mod["actions"][1]["action_type"] == "set_queue"
-        assert flow_mod["actions"][1]["queue_id"] == 3
+        assert flow_mod["actions"][0]["action_type"] == "set_queue"
+        assert flow_mod["actions"][0]["queue_id"] == 3
+        assert flow_mod["actions"][1]["action_type"] == "output"
+        assert flow_mod["actions"][1]["port"] == interface_z.port_number
 
     def test_prepare_pop_flow(self):
         """Test prepare pop flow  method."""
