@@ -10,6 +10,10 @@ Fixed
 =====
 - ``set_queue`` action is now set before ``output``
 
+Changed
+=======
+- Internal refactoring updating UI components to use ``pinia`` and ``axios``
+
 [2025.1.0] - 2025-04-14
 ***********************
 
