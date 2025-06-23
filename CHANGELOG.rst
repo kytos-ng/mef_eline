@@ -13,6 +13,10 @@ Fixed
 =====
 - ``set_queue`` action is now set before ``output``
 
+General Information
+===================
+- ``scripts/console/2025.1.1/001_redeploy_set_queue.py`` is supposed to be used if you have EVCs created in prior versions that have ``set_queue`` action, this script will reploy them which will result in ``set_queue`` being placed before ``output`` action
+
 [2025.1.0] - 2025-04-14
 ***********************
 
