@@ -10,7 +10,7 @@ This folder contains `mef_eline` related scripts that should be run on kytos con
 
 </summary>
 
-[001_redeploy_set_queue.py](./2025.1.1/001_redeploy_set_queue.py) script will reaploy EVCs which have `set_queue` action (incorrectly) as the last action. `set_queue` is supposed to be set before the `output` action.
+[001_redeploy_set_queue.py](./001_redeploy_set_queue.py) script will reaploy EVCs which have `set_queue` action (incorrectly) as the last action. `set_queue` is supposed to be set before the `output` action.
 
 ### How to use
 
