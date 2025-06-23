@@ -6,6 +6,10 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+Changed
+=======
+- Internal refactoring updating UI components to use ``pinia`` and ``axios``
+
 [2025.1.0] - 2025-04-14
 ***********************
 
