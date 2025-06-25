@@ -12,6 +12,10 @@
             <k-button tooltip="Save EVC" title="Save EVC" @click="saveEvc">
             </k-button>
           </div>
+          <div>
+            <k-button tooltip="Redeploy EVC" title="Redeploy EVC" @click="redeployEvc">
+            </k-button>
+          </div>
           <div class="mef-delete-button">
             <k-button tooltip="Delete EVC" title="Delete EVC" @click="showModalDeleteEvc">
             </k-button>
@@ -247,8 +251,6 @@
           <k-checkbox style="background: none;" title="Try to avoid previous VLAN"
                       :action="toggle_avoid" :checked=true
           ></k-checkbox>
-          <k-button tooltip="Redeploy EVC" title="Redeploy EVC" @click="redeployEvc">
-          </k-button>
         </div>
       </div>
       <k-modal

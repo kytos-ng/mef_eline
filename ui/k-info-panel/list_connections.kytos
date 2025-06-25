@@ -271,8 +271,9 @@ export default {
           // Cast to string to search VLAN numbers
           let checks = properties.map(i => 
             !this.search_cols[i] || 
-            item[i].toString().toUpperCase().includes(this.search_cols[i].toString().toUpperCase())
+            this.search_cols[i].toString().toUpperCase().split(/[\s,]+/).some(element => item[i].toString().toUpperCase().includes(element))
           );
+          
           // check if no property is false
           return !checks.includes(false);
         }
@@ -299,8 +300,6 @@ export default {
 
     // Initialize list sort direction
     this.currentSortDir = Array(this.data_headers.length).fill('asc');
-
-    this.$forceUpdate();
   },
   mounted() {
     // Make the panel fill the screen except the left menu width
