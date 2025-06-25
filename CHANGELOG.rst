@@ -9,6 +9,15 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 Changed
 =======
 - Internal refactoring updating UI components to use ``pinia`` and ``axios``
+- The redeploy button within the Circuit Details Menu was moved to the top of the menu for easier accessibility
+
+Added
+=====
+- Filters can now search for multiple values at a time by using comas or spaces
+
+Fixed
+=====
+- The "Back To List" button in the Circuit Details Menu will no longer delete saved EVC filters
 
 [2025.1.0] - 2025-04-14
 ***********************
