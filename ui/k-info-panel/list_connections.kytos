@@ -300,7 +300,7 @@ export default {
     // Initialize list sort direction
     this.currentSortDir = Array(this.data_headers.length).fill('asc');
 
-    this.search_cols = this.data_header_id.reduce((obj, item) => (obj[item] = "", obj), {});
+    this.$forceUpdate();
   },
   mounted() {
     // Make the panel fill the screen except the left menu width
