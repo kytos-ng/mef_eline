@@ -14,6 +14,10 @@ Changed
 =======
 - Internal refactoring updating UI components to use ``pinia`` and ``axios``
 
+Added
+=====
+- Circuit Details Menu now has a table for EVC metadata
+
 [2025.1.0] - 2025-04-14
 ***********************
 
