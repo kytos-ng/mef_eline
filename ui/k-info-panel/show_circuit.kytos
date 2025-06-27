@@ -109,6 +109,49 @@
           </table>
         </div>
 
+        <div class="mef-circuit-table" id="mef-unis">
+          <table class="table">
+            <tbody>
+              <tr>
+                <th>Metadata</th>
+                <th></th>
+                <th></th>
+              </tr>
+              <template v-for="(data, cindex) in metadata">
+                <tr>
+                  <th>{{cindex}}</th>
+                    <td>
+                      <k-input
+                        v-model:value="metadata[cindex]"
+                        :title="cindex">
+                      </k-input>
+                    </td>
+                    <td class="minusButtonWrapper">
+                      <k-button icon="minus" tooltip="Remove metadata" @click="removeMetadata(key)"></k-button>
+                    </td>
+                </tr>
+              </template>
+              <tr>
+                <th>
+                  <k-input
+                    v-model:value="key"
+                    title="Insert Metadata Key">
+                  </k-input>
+                </th>
+                <td>
+                  <k-input
+                    v-model:value="value"
+                    title="Insert Metadata Value">
+                  </k-input>
+                </td>
+                <td class="plusButtonWrapper">
+                  <k-button icon="plus" tooltip="Add metadata" @click="addMetadata"></k-button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <template v-for="(path, pindex) in paths">
           <div class="mef-circuit-table mef-circuit-table-path">
             <table class="table">
@@ -292,6 +335,9 @@ export default {
         link_options: [], // constraint link dropdown options
         form_constraints: {}, // constraint data vue object synchronization
         avoid_vlan: false, // Try to avoid previous s_vlan when redeploying. false so it is true by default.
+        metadata: {node_name: "hello"},
+        key: "",
+        value: ""
     }
   },
   methods: {
@@ -508,6 +554,7 @@ export default {
                     'Archived': {'value': data['archived']?true:false, 'editable':false},
                     'Dynamic backup path': {'value': data['dynamic_backup_path']?true:false, 'editable':true}
                    };
+      this.metadata = data.metadata;
       this.others = {'Owner': {'value': data['owner'], 'editable':false},
                      'Southbound priority': {'value': data['sb_priority'], 'editable':true, 'name':'sb_priority'},
                      'Bandwidth': {'value': data['bandwidth'], 'editable':true, 'name':'bandwidth'},
@@ -786,6 +833,7 @@ export default {
         uni_z: {
           interface_id: this.endpoints_data["DPID"][1]["value"],
         },
+        metadata: this.metadata
       };
 
       // Tag is optional
@@ -892,6 +940,25 @@ export default {
     },
     toggle_avoid: function(){
       this.avoid_vlan = !this.avoid_vlan
+    },
+    addMetadata() {
+      let request = {[this.key]: this.value};
+      this.$http.post(this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + this.content.id + "/metadata", request)
+        .then(response => {
+          this.initialize();
+        })
+        .catch(error => {
+          this.$http_helpers.post_error(this, error, 'Could Not Add Metadata');
+        });
+    },
+    removeMetadata(key) {
+      this.$http.delete(this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + this.content.id + "/metadata/" + key)
+        .then(response => {
+          this.initialize();
+        })
+        .catch(error => {
+          this.$http_helpers.post_error(this, error, 'Could Not Remove Metadata');
+        });
     },
   },
   mounted() {
@@ -1065,6 +1132,14 @@ export default {
     display: flex;
     align-items: center;
     flex-direction: column;
+  }
+  .plusButtonWrapper {
+    display: flex;
+    justify-content: center;
+  }
+  .minusButtonWrapper {
+    display: flex;
+    justify-content: center;
   }
   #mef-flags {
     clear:both;
