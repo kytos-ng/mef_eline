@@ -15,7 +15,6 @@
                     :candidates="dpids" 
                     @focus="fetch_dpids"
                     @blur="onblur_dpid"></k-input-auto>
-            <k-dropdown icon="arrow-right" title="Endpoint A Dropdown" :options="switchName_options" v-model:value="endpoint_a"></k-dropdown>
             <div class="k-input mef-field-label" id="endpoint_name_a"
                     >{{endpoint_name_a}}</div> 
             <k-input id="endpoint-a-tag-type" v-model:value="tag_type_a"
@@ -36,7 +35,6 @@
                     :candidates="dpids"
                     @focus="fetch_dpids"
                     @blur="onblur_dpid"></k-input-auto>
-            <k-dropdown icon="arrow-left" title="Endpoint Z Dropdown" :options="switchName_options" v-model:value="endpoint_z"></k-dropdown>
             <div class="k-input mef-field-label" id="endpoint_name_z"
                     >{{endpoint_name_z}}</div> 
            <k-input id="endpoint-z-tag_type" v-model:value="tag_type_z"
@@ -245,7 +243,6 @@ export default {
         dpids: [""],
         hasAutoComplete:false,
         link_options: [],
-        switchName_options: [],
 
         constraint_titles: {},
         constraints: {},
@@ -321,15 +318,15 @@ export default {
         let dpid_a = this.endpoint_a;
         if(dpid_a.lastIndexOf(' ') > 0) {
             let splitted_dpid = dpid_a.split(' ');
-            this.endpoint_name_a = splitted_dpid[0];
-            this.endpoint_a = splitted_dpid[2];
+            this.endpoint_name_a = splitted_dpid[0] + ": " + splitted_dpid[2];
+            this.endpoint_a = splitted_dpid[4];
         }
         
         let dpid_z = this.endpoint_z;
         if(dpid_z.lastIndexOf(' ') > 0) {
             let splitted_dpid = dpid_z.split(' ');
-            this.endpoint_name_z = splitted_dpid[0];
-            this.endpoint_z = splitted_dpid[2];
+            this.endpoint_name_z = splitted_dpid[0] + ": " + splitted_dpid[2];
+            this.endpoint_z = splitted_dpid[4];
         }
     },
   },
@@ -578,18 +575,21 @@ export default {
     },
     fetch_dpids: function() {
         var self = this // create a closure to access component in the callback below
-        let dataUrl = "/api/kytos/topology/v3/interfaces"
+        let dataUrl = "/api/kytos/topology/v3/switches"
         // Autocomplete usage example.
         fetch(dataUrl).then(response => response.json())
                     .then(data => {
                         let dpids = []
-                        for ( const [key,value] of Object.entries( data.interfaces ) ) {
-                            let item = key;
-                            if(value.name) {
-                                item = value.name + " - " + item;
-                            }
+                        Object.entries(data.switches).forEach(([key, value], index) => {
+                          let switchIdentifier = value.id;
+                          if (value.metadata.node_name) {
+                            switchIdentifier = value.metadata.node_name;
+                          }
+                          Object.entries(value.interfaces).forEach(([key, value], index) => {
+                            let item = switchIdentifier + " - " + value.name + " - " + value.id;
                             dpids.push(item);
-                        }
+                          });
+                        });
                         self.dpids = dpids;
                     });
     },
@@ -608,15 +608,6 @@ export default {
             this.link_options.push({value:value.id, description: value.id});
           }
         });
-        Object.entries(_switch).forEach(([key, value], index) => {
-          let switchName = value.metadata.node_name;
-          Object.entries(value.interfaces).forEach(([key, value], index) => {
-            let interfaceID = value.id;
-            let interfaceName = value.name;
-            this.switchName_options.push({value: `${switchName} - ${interfaceID}`, description: `${switchName} - ${interfaceID}`})
-          });
-        });
-
       } catch (err) {
         console.error(err);
       }
