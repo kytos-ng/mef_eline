@@ -269,10 +269,12 @@ export default {
         {
           // for every property check if search is not empty and item[prop] has search[prop]
           // Cast to string to search VLAN numbers
+          // Regular Expression searches for comas and spaces
           let checks = properties.map(i => 
             !this.search_cols[i] || 
-            item[i].toString().toUpperCase().includes(this.search_cols[i].toString().toUpperCase())
+            this.search_cols[i].toString().toUpperCase().split(/[\s,]+/).some(element => item[i].toString().toUpperCase().includes(element))
           );
+          
           // check if no property is false
           return !checks.includes(false);
         }
@@ -299,8 +301,6 @@ export default {
 
     // Initialize list sort direction
     this.currentSortDir = Array(this.data_headers.length).fill('asc');
-
-    this.search_cols = this.data_header_id.reduce((obj, item) => (obj[item] = "", obj), {});
   },
   mounted() {
     // Make the panel fill the screen except the left menu width
