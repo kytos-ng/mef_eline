@@ -7,18 +7,25 @@
             </k-button>
           </div>
         </div>
-        <div class="mef-buttons-right">
-          <div class="mef-save-button">
-            <k-button tooltip="Save EVC" title="Save EVC" @click="saveEvc">
-            </k-button>
+        <div class="mef-buttons-right-wrapper">
+          <div class="mef-buttons-right">
+            <div class="mef-save-button">
+              <k-button tooltip="Save EVC" title="Save EVC" @click="saveEvc">
+              </k-button>
+            </div>
+            <div>
+              <k-button tooltip="Redeploy EVC" title="Redeploy EVC" @click="redeployEvc">
+              </k-button>
+            </div>
+            <div class="mef-delete-button">
+              <k-button tooltip="Delete EVC" title="Delete EVC" @click="showModalDeleteEvc">
+              </k-button>
+            </div>
           </div>
           <div>
-            <k-button tooltip="Redeploy EVC" title="Redeploy EVC" @click="redeployEvc">
-            </k-button>
-          </div>
-          <div class="mef-delete-button">
-            <k-button tooltip="Delete EVC" title="Delete EVC" @click="showModalDeleteEvc">
-            </k-button>
+            <k-checkbox style="background: none;" title="Try to avoid previous VLAN"
+              :action="toggle_avoid" :checked=true>
+            </k-checkbox>
           </div>
         </div>
       </div>
@@ -246,11 +253,6 @@
         <div class="left-bottom-buttons">
           <k-button tooltip="List installed EVCs" title="< Back to list" @click="showInfoPanel">
           </k-button>
-        </div>
-        <div class="right-bottom-buttons">
-          <k-checkbox style="background: none;" title="Try to avoid previous VLAN"
-                      :action="toggle_avoid" :checked=true
-          ></k-checkbox>
         </div>
       </div>
       <k-modal
@@ -969,6 +971,8 @@ export default {
   .mef-buttons .mef-buttons-right {
     float: right;
     display: flex;
+    align-items: center;
+    flex-direction: row;
   }
   .mef-buttons .mef-delete-button button {
     background: darkred;
@@ -1066,7 +1070,13 @@ export default {
     border-radius: 4px;
     display: flex;
     align-items: center;
+    flex-direction: row;
+  }
+  .mef-buttons-right-wrapper {
+    display: flex;
+    align-items: center;
     flex-direction: column;
+    float: right;
   }
   #mef-flags {
     clear:both;
