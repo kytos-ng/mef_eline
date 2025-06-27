@@ -127,7 +127,7 @@
                       </k-input>
                     </td>
                     <td class="minusButtonWrapper">
-                      <k-button icon="minus" tooltip="Remove metadata" @click="removeMetadata(key)"></k-button>
+                      <k-button icon="minus" tooltip="Remove metadata" @click="removeMetadata(cindex)"></k-button>
                     </td>
                 </tr>
               </template>
