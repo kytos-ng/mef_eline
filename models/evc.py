@@ -1434,7 +1434,8 @@ class EVCDeploy(EVCBase):
         ]
         queue_id = settings.QUEUE_ID if queue_id == -1 else queue_id
         if queue_id is not None:
-            default_actions.append(
+            default_actions.insert(
+                0,
                 {"action_type": "set_queue", "queue_id": queue_id}
             )
 
