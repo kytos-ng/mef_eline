@@ -598,9 +598,7 @@ export default {
       try {
         const response = await this.$http.get(this.$kytos_server_api + "kytos/topology/v3");
         let _link = response.data['topology']['links'];
-        let _switch = response.data['topology']['switches'];
         this.link_options = [];
-        this.switchName_options = [];
         Object.entries(_link).forEach(([key, value], index) => {
           if (value.metadata.link_name !== undefined && value.metadata.link_name.length !== 0){
             this.link_options.push({value:value.id, description: value.metadata.link_name});
