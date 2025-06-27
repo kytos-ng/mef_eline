@@ -6,6 +6,10 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+Fixed
+=====
+- ``set_queue`` action is now set before ``output``
+
 Changed
 =======
 - Internal refactoring updating UI components to use ``pinia`` and ``axios``
