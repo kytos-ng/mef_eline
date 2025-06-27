@@ -13,7 +13,7 @@ Changed
 
 Added
 =====
-- Filters can now search for multiple values at a time by using commas or spaces. If you type ``Switch1, Switch2, Switch3`` or ``Switch1 Switch2 Switch3`` or ``Switch1, Switch2, Switch3``, then your search will include all 3 options, Switch1, Switch2, and Switch3.
+- Filters can now search for multiple values at a time by using commas or spaces. If you type ``Switch1, Switch2, Switch3`` or ``Switch1 Switch2 Switch3`` or ``Switch1, Switch2, Switch3`` into the filter/search-bar, then your search will include all 3 options, Switch1, Switch2, and Switch3.
 
 Fixed
 =====
