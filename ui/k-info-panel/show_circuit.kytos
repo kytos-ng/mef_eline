@@ -134,13 +134,13 @@
               <tr>
                 <th>
                   <k-input
-                    v-model:value="key"
+                    v-model:value="metadata_key"
                     title="Insert Metadata Key">
                   </k-input>
                 </th>
                 <td>
                   <k-input
-                    v-model:value="value"
+                    v-model:value="metadata_value"
                     title="Insert Metadata Value">
                   </k-input>
                 </td>
@@ -335,9 +335,9 @@ export default {
         link_options: [], // constraint link dropdown options
         form_constraints: {}, // constraint data vue object synchronization
         avoid_vlan: false, // Try to avoid previous s_vlan when redeploying. false so it is true by default.
-        metadata: {node_name: "hello"},
-        key: "",
-        value: ""
+        metadata: {},
+        metadata_key: "",
+        metadata_value: ""
     }
   },
   methods: {
@@ -942,7 +942,7 @@ export default {
       this.avoid_vlan = !this.avoid_vlan
     },
     addMetadata() {
-      let request = {[this.key]: this.value};
+      let request = {[this.metadata_key]: this.metadata_value};
       this.$http.post(this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + this.content.id + "/metadata", request)
         .then(response => {
           this.initialize();
@@ -951,8 +951,8 @@ export default {
           this.$http_helpers.post_error(this, error, 'Could Not Add Metadata');
         });
     },
-    removeMetadata(key) {
-      this.$http.delete(this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + this.content.id + "/metadata/" + key)
+    removeMetadata(metadata_key) {
+      this.$http.delete(this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + this.content.id + "/metadata/" + metadata_key)
         .then(response => {
           this.initialize();
         })
