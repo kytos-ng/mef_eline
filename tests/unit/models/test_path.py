@@ -6,6 +6,7 @@ from napps.kytos.mef_eline import settings
 from httpx import TimeoutException, ConnectError
 from kytos.core.common import EntityStatus
 from kytos.core.exceptions import KytosNoTagAvailableError
+from kytos.core.interface import TAG
 from kytos.core.link import Link
 from kytos.core.switch import Switch
 
@@ -137,38 +138,105 @@ class TestPath():
 
     def test_choose_vlans(self) -> None:
         """Test choose vlans."""
-        controller = MagicMock()
+        controller_mock = MagicMock()
+
+        topo_link1 = get_link_mocked(status=EntityStatus.UP)
+        topo_link2 = get_link_mocked(status=EntityStatus.UP)
+        topo_link1.id = "def"
+        topo_link2.id = "abc"
+
+        topology_links = {
+            topo_link1.id: topo_link1,
+            topo_link2.id: topo_link2,
+        }
+
+        topology_mock = MagicMock(links=topology_links)
+        controller_mock.napps = {
+            ("kytos", "topology"): topology_mock
+        }
+
         link1 = get_link_mocked(status=EntityStatus.UP)
         link2 = get_link_mocked(status=EntityStatus.UP)
         link1.id = "def"
         link2.id = "abc"
+
         links = [link1, link2]
         path = Path(links)
+
         path.make_vlans_available = MagicMock()
-        path.choose_vlans(controller)
-        assert link1.get_next_available_tag.call_count == 1
+        path.choose_vlans(controller_mock)
+
+        assert topo_link1.get_next_available_tag.call_count == 1
+        assert not topo_link1.add_metadata.call_count
+
+        assert topo_link2.get_next_available_tag.call_count == 1
+        assert not topo_link2.add_metadata.call_count
+
+        assert not link1.get_next_available_tag.call_count
         assert link1.add_metadata.call_count == 1
-        assert link2.get_next_available_tag.call_count == 1
+
+        assert not link2.get_next_available_tag.call_count
         assert link2.add_metadata.call_count == 1
+
+        link1.add_metadata.assert_called_with(
+            "s_vlan",
+            TAG(
+                "vlan",
+                topo_link1.get_next_available_tag(
+                    "vlan",
+                    try_avoid_value=None
+                )
+            )
+        )
+
+        link2.add_metadata.assert_called_with(
+            "s_vlan",
+            TAG(
+                "vlan",
+                topo_link2.get_next_available_tag(
+                    "vlan",
+                    try_avoid_value=None
+                )
+            )
+        )
+
         assert not path.make_vlans_available.call_count
 
     def test_choose_vlans_tags_not_available(self) -> None:
         """Test choose vlans rollback if tags not available."""
-        controller = MagicMock()
+        controller_mock = MagicMock()
+
+        topo_link1 = get_link_mocked(status=EntityStatus.UP)
+        topo_link2 = get_link_mocked(status=EntityStatus.UP)
+        topo_link1.id = "def"
+        topo_link2.id = "abc"
+
+        topology_links = {
+            topo_link1.id: topo_link1,
+            topo_link2.id: topo_link2,
+        }
+
+        topology_mock = MagicMock(links=topology_links)
+        controller_mock.napps = {
+            ("kytos", "topology"): topology_mock
+        }
+
         link1 = get_link_mocked(status=EntityStatus.UP)
         link2 = get_link_mocked(status=EntityStatus.UP)
         link1.id = "def"
         link2.id = "abc"
+
         links = [link1, link2]
         path = Path(links)
+
         path.make_vlans_available = MagicMock()
         exc = KytosNoTagAvailableError(link2)
-        link2.get_next_available_tag.side_effect = exc
+        topo_link2.get_next_available_tag.side_effect = exc
         with pytest.raises(KytosNoTagAvailableError):
-            path.choose_vlans(controller)
-        assert link1.get_next_available_tag.call_count == 1
+            path.choose_vlans(controller_mock)
+        assert topo_link1.get_next_available_tag.call_count == 1
         assert link1.add_metadata.call_count == 1
-        assert link2.get_next_available_tag.call_count == 1
+        assert topo_link2.get_next_available_tag.call_count == 1
         assert not link2.add_metadata.call_count
         assert path.make_vlans_available.call_count == 1
 
