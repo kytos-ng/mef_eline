@@ -109,7 +109,7 @@
           </table>
         </div>
 
-        <div class="mef-circuit-table" id="mef-unis">
+        <div class="mef-circuit-table vertical-scroll" id="mef-unis">
           <table class="table">
             <tbody>
               <tr>
@@ -1167,5 +1167,9 @@ export default {
   }
   .autocomplete-result-list li {
     white-space: nowrap;
+  }
+  .vertical-scroll {
+    overflow-y: auto;
+    height: 28rem;
   }
 </style>
