@@ -9,6 +9,7 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 Fixed
 =====
 - ``set_queue`` action is now set before ``output``
+- Path tables now display ``link_name`` if available instead of ID
 
 Changed
 =======
