@@ -9,6 +9,7 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 Fixed
 =====
 - ``set_queue`` action is now set before ``output``
+- Path tables now display ``link_name`` if available instead of ID
 
 Changed
 =======
@@ -22,6 +23,10 @@ Added
 Fixed
 =====
 - The "Back To List" button in the Circuit Details Menu will no longer delete saved EVC filters
+
+Added
+=====
+- Circuit Details Menu now has a table for EVC metadata
 
 [2025.1.0] - 2025-04-14
 ***********************
