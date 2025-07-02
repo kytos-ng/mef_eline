@@ -7,7 +7,7 @@ from operator import eq, ne
 from threading import Lock
 from typing import Union
 from uuid import uuid4
-
+import pprint
 import httpx
 from glom import glom
 from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
@@ -1503,7 +1503,7 @@ class EVCDeploy(EVCBase):
             # if in_vlan is set, it must be included in the match
             flow_mod["match"]["dl_vlan"] = in_vlan
 
-        if isinstance(new_c_vlan, int) and (isinstance(in_vlan, list) or in_vlan is None):
+        if not isinstance(in_vlan, int) and isinstance(new_c_vlan, int) and new_c_vlan != 0:
             # new_in_vlan is an integer but zero, action to set is required
             new_action = {"action_type": "set_vlan", "vlan_id": new_c_vlan} # DELETE ME
             flow_mod["actions"].insert(0, new_action) # DELETE ME
