@@ -622,7 +622,7 @@ export default {
       var _this = this;
       return new Promise((resolve, reject) => {
           $.ajax({
-          url: this.$kytos_server_api + "kytos/topology/v3/switches",
+          url: this.$kytos_server_api + "kytos/topology/v3/",
           type:"GET",
           data: JSON.stringify(),
           dataType: "json",
@@ -630,7 +630,8 @@ export default {
           success: function(data){
             let _dpid_names = {};
             let _interface_data = {};
-            let switches = data.switches;
+            let links = data.topology.links;
+            let switches = data.topology.switches;
             $.each(switches, function(i , sw) {
               if(sw.metadata.node_name) {
                 _dpid_names[sw.dpid] = sw.metadata.node_name;
@@ -638,11 +639,13 @@ export default {
               if(sw.interfaces) {
                 $.each(sw.interfaces, function(j , k_interface) {
                   // store interface name data
-                  let metadata = k_interface.metadata;
+                  let switch_metadata = sw.metadata;
+                  let link_metadata = links[k_interface.link]?.metadata;
+                  let interface_metadata = k_interface.metadata;
                   _interface_data[k_interface.id] = {
                     "name": k_interface.name,
-                    "link_name": (metadata && "link_name" in metadata) ? k_interface.metadata.link_name : (k_interface.link || ""),
-                    "port_name": (metadata && "port_name" in metadata) ? k_interface.metadata.port_name : (k_interface.port_number || "")
+                    "link_name": (link_metadata && "link_name" in link_metadata && links[k_interface.link]) ? link_metadata.link_name : (switch_metadata && "node_name" in switch_metadata) ? `${switch_metadata.node_name} port ${k_interface.port_number}` : (k_interface.link || ""),
+                    "port_name": (interface_metadata && "port_name" in interface_metadata) ? k_interface.metadata.port_name : (k_interface.port_number || "")
                   };
                   // store autocomplete dpids
                   let value = k_interface.id;
