@@ -1473,10 +1473,10 @@ class EVCDeploy(EVCBase):
         """Prepare push flow.
 
         Arguments:
-            in_interface(str): Interface input.
-            out_interface(str): Interface output.
+            in_interface(Interface): Interface input.
+            out_interface(Interface): Interface output.
             in_vlan(int,str,None): Vlan input.
-            out_vlan(str): Vlan output.
+            out_vlan(int): Vlan output.
             new_c_vlan(int,str,list,None): New client vlan.
 
         Return:
@@ -1493,7 +1493,10 @@ class EVCDeploy(EVCBase):
         new_action = {"action_type": "set_vlan", "vlan_id": out_vlan}
         flow_mod["actions"].insert(0, new_action)
 
-        if not(in_vlan != new_c_vlan and isinstance(in_vlan, int) and isinstance(new_c_vlan, int)):
+        if (
+            not (in_vlan != new_c_vlan and isinstance(in_vlan, int) and
+                 isinstance(new_c_vlan, int))
+        ):
             # If there is VLAN translation for untagged and a integer VLAN
             # then there is not need for qinq encapsulation
             new_action = {"action_type": "push_vlan", "tag_type": "s"}
@@ -1503,7 +1506,10 @@ class EVCDeploy(EVCBase):
             # if in_vlan is set, it must be included in the match
             flow_mod["match"]["dl_vlan"] = in_vlan
 
-        if not isinstance(in_vlan, int) and isinstance(new_c_vlan, int) and new_c_vlan != 0:
+        if (
+            not isinstance(in_vlan, int) and isinstance(new_c_vlan, int) and
+            new_c_vlan != 0
+        ):
             # new_in_vlan is an integer but zero, action to set is required
             new_action = {"action_type": "set_vlan", "vlan_id": new_c_vlan}
             flow_mod["actions"].insert(0, new_action)
@@ -1525,7 +1531,13 @@ class EVCDeploy(EVCBase):
         return flow_mod
 
     def _prepare_pop_flow(
-        self, in_interface, out_interface, out_vlan, in_vlan, new_c_vlan, queue_id=None
+        self,
+        in_interface: Interface,
+        out_interface: Interface,
+        out_vlan: int,
+        in_vlan: Union[int, str, list, None],
+        new_c_vlan: Union[int, str, list, None],
+        queue_id=None,
     ):
         # pylint: disable=too-many-arguments
         """Prepare pop flow."""
@@ -1536,7 +1548,10 @@ class EVCDeploy(EVCBase):
         if in_vlan == 0:
             new_action = {"action_type": "pop_vlan"}
             flow_mod["actions"].insert(0, new_action)
-        elif in_vlan != new_c_vlan and isinstance(in_vlan, int) and isinstance(new_c_vlan, int):
+        elif (
+            in_vlan != new_c_vlan and isinstance(in_vlan, int) and
+            isinstance(new_c_vlan, int)
+        ):
             # If UNI VLANs are different and in_vlan is not 0
             new_action = {"action_type": "set_vlan", "vlan_id": in_vlan}
             flow_mod["actions"].insert(0, new_action)
