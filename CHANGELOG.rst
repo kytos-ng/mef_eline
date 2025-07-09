@@ -23,6 +23,10 @@ Fixed
 =====
 - The "Back To List" button in the Circuit Details Menu will no longer delete saved EVC filters
 
+Added
+=====
+- Added a new dropdown to choose EVC endpoints by name
+
 [2025.1.0] - 2025-04-14
 ***********************
 
