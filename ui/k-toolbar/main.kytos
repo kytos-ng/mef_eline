@@ -318,15 +318,15 @@ export default {
         let dpid_a = this.endpoint_a;
         if(dpid_a.lastIndexOf(' ') > 0) {
             let splitted_dpid = dpid_a.split(' ');
-            this.endpoint_name_a = splitted_dpid[0];
-            this.endpoint_a = splitted_dpid[2];
+            this.endpoint_name_a = splitted_dpid[0] + ": " + splitted_dpid[2];
+            this.endpoint_a = splitted_dpid[4];
         }
         
         let dpid_z = this.endpoint_z;
         if(dpid_z.lastIndexOf(' ') > 0) {
             let splitted_dpid = dpid_z.split(' ');
-            this.endpoint_name_z = splitted_dpid[0];
-            this.endpoint_z = splitted_dpid[2];
+            this.endpoint_name_z = splitted_dpid[0] + ": " + splitted_dpid[2];
+            this.endpoint_z = splitted_dpid[4];
         }
     },
   },
@@ -575,18 +575,21 @@ export default {
     },
     fetch_dpids: function() {
         var self = this // create a closure to access component in the callback below
-        let dataUrl = "/api/kytos/topology/v3/interfaces"
+        let dataUrl = "/api/kytos/topology/v3/switches"
         // Autocomplete usage example.
         fetch(dataUrl).then(response => response.json())
                     .then(data => {
                         let dpids = []
-                        for ( const [key,value] of Object.entries( data.interfaces ) ) {
-                            let item = key;
-                            if(value.name) {
-                                item = value.name + " - " + item;
-                            }
+                        Object.entries(data.switches).forEach(([key, value], index) => {
+                          let switchIdentifier = value.id;
+                          if (value.metadata.node_name) {
+                            switchIdentifier = value.metadata.node_name;
+                          }
+                          Object.entries(value.interfaces).forEach(([key, value], index) => {
+                            let item = switchIdentifier + " - " + value.name + " - " + value.id;
                             dpids.push(item);
-                        }
+                          });
+                        });
                         self.dpids = dpids;
                     });
     },
