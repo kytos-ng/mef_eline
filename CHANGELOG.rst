@@ -12,6 +12,7 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 Fixed
 =====
 - ``set_queue`` action is now set before ``output``
+- UI: k-toolbar primary and secondary constraints are now collapsed again
 
 General Information
 ===================
