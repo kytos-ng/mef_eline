@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2025.1.2] - 2025-07-23
+***********************
+
+Fixed
+=====
+- UI: k-toolbar primary and secondary constraints are now collapsed again
+
 [2025.1.1] - 2025-06-23
 ***********************
 
