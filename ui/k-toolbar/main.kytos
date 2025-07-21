@@ -73,7 +73,7 @@
         </k-accordion-item>
 
         <span v-for="constraint in ['primary_constraints', 'secondary_constraints']">
-            <k-accordion-item :title="constraint_titles[constraint]" :checked=false>
+            <k-accordion-item :title="constraint_titles[constraint]" :defaultState="false">
 
                 <k-select :title="constraint_titles.undesired_links" :options="get_link_options()"
                 v-model:value ="form_constraints[constraint].undesired_links"
