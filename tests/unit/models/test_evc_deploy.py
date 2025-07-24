@@ -879,8 +879,17 @@ class TestEVC():
             metadata={"s_vlan": Mock(value=6)},
         )
 
+        links_by_id = {
+            link_a_b.id: link_a_b,
+            link_b_c.id: link_b_c,
+        }
+
+        controller = get_controller_mock()
+
+        controller.links = links_by_id
+
         attributes = {
-            "controller": get_controller_mock(),
+            "controller": controller,
             "name": "custom_name",
             "uni_a": uni_a,
             "uni_z": uni_z,
@@ -1004,28 +1013,40 @@ class TestEVC():
         switch_b = Switch("00:00:00:00:00:00:00:02")
         switch_c = Switch("00:00:00:00:00:00:00:03")
 
+        link_a_b = get_link_mocked(
+            switch_a=switch_a,
+            switch_b=switch_b,
+            endpoint_a_port=9,
+            endpoint_b_port=10,
+            metadata={"s_vlan": Mock(value=5)},
+        )
+        link_b_c = get_link_mocked(
+            switch_a=switch_b,
+            switch_b=switch_c,
+            endpoint_a_port=11,
+            endpoint_b_port=12,
+            metadata={"s_vlan": Mock(value=6)},
+        )
+
+        links_by_id = {
+            link_a_b.id: link_a_b,
+            link_b_c.id: link_b_c,
+        }
+
+        controller = get_controller_mock()
+
+        controller.links = links_by_id
+
         attributes = {
-            "controller": get_controller_mock(),
+            "controller": controller,
             "name": "custom_name",
             "uni_a": uni_a,
             "uni_z": uni_z,
             "active": True,
             "enabled": True,
             "failover_path": [
-                get_link_mocked(
-                    switch_a=switch_a,
-                    switch_b=switch_b,
-                    endpoint_a_port=9,
-                    endpoint_b_port=10,
-                    metadata={"s_vlan": 5},
-                ),
-                get_link_mocked(
-                    switch_a=switch_b,
-                    switch_b=switch_c,
-                    endpoint_a_port=11,
-                    endpoint_b_port=12,
-                    metadata={"s_vlan": 6},
-                ),
+                link_a_b,
+                link_b_c,
             ],
         }
 
