@@ -10,6 +10,7 @@ Fixed
 =====
 - ``set_queue`` action is now set before ``output``
 - UI: k-toolbar primary and secondary constraints are now collapsed again
+- UI: Autocomplete no longer throws an error when typing in spaces
 
 Changed
 =======
