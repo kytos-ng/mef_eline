@@ -14,7 +14,7 @@
                     placeholder="Endpoint A" icon="arrow-right"
                     :candidates="dpids" 
                     @focus="fetch_dpids"
-                    @blur="onblur_dpid"></k-input-auto>
+                    :submit_action="onblur_dpid"></k-input-auto>
             <div class="k-input mef-field-label" id="endpoint_name_a"
                     >{{endpoint_name_a}}</div> 
             <k-input id="endpoint-a-tag-type" v-model:value="tag_type_a"
@@ -34,7 +34,7 @@
                     placeholder="Endpoint Z" icon="arrow-left"
                     :candidates="dpids"
                     @focus="fetch_dpids"
-                    @blur="onblur_dpid"></k-input-auto>
+                    :submit_action="onblur_dpid"></k-input-auto>
             <div class="k-input mef-field-label" id="endpoint_name_z"
                     >{{endpoint_name_z}}</div> 
            <k-input id="endpoint-z-tag_type" v-model:value="tag_type_z"
@@ -319,13 +319,13 @@ export default {
       **/
       let dpid_a = this.endpoint_a;
       let splitted_dpid_a = dpid_a.split(' ');
-      this.endpoint_name_a = splitted_dpid[0] + ": " + splitted_dpid[2];
-      this.endpoint_a = splitted_dpid[4];
+      this.endpoint_name_a = splitted_dpid_a[0] + ": " + splitted_dpid_a[2];
+      this.endpoint_a = splitted_dpid_a[4];
       
       let dpid_z = this.endpoint_z;
       let splitted_dpid_z = dpid_z.split(' ');
-      this.endpoint_name_z = splitted_dpid[0] + ": " + splitted_dpid[2];
-      this.endpoint_z = splitted_dpid[4];
+      this.endpoint_name_z = splitted_dpid_z[0] + ": " + splitted_dpid_z[2];
+      this.endpoint_z = splitted_dpid_z[4];
     },
     set_metrics: function (val, constraint) {
       try { this.form_constraints[constraint].metrics.not_ownership = JSON.parse(val) }
