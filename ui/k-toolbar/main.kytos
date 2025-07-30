@@ -14,7 +14,7 @@
                     placeholder="Endpoint A" icon="arrow-right"
                     :candidates="dpids" 
                     @focus="fetch_dpids"
-                    :submit_action="onblur_dpid"></k-input-auto>
+                    :submit_action="onsubmit_dpid_a"></k-input-auto>
             <div class="k-input mef-field-label" id="endpoint_name_a"
                     >{{endpoint_name_a}}</div> 
             <k-input id="endpoint-a-tag-type" v-model:value="tag_type_a"
@@ -34,7 +34,7 @@
                     placeholder="Endpoint Z" icon="arrow-left"
                     :candidates="dpids"
                     @focus="fetch_dpids"
-                    :submit_action="onblur_dpid"></k-input-auto>
+                    :submit_action="onsubmit_dpid_z"></k-input-auto>
             <div class="k-input mef-field-label" id="endpoint_name_z"
                     >{{endpoint_name_z}}</div> 
            <k-input id="endpoint-z-tag_type" v-model:value="tag_type_z"
@@ -311,19 +311,18 @@ export default {
     }
   },
   methods: {
-    onblur_dpid() {
-      /**
-      * Update dpid values on event onblur triggered in dpids fields.
-      * It split the value selected from autocomplete list.
-      * It is expected the value as "NAME - DPID".
-      **/
-      let dpid_a = this.endpoint_a;
-      let splitted_dpid_a = dpid_a.split(' ');
+    /**
+    * Update dpid values on event onblur triggered in dpids fields.
+    * It split the value selected from autocomplete list.
+    * It is expected the value as "NAME - DPID".
+    **/
+    onsubmit_dpid_a() {
+      let splitted_dpid_a = this.endpoint_a.split(' ');
       this.endpoint_name_a = splitted_dpid_a[0] + ": " + splitted_dpid_a[2];
       this.endpoint_a = splitted_dpid_a[4];
-      
-      let dpid_z = this.endpoint_z;
-      let splitted_dpid_z = dpid_z.split(' ');
+    },
+    onsubmit_dpid_z() {
+      let splitted_dpid_z = this.endpoint_z.split(' ');
       this.endpoint_name_z = splitted_dpid_z[0] + ": " + splitted_dpid_z[2];
       this.endpoint_z = splitted_dpid_z[4];
     },
