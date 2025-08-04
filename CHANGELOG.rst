@@ -10,6 +10,8 @@ Fixed
 =====
 - ``set_queue`` action is now set before ``output``
 - UI: k-toolbar primary and secondary constraints are now collapsed again
+- The "Back To List" button in the Circuit Details Menu will no longer delete saved EVC filters
+- Consistency check setting up failover paths is now distributed across multiple threads through the event bus.
 
 Changed
 =======
@@ -19,13 +21,6 @@ Changed
 Added
 =====
 - Filters can now search for multiple values at a time by using commas or spaces. If you type ``Switch1, Switch2, Switch3`` or ``Switch1 Switch2 Switch3`` or ``Switch1, Switch2, Switch3`` into the filter/search-bar, then your search will include all 3 options, Switch1, Switch2, and Switch3.
-
-Fixed
-=====
-- The "Back To List" button in the Circuit Details Menu will no longer delete saved EVC filters
-
-Added
-=====
 - Added a new dropdown to choose EVC endpoints by name
 
 [2025.1.0] - 2025-04-14
