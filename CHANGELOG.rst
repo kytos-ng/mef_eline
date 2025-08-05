@@ -14,6 +14,7 @@ Changed
 =======
 - Internal refactoring updating UI components to use ``pinia`` and ``axios``
 - The redeploy button within the Circuit Details Menu was moved to the top of the menu for easier accessibility
+- In EVCs flows where VLAN translation (numeric VLAN to untagged and different numeric VLANs) is performed, there is not longer ``qinq`` encapsulation applied.
 
 Added
 =====

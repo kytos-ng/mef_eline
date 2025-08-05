@@ -1497,8 +1497,8 @@ class EVCDeploy(EVCBase):
             not (in_vlan != new_c_vlan and isinstance(in_vlan, int) and
                  isinstance(new_c_vlan, int))
         ):
-            # If there is VLAN translation for untagged and a integer VLAN
-            # then there is not need for qinq encapsulation
+            # Add service VLAN header when it does NOT fall into this
+            # statement: Both VLANs should be integer and different.
             new_action = {"action_type": "push_vlan", "tag_type": "s"}
             flow_mod["actions"].insert(0, new_action)
 

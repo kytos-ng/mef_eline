@@ -4,9 +4,11 @@
 import sys
 import os
 import httpx
-
+import concurrent.futures
 from kytos.core.db import Mongo
 
+BATCH_SIZE = 10
+MEF_URL = "http://localhost:8181/api/kytos/mef_eline/v2/evc/"
 
 def number_evcs_affected():
     mongo = Mongo()
@@ -36,6 +38,13 @@ def number_evcs_affected():
     print(f"There are {n_documents} that need to be redeploy")
     return
 
+def _redeploy_evc(evc_id):
+    response = httpx.patch(MEF_URL+evc_id+"/redeploy", timeout=60)
+    if not response.status_code//100 == 2:
+        print(f"EVC {evc_id} was not redeployed, error: {response.text}")
+        return
+    print(f"EVC {evc_id} was redeployed successfully.")
+
 def redeploy_affected_evcs():
     mongo = Mongo()
     evcs_collection = mongo.client[mongo.db_name]["evcs"]
@@ -62,27 +71,17 @@ def redeploy_affected_evcs():
         ]
     })
 
-    evc_count = 0
     evc_ids: list[str] = []
     for evc in documents:
-        evc_count += 1
         evc_ids.append(evc["id"])
-    print(f"{evc_count} EVCs to be redeploy.")
+    print(f"{len(evc_ids)} EVCs to be redeploy.")
     print("Redeploying...")
 
-    evc_deleted_count = 0
-    evc_not_deleted: list[str] = []
-    MEF_URL = "http://localhost:8181/api/kytos/mef_eline/v2/evc/"
-    for evc in evc_ids:
-        response = httpx.patch(MEF_URL+evc+"/redeploy", timeout=60)
-        if response.status_code//100 == 2:
-            evc_deleted_count += 1
+    executor = concurrent.futures.ThreadPoolExecutor(BATCH_SIZE, "script:redeploy")
+    executor.map(_redeploy_evc, evc_ids)
+    executor.shutdown()
 
-    if evc_count != evc_deleted_count:
-        print("Not redeployed EVCs: ", evc_not_deleted)
-
-    else:
-        print("All EVCs were redeployed successfully.")
+    print("Finnished redeploying EVCs")
 
     return 0
 

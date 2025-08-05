@@ -5,7 +5,7 @@ This folder contains Mef_eline's related scripts:
 ### Remove Qinq from EVCs flows when VLAN translation is needed
 
 
-[`000_quinq_evcs.py`](./000_quinq_evcs.py) is a script that redeploys EVCs with VLAN translatio so their flows are updated. This script will only cover cases where both UNIs have different numeric VLAN (from 1 to 4094 inclusive) and a numeric and ``untagged`` VLANs
+[`000_quinq_evcs.py`](./000_quinq_evcs.py) is a script that redeploys EVCs with VLAN translation so their flows are updated. This script will only cover cases where both UNIs have different numeric VLAN (from 1 to 4094 inclusive) and a numeric and ``untagged`` VLANs
 
 #### Pre-requisites
 
@@ -28,20 +28,20 @@ number_evcs_affected
 redeploy_affected_evcs
 ```
 
-#### Examples
+#### Commands
 
-Use ``number_evcs_affected`` to get the number of EVCs that will be re-deployed.
-
-```
-❯ CMD=number_evcs_affected python scripts/db/2025.2.0/000_quinq_evcs.py
-There are 3 that need to be redeploy
-```
-
-``redeploy_affected_evcs`` command will redeploy every EVC.
+``redeploy_affected_evcs`` command will redeploy every EVC. This option is not idempotent, meaning each time is used it re-deploy the same amount EVCs.
 
 ```
 ❯ CMD=redeploy_affected_evcs python scripts/db/2025.2.0/000_quinq_evcs.py
 3 EVCs to be redeploy.
 Redeploying...
 All EVCs were redeployed successfully.
+```
+
+Use ``number_evcs_affected`` to get the number of EVCs that will be re-deployed, EVCs with VLAN translation. If they were re-deployed before, the number will not change since this script does not look into QINQ encapsulation from the flows.
+
+```
+❯ CMD=number_evcs_affected python scripts/db/2025.2.0/000_quinq_evcs.py
+There are 3 that need to be redeploy
 ```

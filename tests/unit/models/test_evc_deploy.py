@@ -214,6 +214,7 @@ class TestEVC():
         [
             (2, 100, 0),
             (2, 100, 200),
+            (2, 2, 2)
         ]
     )
     def test_prepare_pop_flow_set_vlan(self, out_vlan, in_vlan, new_c_vlan):
@@ -244,7 +245,13 @@ class TestEVC():
             "table_group": "evpl",
             "table_id": 0,
         }
-        assert flow_mod == expected_flow_mod
+        if out_vlan == in_vlan == new_c_vlan:
+            assert flow_mod["actions"] == [
+                {"action_type": "pop_vlan"},
+                {"action_type": "output", "port": interface_z.port_number},
+            ]
+        else:
+            assert flow_mod == expected_flow_mod
 
     @pytest.mark.parametrize(
         "out_vlan, in_vlan, new_c_vlan",
