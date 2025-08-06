@@ -162,8 +162,10 @@ class DynamicPathManager:
         except httpx.RequestError as err:
             raise PathFinderException(str(err)) from err
 
-        if api_reply.status_code >= 400:
+        if api_reply.status_code >= 500:
             raise PathFinderException(api_reply.text)
+        if api_reply.status_code >= 400:
+            return []
         reply_data = api_reply.json()
         return reply_data.get("paths", [])
 
