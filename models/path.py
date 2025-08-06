@@ -242,6 +242,8 @@ class DynamicPathManager:
             Generator of unwanted_path disjoint paths. If unwanted_path is
             not provided or empty, we return an empty list.
         """
+        if cutoff < 1:
+            return None
         unwanted_links = [
             (link.endpoint_a.id, link.endpoint_b.id) for link in unwanted_path
         ]
