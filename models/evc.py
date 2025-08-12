@@ -162,8 +162,6 @@ class EVCBase(GenericEntity):
         self.old_path = Path([])
         self.max_paths = kwargs.get("max_paths", 2)
 
-        self.lock = Lock()
-
         self.archived = kwargs.get("archived", False)
 
         self.metadata = kwargs.get("metadata", {})
