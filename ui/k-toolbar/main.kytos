@@ -14,7 +14,7 @@
                     placeholder="Endpoint A" icon="arrow-right"
                     :candidates="dpids" 
                     @focus="fetch_dpids"
-                    @blur="onblur_dpid"></k-input-auto>
+                    :submit_action="onsubmit_dpid_a"></k-input-auto>
             <div class="k-input mef-field-label" id="endpoint_name_a"
                     >{{endpoint_name_a}}</div> 
             <k-input id="endpoint-a-tag-type" v-model:value="tag_type_a"
@@ -34,7 +34,7 @@
                     placeholder="Endpoint Z" icon="arrow-left"
                     :candidates="dpids"
                     @focus="fetch_dpids"
-                    @blur="onblur_dpid"></k-input-auto>
+                    :submit_action="onsubmit_dpid_z"></k-input-auto>
             <div class="k-input mef-field-label" id="endpoint_name_z"
                     >{{endpoint_name_z}}</div> 
            <k-input id="endpoint-z-tag_type" v-model:value="tag_type_z"
@@ -308,29 +308,24 @@ export default {
           x => queue_ids.push({value:x?.toString(), description:String(x)})
       )
       return queue_ids;
-    },
-    onblur_dpid() {
-        /**
-        * Update dpid values on event onblur triggered in dpids fields.
-        * It split the value selected from autocomplete list.
-        * It is expected the value as "NAME - DPID".
-        **/
-        let dpid_a = this.endpoint_a;
-        if(dpid_a.lastIndexOf(' ') > 0) {
-            let splitted_dpid = dpid_a.split(' ');
-            this.endpoint_name_a = splitted_dpid[0] + ": " + splitted_dpid[2];
-            this.endpoint_a = splitted_dpid[4];
-        }
-        
-        let dpid_z = this.endpoint_z;
-        if(dpid_z.lastIndexOf(' ') > 0) {
-            let splitted_dpid = dpid_z.split(' ');
-            this.endpoint_name_z = splitted_dpid[0] + ": " + splitted_dpid[2];
-            this.endpoint_z = splitted_dpid[4];
-        }
-    },
+    }
   },
   methods: {
+    /**
+    * Update dpid values on event onblur triggered in dpids fields.
+    * It split the value selected from autocomplete list.
+    * It is expected the value as "NAME - DPID".
+    **/
+    onsubmit_dpid_a() {
+      let splitted_dpid_a = this.endpoint_a.split(' ');
+      this.endpoint_name_a = splitted_dpid_a[0] + ": " + splitted_dpid_a[2];
+      this.endpoint_a = splitted_dpid_a[4];
+    },
+    onsubmit_dpid_z() {
+      let splitted_dpid_z = this.endpoint_z.split(' ');
+      this.endpoint_name_z = splitted_dpid_z[0] + ": " + splitted_dpid_z[2];
+      this.endpoint_z = splitted_dpid_z[4];
+    },
     set_metrics: function (val, constraint) {
       try { this.form_constraints[constraint].metrics.not_ownership = JSON.parse(val) }
       catch (e) {
