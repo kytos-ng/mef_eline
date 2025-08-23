@@ -469,9 +469,13 @@ class EVCBase(GenericEntity):
             tag = range_difference(tag, uni_dif.user_tag.value)
             if not tag:
                 return
-        uni.interface.use_tags(
-            self._controller, tag, tag_type, use_lock=True, check_order=False
-        )
+        with uni.interface.tag_lock:
+            uni.interface.use_tags(
+                tag_type, tag, check_order=False
+            )
+            uni.interface.notify_tag_listeners(
+                self._controller
+            )
 
     def make_uni_vlan_available(
         self,
@@ -489,10 +493,15 @@ class EVCBase(GenericEntity):
             if not tag:
                 return
         try:
-            conflict = uni.interface.make_tags_available(
-                self._controller, tag, tag_type, use_lock=True,
-                check_order=False
-            )
+            with uni.interface.tag_lock:
+                conflict = uni.interface.make_tags_available(
+                    tag_type,
+                    tag,
+                    check_order=False
+                )
+                uni.interface.notify_tag_listeners(
+                    self._controller
+                )
         except KytosTagError as err:
             log.error(f"Error in {self}: {err}")
             return
