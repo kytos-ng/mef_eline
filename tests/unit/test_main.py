@@ -106,16 +106,19 @@ class TestMain:
         mock_log.info.assert_not_called()
 
     @patch('napps.kytos.mef_eline.main.settings')
-    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_list_traces")
-    def test_execute_consistency(self, mock_check_list_traces, *args):
+    def test_execute_consistency(self, *args):
         """Test execute_consistency."""
-        (mongo_controller_upsert_mock, mock_settings) = args
+        (
+            mock_check_list_traces,
+            mock_settings,
+        ) = args
+
+        self.napp.execute_undeploy = MagicMock()
 
         stored_circuits = {'1': {'name': 'circuit_1'},
                            '2': {'name': 'circuit_2'},
                            '3': {'name': 'circuit_3'}}
-        mongo_controller_upsert_mock.return_value = True
         self.napp.mongo_controller.get_circuits.return_value = {
             "circuits": stored_circuits
         }
@@ -143,23 +146,35 @@ class TestMain:
                                                 2: False
                                             }
 
+        self.napp.execute_undeploy.return_value = [evc2], []
+
         self.napp.execute_consistency()
-        assert evc1.activate.call_count == 1
-        assert evc1.sync.call_count == 1
+
         evc1.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
-        assert evc2.deploy.call_count == 1
         evc2.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
 
+        assert evc1.activate.call_count == 1
+
+        self.napp.execute_undeploy.assert_called_with(
+            [evc2]
+        )
+
+        self.napp.mongo_controller.update_evcs.assert_called_with(
+            [evc1.as_dict(), evc2.as_dict()]
+        )
+
     @patch('napps.kytos.mef_eline.main.settings')
-    @patch('napps.kytos.mef_eline.main.Main._load_evc')
-    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_list_traces")
-    def test_execute_consistency_wait_for(self, mock_check_list_traces, *args):
+    def test_execute_consistency_wait_for(self, *args):
         """Test execute and wait for setting."""
-        (mongo_controller_upsert_mock, _, mock_settings) = args
+        (
+            mock_check_list_traces,
+            mock_settings
+        ) = args
+
+        self.napp.execute_undeploy = MagicMock()
 
         stored_circuits = {'1': {'name': 'circuit_1'}}
-        mongo_controller_upsert_mock.return_value = True
         self.napp.mongo_controller.get_circuits.return_value = {
             "circuits": stored_circuits
         }
@@ -180,9 +195,16 @@ class TestMain:
         mock_check_list_traces.return_value = {1: False}
 
         self.napp.execute_consistency()
-        assert evc1.deploy.call_count == 0
+        self.napp.execute_undeploy.assert_not_called()
+        self.napp.mongo_controller.update_evcs.assert_not_called()
+
+        self.napp.execute_undeploy.return_value = [evc1], []
+
         self.napp.execute_consistency()
-        assert evc1.deploy.call_count == 1
+        self.napp.execute_undeploy.assert_called_with([evc1])
+        self.napp.mongo_controller.update_evcs.assert_called_with(
+            [evc1.as_dict()]
+        )
 
     @patch('napps.kytos.mef_eline.main.Main._uni_from_dict')
     @patch('napps.kytos.mef_eline.models.evc.EVCBase._validate')
@@ -2355,6 +2377,7 @@ class TestMain:
         """Test method to add metadata"""
         self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evc_mock.metadata = {}
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2431,6 +2454,7 @@ class TestMain:
     async def test_delete_metadata(self):
         """Test method to delete metadata"""
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evc_mock.metadata = {'metadata1': 1, 'metadata2': 2}
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
