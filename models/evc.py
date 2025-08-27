@@ -4,7 +4,6 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from datetime import datetime
 from operator import eq, ne
-from threading import Lock
 from typing import Union
 from uuid import uuid4
 
@@ -467,13 +466,12 @@ class EVCBase(GenericEntity):
             tag = range_difference(tag, uni_dif.user_tag.value)
             if not tag:
                 return
-        with uni.interface.tag_lock:
-            uni.interface.use_tags(
-                tag_type, tag, check_order=False
-            )
-            uni.interface.notify_tag_listeners(
-                self._controller
-            )
+        uni.interface.atomic_use_tags(
+            self._controller,
+            tag_type,
+            tag,
+            check_order=False
+        )
 
     def make_uni_vlan_available(
         self,
@@ -491,15 +489,12 @@ class EVCBase(GenericEntity):
             if not tag:
                 return
         try:
-            with uni.interface.tag_lock:
-                conflict = uni.interface.make_tags_available(
-                    tag_type,
-                    tag,
-                    check_order=False
-                )
-                uni.interface.notify_tag_listeners(
-                    self._controller
-                )
+            conflict = uni.interface.atomic_make_tags_available(
+                self._controller,
+                tag_type,
+                tag,
+                check_order=False
+            )
         except KytosTagError as err:
             log.error(f"Error in {self}: {err}")
             return

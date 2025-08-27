@@ -593,35 +593,35 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         }
         evc = EVC(**attributes)
         uni = get_uni_mocked(is_valid=True)
-        uni.interface.use_tags = MagicMock()
+        uni.interface.atomic_use_tags = MagicMock()
         evc._use_uni_vlan(uni)
-        args = uni.interface.use_tags.call_args[0]
-        assert args[0] == uni.user_tag.tag_type
-        assert args[1] == uni.user_tag.value
-        assert uni.interface.use_tags.call_count == 1
+        args = uni.interface.atomic_use_tags.call_args[0]
+        assert args[1] == uni.user_tag.tag_type
+        assert args[2] == uni.user_tag.value
+        assert uni.interface.atomic_use_tags.call_count == 1
 
         uni.user_tag.value = "any"
         evc._use_uni_vlan(uni)
-        assert uni.interface.use_tags.call_count == 2
+        assert uni.interface.atomic_use_tags.call_count == 2
 
         uni.user_tag.value = [[1, 10]]
         uni_dif = get_uni_mocked(tag_value=[[1, 2]])
         mock_difference.return_value = [[3, 10]]
         evc._use_uni_vlan(uni, uni_dif)
-        assert uni.interface.use_tags.call_count == 3
+        assert uni.interface.atomic_use_tags.call_count == 3
 
         mock_difference.return_value = []
         evc._use_uni_vlan(uni, uni_dif)
-        assert uni.interface.use_tags.call_count == 3
+        assert uni.interface.atomic_use_tags.call_count == 3
 
-        uni.interface.use_tags.side_effect = KytosTagError("")
+        uni.interface.atomic_use_tags.side_effect = KytosTagError("")
         with pytest.raises(KytosTagError):
             evc._use_uni_vlan(uni)
-        assert uni.interface.use_tags.call_count == 4
+        assert uni.interface.atomic_use_tags.call_count == 4
 
         uni.user_tag = None
         evc._use_uni_vlan(uni)
-        assert uni.interface.use_tags.call_count == 4
+        assert uni.interface.atomic_use_tags.call_count == 4
 
     @patch("napps.kytos.mef_eline.models.evc.log")
     def test_make_uni_vlan_available(self, mock_log):
@@ -635,26 +635,26 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         }
         evc = EVC(**attributes)
         uni = get_uni_mocked(is_valid=True)
-        uni.interface.make_tags_available = MagicMock()
+        uni.interface.atomic_make_tags_available = MagicMock()
 
         evc.make_uni_vlan_available(uni)
-        args = uni.interface.make_tags_available.call_args[0]
-        assert args[0] == uni.user_tag.tag_type
-        assert args[1] == uni.user_tag.value
-        assert uni.interface.make_tags_available.call_count == 1
+        args = uni.interface.atomic_make_tags_available.call_args[0]
+        assert args[1] == uni.user_tag.tag_type
+        assert args[2] == uni.user_tag.value
+        assert uni.interface.atomic_make_tags_available.call_count == 1
 
         uni.user_tag.value = [[1, 10]]
         uni_dif = get_uni_mocked(tag_value=[[1, 2]])
         evc.make_uni_vlan_available(uni, uni_dif)
-        assert uni.interface.make_tags_available.call_count == 2
+        assert uni.interface.atomic_make_tags_available.call_count == 2
 
-        uni.interface.make_tags_available.side_effect = KytosTagError("")
+        uni.interface.atomic_make_tags_available.side_effect = KytosTagError("")
         evc.make_uni_vlan_available(uni)
         assert mock_log.error.call_count == 1
 
         uni.user_tag = None
         evc.make_uni_vlan_available(uni)
-        assert uni.interface.make_tags_available.call_count == 3
+        assert uni.interface.atomic_make_tags_available.call_count == 3
 
     def test_remove_uni_tags(self):
         """Test remove_uni_tags"""
