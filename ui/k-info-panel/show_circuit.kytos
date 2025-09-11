@@ -648,7 +648,7 @@ export default {
                   let interface_metadata = k_interface.metadata;
                   _interface_data[k_interface.id] = {
                     "name": k_interface.name,
-                    "link_name": (link_metadata && "link_name" in link_metadata && links[k_interface.link]) ? link_metadata.link_name : (switch_metadata && "node_name" in switch_metadata) ? `${switch_metadata.node_name} port ${k_interface.port_number}` : (k_interface.link || ""),
+                    "link_name": (link_metadata && "link_name" in link_metadata && links[k_interface.link]) ? link_metadata.link_name : (switch_metadata && "node_name" in switch_metadata) ? `${switch_metadata.node_name}:${k_interface.port_number}` : (k_interface.link || ""),
                     "port_name": (interface_metadata && "port_name" in interface_metadata) ? k_interface.metadata.port_name : (k_interface.port_number || "")
                   };
                   // store autocomplete dpids
@@ -770,7 +770,7 @@ export default {
       let port = endpoint.substring(24);
       let node_name = (dpid in this.dpid_names) ? this.dpid_names[dpid] : dpid;
 
-      let interface_name =  port;
+      let interface_name = port;
       let link_name = "";
       let port_name = "";
       if(endpoint in this.interface_data) {
