@@ -616,7 +616,7 @@ export default {
           }
         });
       } catch (err) {
-        console.error(err);
+        this.$http_helpers.post_error(this, error, 'Could Not Create Topology');
       }
     },
   },
