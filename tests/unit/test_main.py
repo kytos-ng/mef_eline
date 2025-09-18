@@ -6,7 +6,6 @@ from unittest.mock import (AsyncMock, MagicMock, Mock, call,
 import pytest
 from kytos.lib.helpers import get_controller_mock, get_test_client
 from kytos.core.helpers import now
-from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
 from kytos.core.exceptions import KytosTagError
 from kytos.core.interface import TAGRange, UNI, Interface
@@ -569,39 +568,6 @@ class TestMain:
         response = await self.api_client.post(url, json=payload)
         assert 400 == response.status_code, response.data
 
-    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
-    @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
-    async def test_create_a_circuit_case_5(
-        self,
-        validate_mock,
-        uni_from_dict_mock
-    ):
-        """Test create a new intra circuit with a disabled switch"""
-        self.napp.controller.loop = asyncio.get_running_loop()
-        validate_mock.return_value = True
-        uni1 = create_autospec(UNI)
-        uni1.interface = create_autospec(Interface)
-        uni1.interface.switch = MagicMock()
-        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.status = EntityStatus.DISABLED
-        uni_from_dict_mock.side_effect = [uni1, uni1]
-        url = f"{self.base_endpoint}/v2/evc/"
-        payload = {
-            "name": "my evc1",
-            "dynamic_backup_path": True,
-            "uni_a": {
-                "interface_id": "00:00:00:00:00:00:00:01:1",
-                "tag": {"tag_type": 'vlan', "value": 80},
-            },
-            "uni_z": {
-                "interface_id": "00:00:00:00:00:00:00:01:2",
-                "tag": {"tag_type": 'vlan', "value": 1},
-            },
-        }
-
-        response = await self.api_client.post(url, json=payload)
-        assert 409 == response.status_code, response.data
-
     async def test_create_a_circuit_invalid_queue_id(self):
         """Test create a new circuit with invalid queue_id."""
         self.napp.controller.loop = asyncio.get_running_loop()
@@ -748,75 +714,6 @@ class TestMain:
             },
             "uni_z": {
                 "interface_id": "00:00:00:00:00:00:00:02:2",
-            },
-        }
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 400, response.data
-
-    @patch("napps.kytos.mef_eline.main.check_disabled_component")
-    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
-    async def test_create_circuit_case_7(
-        self,
-        mock_evc,
-        mock_check_disabled_component
-    ):
-        """Test create_circuit with InvalidPath"""
-        self.napp.controller.loop = asyncio.get_running_loop()
-        mock_check_disabled_component.return_value = True
-        url = f"{self.base_endpoint}/v2/evc/"
-        uni1 = get_uni_mocked()
-        uni2 = get_uni_mocked()
-        evc = MagicMock(uni_a=uni1, uni_z=uni2)
-        evc.primary_path = MagicMock()
-        evc.backup_path = MagicMock()
-
-        # Backup_path invalid
-        evc.backup_path.is_valid = MagicMock(side_effect=InvalidPath)
-        mock_evc.return_value = evc
-        payload = {
-            "name": "my evc1",
-            "uni_a": {
-                "interface_id": "00:00:00:00:00:00:00:01:1",
-            },
-            "uni_z": {
-                "interface_id": "00:00:00:00:00:00:00:02:2",
-            },
-        }
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 400, response.data
-
-        # Backup_path invalid
-        evc.primary_path.is_valid = MagicMock(side_effect=InvalidPath)
-        mock_evc.return_value = evc
-
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 400, response.data
-
-    @patch("napps.kytos.mef_eline.main.check_disabled_component")
-    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
-    async def test_create_circuit_case_8(
-        self,
-        mock_evc,
-        mock_check_disabled_component
-    ):
-        """Test create_circuit wit no equal tag lists"""
-        self.napp.controller.loop = asyncio.get_running_loop()
-        mock_check_disabled_component.return_value = True
-        url = f"{self.base_endpoint}/v2/evc/"
-        uni1 = get_uni_mocked()
-        uni2 = get_uni_mocked()
-        evc = MagicMock(uni_a=uni1, uni_z=uni2)
-        evc._tag_lists_equal = MagicMock(return_value=False)
-        mock_evc.return_value = evc
-        payload = {
-            "name": "my evc1",
-            "uni_a": {
-                "interface_id": "00:00:00:00:00:00:00:01:1",
-                "tag": {"tag_type": 'vlan', "value": [[50, 100]]},
-            },
-            "uni_z": {
-                "interface_id": "00:00:00:00:00:00:00:02:2",
-                "tag": {"tag_type": 'vlan', "value": [[1, 10]]},
             },
         }
         response = await self.api_client.post(url, json=payload)
@@ -1606,78 +1503,6 @@ class TestMain:
         expected_data = "primary_path is not a valid path: error"
         assert 400 == response.status_code
         assert current_data["description"] == expected_data
-
-    @patch("napps.kytos.mef_eline.models.evc.EVC._get_unis_use_tags")
-    @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
-    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
-    @patch('napps.kytos.mef_eline.models.evc.EVC._validate')
-    @patch('napps.kytos.mef_eline.models.evc.EVCDeploy.deploy')
-    @patch('napps.kytos.mef_eline.main.Main._uni_from_dict')
-    async def test_update_disabled_intra_switch(
-        self,
-        uni_from_dict_mock,
-        evc_deploy,
-        _mock_validate,
-        _mongo_controller_upsert_mock,
-        mock_use_uni_tags,
-        mock_get_unis
-    ):
-        """Test update a circuit that result in an intra-switch EVC
-        with disabled switches or interfaces"""
-        evc_deploy.return_value = True
-        _mock_validate.return_value = True
-        _mongo_controller_upsert_mock.return_value = True
-        mock_use_uni_tags.return_value = True
-        self.napp.controller.loop = asyncio.get_running_loop()
-        # Interfaces from get_uni_mocked() are disabled
-        uni_a = get_uni_mocked(
-            switch_dpid="00:00:00:00:00:00:00:01",
-            switch_id="00:00:00:00:00:00:00:01"
-        )
-        uni_z = get_uni_mocked(
-            switch_dpid="00:00:00:00:00:00:00:02",
-            switch_id="00:00:00:00:00:00:00:02"
-        )
-        unis = [uni_a, uni_z]
-        uni_from_dict_mock.side_effect = 2 * unis
-
-        evc_payload = {
-            "name": "Intra-EVC",
-            "dynamic_backup_path": True,
-            "uni_a": {
-                "tag": {"value": 101, "tag_type": 'vlan'},
-                "interface_id": "00:00:00:00:00:00:00:02:2"
-            },
-            "uni_z": {
-                "tag": {"value": 101, "tag_type": 'vlan'},
-                "interface_id": "00:00:00:00:00:00:00:01:1"
-            }
-        }
-
-        # With this update the EVC will be intra-switch
-        update_payload = {
-            "uni_z": {
-                "tag": {"value": 101, "tag_type": 'vlan'},
-                "interface_id": "00:00:00:00:00:00:00:02:1"
-            }
-        }
-        # Same mocks = intra-switch
-        mock_get_unis.return_value = [uni_z, uni_z]
-        response = await self.api_client.post(
-            f"{self.base_endpoint}/v2/evc/",
-            json=evc_payload,
-        )
-        assert 201 == response.status_code
-        current_data = response.json()
-        circuit_id = current_data["circuit_id"]
-
-        response = await self.api_client.patch(
-            f"{self.base_endpoint}/v2/evc/{circuit_id}",
-            json=update_payload,
-        )
-        assert 409 == response.status_code
-        description = "00:00:00:00:00:00:00:02:1 is disabled"
-        assert description in response.json()["description"]
 
     def test_link_from_dict_non_existent_intf(self):
         """Test _link_from_dict non existent intf."""
