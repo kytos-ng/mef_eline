@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from kytos.core.common import EntityStatus
-from napps.kytos.mef_eline.exceptions import DisabledSwitch
 from napps.kytos.mef_eline.utils import (compare_endpoint_trace,
                                          compare_uni_out_trace,
                                          get_vlan_tags_and_masks, map_dl_vlan,

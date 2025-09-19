@@ -7,10 +7,10 @@ from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
 
 from kytos.core.common import EntityStatus
 from kytos.core.events import KytosEvent
-from kytos.core.interface import UNI, Interface, TAGRange
+from kytos.core.interface import Interface, TAGRange
 from kytos.core.retry import before_sleep
 from napps.kytos.mef_eline import settings
-from napps.kytos.mef_eline.exceptions import DisabledSwitch, FlowModException
+from napps.kytos.mef_eline.exceptions import FlowModException
 
 
 def map_evc_event_content(evc, **kwargs) -> dict:
