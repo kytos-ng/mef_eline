@@ -125,21 +125,6 @@ def get_vlan_tags_and_masks(tag_ranges: list[list[int]]) -> list[int, str]:
     return masks_list
 
 
-def check_disabled_component(uni_a: UNI, uni_z: UNI):
-    """Check if a switch or an interface is disabled"""
-    if uni_a.interface.switch != uni_z.interface.switch:
-        return
-    if uni_a.interface.switch.status == EntityStatus.DISABLED:
-        dpid = uni_a.interface.switch.dpid
-        raise DisabledSwitch(f"Switch {dpid} is disabled")
-    if uni_a.interface.status == EntityStatus.DISABLED:
-        id_ = uni_a.interface.id
-        raise DisabledSwitch(f"Interface {id_} is disabled")
-    if uni_z.interface.status == EntityStatus.DISABLED:
-        id_ = uni_z.interface.id
-        raise DisabledSwitch(f"Interface {id_} is disabled")
-
-
 def make_uni_list(list_circuits: list) -> list:
     """Make uni list to be sent to sdntrace"""
     uni_list = []
