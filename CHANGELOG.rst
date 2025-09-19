@@ -279,6 +279,7 @@ Changed
 - ``GET /v2/evc?archived=true`` will only return archived EVCs
 - k-toolbar UI component won't expose UNI tag type anymore, if a tag value is set, it'll assume it's tag type vlan.
 - Consistency check uses the new ``PUT /traces`` endpoint from `sdntrace_cp` for bulk requests.
+- Changed validation of EVCs. Will no longer check for disabled components on intra-switch EVCs.
 
 Removed
 =======
@@ -292,7 +293,7 @@ Fixed
 - Fixed found but unloaded message log attempt for archived EVCs
 - Fixed EVC validation to catch nonexistent links interfaces
 - Allowed ``primary_path`` to be empty on update when ``dynamic_backup_path`` is true and ``backup_path`` to be empty too
-
+- Fixed bug with updates to intra-switch EVCs failing into an inconsistent state due to disabled components.
 
 [2022.2.0] - 2022-08-12
 ***********************
