@@ -385,6 +385,9 @@ export default {
   width: 100%;
 }
 .mef-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 100; /* Without this property, # th will be overelapped by tbody when scrolling */
   font-weight: bold;
   background: #554077;
 }
