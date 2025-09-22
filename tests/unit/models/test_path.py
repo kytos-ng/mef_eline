@@ -142,6 +142,11 @@ class TestPath():
         link2 = get_link_mocked(status=EntityStatus.UP)
         link1.id = "def"
         link2.id = "abc"
+        links_by_id = {
+            link1.id: link1,
+            link2.id: link2
+        }
+        controller.get_link = links_by_id.get
         links = [link1, link2]
         path = Path(links)
         path.make_vlans_available = MagicMock()
@@ -159,6 +164,11 @@ class TestPath():
         link2 = get_link_mocked(status=EntityStatus.UP)
         link1.id = "def"
         link2.id = "abc"
+        links_by_id = {
+            link1.id: link1,
+            link2.id: link2
+        }
+        controller.get_link = links_by_id.get
         links = [link1, link2]
         path = Path(links)
         path.make_vlans_available = MagicMock()
