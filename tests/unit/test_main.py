@@ -672,6 +672,110 @@ class TestMain:
         # verify add circuit in sched
         sched_add_mock.assert_called_once()
 
+    @patch("napps.kytos.mef_eline.main.Main._check_no_tag_duplication")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
+    @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
+    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    @patch("napps.kytos.mef_eline.main.EVC.as_dict")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
+    async def test_create_a_circuit_case_6(
+        self,
+        validate_mock,
+        evc_as_dict_mock,
+        mongo_controller_upsert_mock,
+        uni_from_dict_mock,
+        sched_add_mock,
+        evc_deploy_mock,
+        mock_use_uni_tags,
+        mock_tags_equal,
+        mock_check_duplicate
+    ):
+        """Test create a new intra circuit with a disabled interface"""
+        # pylint: disable=too-many-locals
+        self.napp.controller.loop = asyncio.get_running_loop()
+        validate_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
+        evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
+        mock_tags_equal.return_value = True
+        mock_check_duplicate.return_value = True
+        uni1 = create_autospec(UNI)
+        uni2 = create_autospec(UNI)
+        uni1.interface = create_autospec(Interface)
+        uni2.interface = create_autospec(Interface)
+        switch = MagicMock()
+        switch.status = EntityStatus.UP
+        switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch = switch
+        uni1.interface.status = EntityStatus.DISABLED
+        uni2.interface.switch = switch
+        uni_from_dict_mock.side_effect = [uni1, uni2]
+        evc_as_dict_mock.return_value = {}
+        sched_add_mock.return_value = True
+        self.napp.mongo_controller.get_circuits.return_value = {}
+
+        url = f"{self.base_endpoint}/v2/evc/"
+        payload = {
+            "name": "my evc1",
+            "frequency": "* * * * *",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+                "tag": {"tag_type": 'vlan', "value": 80},
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:01:2",
+                "tag": {"tag_type": 'vlan', "value": 1},
+            },
+            "dynamic_backup_path": True,
+            "primary_constraints": {
+                "spf_max_path_cost": 8,
+                "mandatory_metrics": {
+                    "ownership": "red"
+                }
+            },
+            "secondary_constraints": {
+                "spf_attribute": "priority",
+                "mandatory_metrics": {
+                    "ownership": "blue"
+                }
+            }
+        }
+
+        response = await self.api_client.post(url, json=payload)
+        current_data = response.json()
+
+        # verify expected result from request
+        assert 201 == response.status_code
+        assert "circuit_id" in current_data
+
+        # verify uni called
+        uni_from_dict_mock.called_twice()
+        uni_from_dict_mock.assert_any_call(payload["uni_z"])
+        uni_from_dict_mock.assert_any_call(payload["uni_a"])
+
+        # verify validation called
+        validate_mock.assert_called_once()
+        validate_mock.assert_called_with(
+            table_group={'evpl': 0, 'epl': 0},
+            frequency="* * * * *",
+            name="my evc1",
+            uni_a=uni1,
+            uni_z=uni2,
+            dynamic_backup_path=True,
+            primary_constraints=payload["primary_constraints"],
+            secondary_constraints=payload["secondary_constraints"],
+        )
+        # verify save method is called
+        mongo_controller_upsert_mock.assert_called_once()
+
+        # verify evc as dict is called to save in the box
+        evc_as_dict_mock.assert_called()
+        # verify add circuit in sched
+        sched_add_mock.assert_called_once()
+
     async def test_create_a_circuit_invalid_queue_id(self):
         """Test create a new circuit with invalid queue_id."""
         self.napp.controller.loop = asyncio.get_running_loop()
