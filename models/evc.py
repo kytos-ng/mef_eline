@@ -27,7 +27,6 @@ from napps.kytos.mef_eline.exceptions import (ActivationError,
                                               EVCPathNotInstalled,
                                               FlowModException, InvalidPath)
 from napps.kytos.mef_eline.utils import (_does_uni_affect_evc,
-                                         check_disabled_component,
                                          compare_endpoint_trace,
                                          compare_uni_out_trace, emit_event,
                                          make_uni_list, map_dl_vlan,
@@ -246,7 +245,6 @@ class EVCBase(GenericEntity):
                 "UNI_A and UNI_Z tag lists should be the same."
             )
         uni_a, uni_z = self._get_unis_use_tags(**kwargs)
-        check_disabled_component(uni_a, uni_z)
         self._validate_has_primary_or_dynamic(
             primary_path=kwargs.get("primary_path"),
             dynamic_backup_path=kwargs.get("dynamic_backup_path"),
