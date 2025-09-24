@@ -20,6 +20,7 @@ Changed
 - In EVCs flows where VLAN translation (numeric VLAN to untagged and different numeric VLANs) is performed, there is not longer ``qinq`` encapsulation applied. The translation will happen in the egress switch.
 - UI: Table from ``View Connections`` has now sticky property. This means that the title of every column will always be on sight when scrolling vertically.
 - UI: Table columns from ``View Connections`` are resizeable now. The cursor will change when hovering over the title of the column edges.
+- UI: Path tables from ``Circuit Details`` now have accordion tables. At first only shows the links for each path which are collapsible to show details of the clicked link.
 
 Added
 =====
