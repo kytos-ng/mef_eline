@@ -171,18 +171,23 @@
                   <th>{{pindex}}</th>
                   <td v-if="path && path.length > 0">
                     <template v-for="step in path">
-                      <table class="mef-path-table">
-                        <tr>
-                          <th></th><th>Endpoint A</th><th>Endpoint B</th>
-                        </tr>
-                        <template v-for="(attr, cindex) in step">
+                      <div class="mef-link-name" @click="onLinkClick(step, pindex)">
+                        {{step['Link'][0]}}
+                      </div>
+                      <div :class="`accordion-${pindex}-${step['CSS-ID']}`" style="display: none;">
+                        <table class="mef-path-table">
                           <tr>
-                            <th>{{cindex}}</th><td>{{attr[0]}}</td><td>{{attr[1]}}</td>
+                            <th></th><th>Endpoint A</th><th>Endpoint B</th>
                           </tr>
-                        </template>
-                      </table>
+                          <template v-for="(attr, cindex) in step">
+                            <tr v-if="cindex !== 'CSS-ID'">
+                              <th>{{cindex}}</th><td>{{attr[0]}}</td><td>{{attr[1]}}</td>
+                            </tr>
+                          </template>
+                        </table>
+                      </div>
                     </template>
-                </td>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -575,7 +580,6 @@ export default {
                     "Primary path": this.buildPathView(data['primary_path']),
                     "Backup path": this.buildPathView(data['backup_path'])
                    };
-
       this.links = {"Primary links": data['primary_links'],
                     "Backup links": data['backup_links']
                    };
@@ -612,7 +616,8 @@ export default {
             'Interface': [data_a['interface_name'], data_b['interface_name']],
             'Port': [data_a['port_name'], data_b['port_name']],
             'Link': [data_a['link_name'], data_b['link_name']],
-            'S-VLAN': [svlan, svlan]
+            'S-VLAN': [svlan, svlan],
+            'CSS-ID': dpid_a + "-" + dpid_b + "-" + svlan,
           };
           _path.push(_item);
         }
@@ -967,6 +972,18 @@ export default {
           this.$http_helpers.post_error(this, error, 'Could Not Remove Metadata');
         });
     },
+    onLinkClick: function(step, path_type) {
+      let table_div = document.getElementsByClassName("accordion-" + path_type + "-" + step['CSS-ID'])
+      if (table_div.length <= 0) {
+        return
+      };
+      table_div = table_div[0]
+      if (table_div.style.display === "block") {
+        table_div.style.display = "none"
+      } else {
+        table_div.style.display = "block"
+      };
+    }
   },
   mounted() {
     let _this = this;
@@ -1186,5 +1203,12 @@ export default {
   .vertical-scroll {
     overflow-y: auto;
     max-height: 28rem;
+  }
+  .mef-link-name {
+    cursor: pointer;
+    font-size: 1.2em;
+  } 
+  .mef-link-name:hover {
+    background-color: #666;
   }
 </style>
