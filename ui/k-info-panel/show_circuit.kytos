@@ -174,7 +174,7 @@
                       <div class="mef-link-name" @click="onLinkClick(step, pindex)">
                         {{step['Link'][0]}}
                       </div>
-                      <div :class="`accordion-${pindex}-${step['CSS-ID']}`" style="display: none;">
+                      <div :id="`accordion-${pindex}-${step['CSS-ID']}`" style="display: none;">
                         <table class="mef-path-table">
                           <tr>
                             <th></th><th>Endpoint A</th><th>Endpoint B</th>
@@ -973,11 +973,10 @@ export default {
         });
     },
     onLinkClick: function(step, path_type) {
-      let table_div = document.getElementsByClassName("accordion-" + path_type + "-" + step['CSS-ID'])
-      if (table_div.length <= 0) {
+      let table_div = document.getElementById("accordion-" + path_type + "-" + step['CSS-ID'])
+      if (!table_div) {
         return
       };
-      table_div = table_div[0]
       if (table_div.style.display === "block") {
         table_div.style.display = "none"
       } else {
