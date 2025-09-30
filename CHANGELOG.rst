@@ -9,16 +9,20 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 Fixed
 =====
 - ``set_queue`` action is now set before ``output``
+- Path tables now display ``link_name`` if available instead of ID
 - UI: k-toolbar primary and secondary constraints are now collapsed again
+- UI: Autocomplete no longer throws an error when typing in spaces
 
 Changed
 =======
 - Internal refactoring updating UI components to use ``pinia`` and ``axios``
 - The redeploy button within the Circuit Details Menu was moved to the top of the menu for easier accessibility
+- In EVCs flows where VLAN translation (numeric VLAN to untagged and different numeric VLANs) is performed, there is not longer ``qinq`` encapsulation applied. The translation will happen in the egress switch.
 
 Added
 =====
 - Filters can now search for multiple values at a time by using commas or spaces. If you type ``Switch1, Switch2, Switch3`` or ``Switch1 Switch2 Switch3`` or ``Switch1, Switch2, Switch3`` into the filter/search-bar, then your search will include all 3 options, Switch1, Switch2, and Switch3.
+- UI: integrated a dropdown to set INT proxy_port_enabled metadata option
 
 Fixed
 =====
@@ -27,6 +31,10 @@ Fixed
 Added
 =====
 - Added a new dropdown to choose EVC endpoints by name
+
+Added
+=====
+- Circuit Details Menu now has a table for EVC metadata
 
 [2025.1.0] - 2025-04-14
 ***********************

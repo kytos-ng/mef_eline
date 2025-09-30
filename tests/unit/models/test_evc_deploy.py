@@ -209,8 +209,16 @@ class TestEVC():
         assert flow_mod["actions"][1]["action_type"] == "output"
         assert flow_mod["actions"][1]["port"] == interface_z.port_number
 
-    def test_prepare_pop_flow(self):
-        """Test prepare pop flow  method."""
+    @pytest.mark.parametrize(
+        "out_vlan, in_vlan, new_c_vlan",
+        [
+            (2, 100, 0),
+            (2, 100, 200),
+            (2, 2, 2)
+        ]
+    )
+    def test_prepare_pop_flow_set_vlan(self, out_vlan, in_vlan, new_c_vlan):
+        """Test _preprate_pop_flow when it adds set_vlan."""
         attributes = {
             "table_group": {"epl": 0, "evpl": 0},
             "controller": get_controller_mock(),
@@ -221,16 +229,71 @@ class TestEVC():
         evc = EVC(**attributes)
         interface_a = evc.uni_a.interface
         interface_z = evc.uni_z.interface
-        in_vlan = 10
+        flow_mod = evc._prepare_pop_flow(
+            interface_a, interface_z, out_vlan, in_vlan, new_c_vlan
+        )
+        expected_flow_mod = {
+            "match": {"in_port": interface_a.port_number,
+                      "dl_vlan": out_vlan},
+            "cookie": evc.get_cookie(),
+            "owner": "mef_eline",
+            "actions": [
+                {"action_type": "set_vlan", "vlan_id": in_vlan},
+                {"action_type": "output", "port": interface_z.port_number},
+            ],
+            "priority": EVPL_SB_PRIORITY,
+            "table_group": "evpl",
+            "table_id": 0,
+        }
+        if out_vlan == in_vlan == new_c_vlan:
+            assert flow_mod["actions"] == [
+                {"action_type": "pop_vlan"},
+                {"action_type": "output", "port": interface_z.port_number},
+            ]
+        else:
+            assert flow_mod == expected_flow_mod
+
+    @pytest.mark.parametrize(
+        "out_vlan, in_vlan, new_c_vlan",
+        [
+            (2, 100, 100),
+            (2, 0, 100),
+            (2, "4096/4096", 100),
+            (2, None, 100),
+            (2, 0, 0),
+            (2, "4096/4096", 0),
+            (2, None, 0),
+            (2, 100, "4096/4096"),
+            (2, 0, "4096/4096"),
+            (2, "4096/4096", "4096/4096"),
+            (2, None, "4096/4096"),
+            (2, 100, None),
+            (2, 0, None),
+            (2, "4096/4096", None),
+            (2, None, None)
+        ]
+    )
+    def test_prepare_pop_flow_pop_vlan(self, out_vlan, in_vlan, new_c_vlan):
+        """Test _prepare_pop_flow  method with pop_vlan."""
+        attributes = {
+            "table_group": {"epl": 0, "evpl": 0},
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": get_uni_mocked(interface_port=1, is_valid=True),
+            "uni_z": get_uni_mocked(interface_port=2, is_valid=True),
+        }
+        evc = EVC(**attributes)
+        interface_a = evc.uni_a.interface
+        interface_z = evc.uni_z.interface
 
         # pylint: disable=protected-access
         flow_mod = evc._prepare_pop_flow(
-            interface_a, interface_z, in_vlan
+            interface_a, interface_z, out_vlan, in_vlan, new_c_vlan
         )
 
         expected_flow_mod = {
             "match": {"in_port": interface_a.port_number,
-                      "dl_vlan": in_vlan},
+                      "dl_vlan": out_vlan},
             "cookie": evc.get_cookie(),
             "owner": "mef_eline",
             "actions": [
@@ -301,17 +364,23 @@ class TestEVC():
             "priority": EVPL_SB_PRIORITY,
         }
         expected_flow_mod["priority"] = evc.get_priority(in_vlan_a)
+        if (
+            isinstance(in_vlan_a, int) and
+            isinstance(in_vlan_z, int) and
+            in_vlan_a != in_vlan_z
+        ):
+            expected_flow_mod["actions"].pop(0)
         if in_vlan_a is not None:
             expected_flow_mod['match']['dl_vlan'] = in_vlan_a
-        if in_vlan_z not in evc.special_cases and in_vlan_a != in_vlan_z:
+        if (
+            in_vlan_z not in evc.special_cases and
+            in_vlan_a != in_vlan_z and
+            not isinstance(in_vlan_a, int)
+        ):
             new_action = {"action_type": "set_vlan",
                           "vlan_id": in_vlan_z}
             expected_flow_mod["actions"].insert(0, new_action)
-        if in_vlan_a not in evc.special_cases:
-            if in_vlan_z == 0:
-                new_action = {"action_type": "pop_vlan"}
-                expected_flow_mod["actions"].insert(0, new_action)
-        elif in_vlan_a == "4096/4096":
+        if in_vlan_a == "4096/4096":
             if in_vlan_z == 0:
                 new_action = {"action_type": "pop_vlan"}
                 expected_flow_mod["actions"].insert(0, new_action)
@@ -323,7 +392,7 @@ class TestEVC():
                 new_action = {"action_type": "push_vlan",
                               "tag_type": "c"}
                 expected_flow_mod["actions"].insert(0, new_action)
-        assert expected_flow_mod == flow_mod
+        assert expected_flow_mod == flow_mod, (in_vlan_a, in_vlan_z)
 
     @staticmethod
     def create_evc_inter_switch(tag_value_a=82, tag_value_z=83):
