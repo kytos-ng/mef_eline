@@ -165,6 +165,10 @@ class DynamicPathManager:
         if api_reply.status_code >= 500:
             raise PathFinderException(api_reply.text)
         if api_reply.status_code >= 400:
+            log.error(
+                f"{circuit} failed to get paths from pathfinder. "
+                f"Error {api_reply.text}"
+            )
             return []
         reply_data = api_reply.json()
         return reply_data.get("paths", [])
