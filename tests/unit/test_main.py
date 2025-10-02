@@ -2839,6 +2839,9 @@ class TestMain:
     def test_handle_evc_deployed(
         self,
     ):
+        """
+        Test setting up failover path with need_failover event.
+        """
         evc1 = MagicMock()
         evc1.is_eligible_for_failover_path.return_value = True
         evc1.is_active.return_value = True
