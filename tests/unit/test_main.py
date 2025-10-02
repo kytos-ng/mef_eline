@@ -2799,7 +2799,7 @@ class TestMain:
         mock_intf = Mock()
         mock_intf.id = "mock_intf"
 
-        # Created/link_up
+        # Created/link_up/enabled
         name = '.*.switch.interface.created'
         content = {"interface": mock_intf}
         event = KytosEvent(name=name, content=content)
@@ -2807,29 +2807,42 @@ class TestMain:
         assert mock_down.call_count == 0
         assert mock_up.call_count == 1
 
-        # Deleted/link_down
+        name = '.*.interface.enabled'
+        content = {"interface": mock_intf}
+        event = KytosEvent(name=name, content=content)
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 0
+        assert mock_up.call_count == 2
+
+        # Deleted/link_down/disabled
         name = '.*.switch.interface.deleted'
         event = KytosEvent(name=name, content=content)
         self.napp.handle_on_interface_link_change(event)
         assert mock_down.call_count == 1
-        assert mock_up.call_count == 1
+        assert mock_up.call_count == 2
+
+        name = '.*.interface.disabled'
+        event = KytosEvent(name=name, content=content)
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 2
+        assert mock_up.call_count == 2
 
         # Event delay
         self.napp._intf_events[mock_intf.id]["last_acquired"] = "mock_time"
         for _ in range(1, 6):
             self.napp.handle_on_interface_link_change(event)
-        assert mock_down.call_count == 1
-        assert mock_up.call_count == 1
+        assert mock_down.call_count == 2
+        assert mock_up.call_count == 2
 
         self.napp._intf_events[mock_intf.id].pop("last_acquired")
         self.napp.handle_on_interface_link_change(event)
-        assert mock_down.call_count == 2
-        assert mock_up.call_count == 1
+        assert mock_down.call_count == 3
+        assert mock_up.call_count == 2
 
         # Out of order event
         event = KytosEvent(name=name, content=content)
         self.napp._intf_events[mock_intf.id]["event"] = Mock(timestamp=now())
 
         self.napp.handle_on_interface_link_change(event)
-        assert mock_down.call_count == 2
-        assert mock_up.call_count == 1
+        assert mock_down.call_count == 3
+        assert mock_up.call_count == 2

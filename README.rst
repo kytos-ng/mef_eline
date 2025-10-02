@@ -64,6 +64,8 @@ Subscribed
 - ``kytos/mef_eline.redeployed_link_up``
 - ``kytos/mef_eline.redeployed_link_down``
 - ``kytos/mef_eline.deployed``
+- ``kytos/topology.interface.enabled``
+- ``kytos/topology.interface.disabled``
 
 Published
 ---------
