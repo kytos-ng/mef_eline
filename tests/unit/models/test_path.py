@@ -872,7 +872,13 @@ class TestDynamicPathManager():
 
         mock_response.json.return_value = {"paths": paths2["paths"]}
         mock_httpx_post.return_value = mock_response
-        paths = list(DynamicPathManager.get_disjoint_paths(evc, current_path, 1))
+        paths = list(
+            DynamicPathManager.get_disjoint_paths(
+                evc,
+                current_path,
+                cutoff=1
+            )
+        )
         args = mock_shared.call_args[0]
         assert args[0] == paths2["paths"][-1]
         assert args[1] == path_interfaces
@@ -883,13 +889,15 @@ class TestDynamicPathManager():
             [link.id for link in expected_disjoint_path]
         )
 
-        result = list(DynamicPathManager.get_disjoint_paths(
-            evc,
-            current_path,
-            0
-        ))
+        result = list(
+            DynamicPathManager.get_disjoint_paths(
+                evc,
+                current_path,
+                cutoff=0
+            )
+        )
 
-        assert result == []
+        assert not result
 
     @patch("httpx.post")
     def test_get_disjoint_paths_simple_evc(self, mock_httpx_post):
