@@ -66,8 +66,8 @@ Subscribed
 - ``kytos/mef_eline.deployed``
 - ``kytos/topology.interface.enabled``
 - ``kytos/topology.interface.disabled``
-- ``kytos/topology.interface.UP``
-- ``kytos/topology.interface.DOWN``
+- ``kytos/topology.interface.up``
+- ``kytos/topology.interface.down``
 
 Published
 ---------

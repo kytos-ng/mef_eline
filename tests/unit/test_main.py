@@ -2821,7 +2821,7 @@ class TestMain:
         assert mock_down.call_count == 1
         assert mock_up.call_count == 2
 
-        name = '.*.interface.DOWN'
+        name = '.*.interface.down'
         event = KytosEvent(name=name, content=content)
         self.napp.handle_on_interface_link_change(event)
         assert mock_down.call_count == 2
