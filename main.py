@@ -760,7 +760,7 @@ class Main(KytosNApp):
     # Possibly replace this with interruptions?
     @listen_to(
         '.*.switch.interface.(link_up|link_down|created|deleted)',
-        '.*.interface.(disabled|enabled)'
+        '.*.interface.(disabled|enabled|UP|DOWN)'
     )
     def on_interface_link_change(self, event: KytosEvent):
         """
@@ -796,9 +796,9 @@ class Main(KytosNApp):
             event = self._intf_events[iface.id]["event"]
             self._intf_events[iface.id].pop('last_acquired', None)
             _, _, event_type = event.name.rpartition('.')
-            if event_type in ('link_up', 'created', 'enabled'):
+            if event_type in ('link_up', 'created', 'enabled', 'UP'):
                 self.handle_interface_link_up(iface)
-            elif event_type in ('link_down', 'deleted', 'disabled'):
+            elif event_type in ('link_down', 'deleted', 'disabled', 'DOWN'):
                 self.handle_interface_link_down(iface)
 
     def handle_interface_link_up(self, interface):
