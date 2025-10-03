@@ -19,6 +19,8 @@ Changed
 - Internal refactoring updating UI components to use ``pinia`` and ``axios``
 - The redeploy button within the Circuit Details Menu was moved to the top of the menu for easier accessibility
 - In EVCs flows where VLAN translation (numeric VLAN to untagged and different numeric VLANs) is performed, there is not longer ``qinq`` encapsulation applied. The translation will happen in the egress switch.
+- UI: Table from ``View Connections`` has now sticky property. This means that the title of every column will always be on sight when scrolling vertically.
+- UI: Table columns from ``View Connections`` are resizeable now. The cursor will change when hovering over the title of the column edges.
 
 Added
 =====
@@ -280,6 +282,7 @@ Changed
 - ``GET /v2/evc?archived=true`` will only return archived EVCs
 - k-toolbar UI component won't expose UNI tag type anymore, if a tag value is set, it'll assume it's tag type vlan.
 - Consistency check uses the new ``PUT /traces`` endpoint from `sdntrace_cp` for bulk requests.
+- Changed validation of EVCs. Will no longer check for disabled components on intra-switch EVCs.
 
 Removed
 =======
@@ -293,7 +296,7 @@ Fixed
 - Fixed found but unloaded message log attempt for archived EVCs
 - Fixed EVC validation to catch nonexistent links interfaces
 - Allowed ``primary_path`` to be empty on update when ``dynamic_backup_path`` is true and ``backup_path`` to be empty too
-
+- Fixed bug with updates to intra-switch EVCs failing into an inconsistent state due to disabled components.
 
 [2022.2.0] - 2022-08-12
 ***********************

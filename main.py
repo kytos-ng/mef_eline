@@ -32,8 +32,7 @@ from napps.kytos.mef_eline.models import (EVC, DynamicPathManager, EVCDeploy,
                                           Path)
 from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
 from napps.kytos.mef_eline.utils import (_does_uni_affect_evc, aemit_event,
-                                         check_disabled_component, emit_event,
-                                         get_vlan_tags_and_masks,
+                                         emit_event, get_vlan_tags_and_masks,
                                          map_evc_event_content,
                                          merge_flow_dicts, prepare_delete_flow,
                                          send_flow_mods_http)
@@ -261,15 +260,6 @@ class Main(KytosNApp):
         except (ValueError, KytosTagError) as exception:
             log.debug("create_circuit result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
-        try:
-            check_disabled_component(evc.uni_a, evc.uni_z)
-        except DisabledSwitch as exception:
-            log.debug("create_circuit result %s %s", exception, 409)
-            raise HTTPException(
-                    409,
-                    detail=f"Path is not valid: {exception}"
-                ) from exception
-
         if evc.primary_path:
             try:
                 evc.primary_path.is_valid(
