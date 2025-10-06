@@ -158,7 +158,6 @@ class EVCBase(GenericEntity):
         self.current_links_cache = set()
         self.primary_links_cache = set()
         self.backup_links_cache = set()
-        self.affected_by_link_at = get_time("0001-01-01T00:00:00")
         self.old_path = Path([])
         self.max_paths = kwargs.get("max_paths", 2)
 
