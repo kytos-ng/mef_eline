@@ -105,12 +105,21 @@ class TestMain:
         mock_execute_consistency.assert_not_called()
         mock_log.info.assert_not_called()
 
+    @patch("napps.kytos.mef_eline.main.map_evc_event_content")
+    @patch("napps.kytos.mef_eline.main.emit_event")
     @patch('napps.kytos.mef_eline.main.settings')
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_list_traces")
     def test_execute_consistency(self, mock_check_list_traces, *args):
         """Test execute_consistency."""
-        (mongo_controller_upsert_mock, mock_settings) = args
+        (
+            mongo_controller_upsert_mock,
+            mock_settings,
+            mock_emit_event,
+            mock_map_evc,
+        ) = args
+
+        mock_map_evc.side_effect = lambda x: x
 
         stored_circuits = {'1': {'name': 'circuit_1'},
                            '2': {'name': 'circuit_2'},
@@ -121,6 +130,7 @@ class TestMain:
         }
 
         mock_settings.WAIT_FOR_OLD_PATH = -1
+
         evc1 = MagicMock(id=1, service_level=0, creation_time=1)
         evc1.is_enabled.return_value = True
         evc1.is_active.return_value = False
@@ -128,6 +138,7 @@ class TestMain:
         evc1.has_recent_removed_flow.return_value = False
         evc1.is_recent_updated.return_value = False
         evc1.execution_rounds = 0
+
         evc2 = MagicMock(id=2, service_level=7, creation_time=1)
         evc2.is_enabled.return_value = True
         evc2.is_active.return_value = False
@@ -135,20 +146,44 @@ class TestMain:
         evc2.has_recent_removed_flow.return_value = False
         evc2.is_recent_updated.return_value = False
         evc2.execution_rounds = 0
-        self.napp.circuits = {'1': evc1, '2': evc2}
-        assert self.napp.get_evcs_by_svc_level() == [evc2, evc1]
+
+        evc3 = MagicMock(id=3, service_level=0, creation_time=1)
+        evc3.is_enabled.return_value = True
+        evc3.is_active.return_value = True
+        evc3.lock.locked.return_value = False
+        evc3.has_recent_removed_flow.return_value = False
+        evc3.is_recent_updated.return_value = False
+        evc3.execution_rounds = 0
+        evc3.is_eligible_for_failover_path.return_value = True
+        evc3.failover_path = Path([])
+
+        self.napp.circuits = {
+            '1': evc1,
+            '2': evc2,
+            '3': evc3,
+        }
+        assert self.napp.get_evcs_by_svc_level() == [
+            evc2,
+            evc1,
+            evc3
+        ]
 
         mock_check_list_traces.return_value = {
-                                                1: True,
-                                                2: False
-                                            }
+            1: True,
+            2: False,
+            3: True,
+        }
 
         self.napp.execute_consistency()
         assert evc1.activate.call_count == 1
         assert evc1.sync.call_count == 1
-        evc1.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
         assert evc2.deploy.call_count == 1
-        evc2.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
+
+        mock_emit_event.assert_called_once_with(
+            self.napp.controller,
+            "need_failover",
+            content=evc3
+        )
 
     @patch('napps.kytos.mef_eline.main.settings')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
@@ -2846,3 +2881,46 @@ class TestMain:
         self.napp.handle_on_interface_link_change(event)
         assert mock_down.call_count == 3
         assert mock_up.call_count == 2
+
+    def test_handle_evc_deployed(
+        self,
+    ):
+        """
+        Test setting up failover path with need_failover event.
+        """
+        evc1 = MagicMock()
+        evc1.is_eligible_for_failover_path.return_value = True
+        evc1.is_active.return_value = True
+        evc1.failover_path = Path([])
+        evc1.current_path = ["LINK"]
+
+        evc2 = MagicMock()
+        evc2.is_eligible_for_failover_path.return_value = False
+        evc2.is_active.return_value = True
+        evc2.failover_path = Path([])
+        evc2.current_path = ["LINK"]
+
+        self.napp.circuits = {
+            "evc_1": evc1,
+            "evc_2": evc2,
+        }
+
+        event = KytosEvent(
+            name="kytos/mef_eline.need_failover",
+            content={
+                "evc_id": "evc_1",
+            }
+        )
+
+        self.napp.handle_evc_deployed(event)
+        evc1.setup_failover_path.assert_called()
+
+        event = KytosEvent(
+            name="kytos/mef_eline.need_failover",
+            content={
+                "evc_id": "evc_2",
+            }
+        )
+
+        self.napp.handle_evc_deployed(event)
+        evc2.setup_failover_path.assert_not_called()

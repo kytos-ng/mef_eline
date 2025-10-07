@@ -157,7 +157,6 @@ class EVCBase(GenericEntity):
         self.current_links_cache = set()
         self.primary_links_cache = set()
         self.backup_links_cache = set()
-        self.affected_by_link_at = get_time("0001-01-01T00:00:00")
         self.old_path = Path([])
         self.max_paths = kwargs.get("max_paths", 2)
 
@@ -977,21 +976,6 @@ class EVCDeploy(EVCBase):
         self.sync()
         log.info(msg)
         return True
-
-    def try_setup_failover_path(
-        self,
-        wait=settings.DEPLOY_EVCS_INTERVAL,
-        warn_if_not_path=True
-    ):
-        """Try setup failover_path whenever possible."""
-        if (
-                self.failover_path or not self.current_path
-                or not self.is_active()
-                ):
-            return
-        if (now() - self.affected_by_link_at).seconds >= wait:
-            with self.lock:
-                self.setup_failover_path(warn_if_not_path)
 
     # pylint: disable=too-many-statements
     def setup_failover_path(self, warn_if_not_path=True):
