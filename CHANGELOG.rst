@@ -21,6 +21,7 @@ Changed
 - In EVCs flows where VLAN translation (numeric VLAN to untagged and different numeric VLANs) is performed, there is not longer ``qinq`` encapsulation applied. The translation will happen in the egress switch.
 - UI: Table from ``View Connections`` has now sticky property. This means that the title of every column will always be on sight when scrolling vertically.
 - UI: Table columns from ``View Connections`` are resizeable now. The cursor will change when hovering over the title of the column edges.
+- ``mef_eline`` now listens to ``kytos/topology.interface.(enabled|up|disabled|down)`` events to update affected EVCs.
 
 Added
 =====
