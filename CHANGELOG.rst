@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2025.1.3] - 2025-10-02
+***********************
+
+Fixed
+=====
+- Consistency check setting up failover paths is now distributed across multiple threads through the event bus.
+
 [2025.1.2] - 2025-07-23
 ***********************
 
