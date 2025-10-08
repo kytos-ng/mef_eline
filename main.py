@@ -130,7 +130,16 @@ class Main(KytosNApp):
         for circuit in self.get_evcs_by_svc_level(enable_filter=False):
             if self.should_be_checked(circuit):
                 circuits_to_check.append(circuit)
-            circuit.try_setup_failover_path(warn_if_not_path=False)
+            if (
+                circuit.is_active()
+                and not circuit.failover_path
+                and circuit.is_eligible_for_failover_path()
+            ):
+                emit_event(
+                    self.controller,
+                    "need_failover",
+                    content=map_evc_event_content(circuit)
+                )
         circuits_checked = EVCDeploy.check_list_traces(circuits_to_check)
         for circuit in circuits_to_check:
             is_checked = circuits_checked.get(circuit.id)
@@ -562,8 +571,8 @@ class Main(KytosNApp):
                 detail=f"circuit_id {circuit_id} not found"
             ) from KeyError
         deployed = False
-        if evc.is_enabled():
-            with evc.lock:
+        with evc.lock:
+            if evc.is_enabled():
                 path_dict = evc.remove_current_flows(
                     sync=False,
                     return_path=try_avoid_same_s_vlan == "true"
@@ -759,7 +768,8 @@ class Main(KytosNApp):
 
     # Possibly replace this with interruptions?
     @listen_to(
-        '.*.switch.interface.(link_up|link_down|created|deleted)'
+        '.*.switch.interface.(link_up|link_down|created|deleted)',
+        '.*.interface.(disabled|enabled|up|down)'
     )
     def on_interface_link_change(self, event: KytosEvent):
         """
@@ -795,9 +805,9 @@ class Main(KytosNApp):
             event = self._intf_events[iface.id]["event"]
             self._intf_events[iface.id].pop('last_acquired', None)
             _, _, event_type = event.name.rpartition('.')
-            if event_type in ('link_up', 'created'):
+            if event_type in ('link_up', 'created', 'enabled', 'up'):
                 self.handle_interface_link_up(iface)
-            elif event_type in ('link_down', 'deleted'):
+            elif event_type in ('link_down', 'deleted', 'disabled', 'down'):
                 self.handle_interface_link_down(iface)
 
     def handle_interface_link_up(self, interface):
@@ -1126,7 +1136,9 @@ class Main(KytosNApp):
         emit_event(self.controller, event_name,
                    content=map_evc_event_content(evc))
 
-    @listen_to("kytos/mef_eline.(redeployed_link_(up|down)|deployed)")
+    @listen_to(
+        "kytos/mef_eline.(redeployed_link_(up|down)|deployed|need_failover)"
+    )
     def on_evc_deployed(self, event):
         """Handle EVC deployed|redeployed_link_down."""
         self.handle_evc_deployed(event)
@@ -1134,9 +1146,17 @@ class Main(KytosNApp):
     def handle_evc_deployed(self, event):
         """Setup failover path on evc deployed."""
         evc = self.circuits.get(event.content["evc_id"])
-        if not evc:
+        if evc is None:
             return
-        evc.try_setup_failover_path()
+        with evc.lock:
+            if (
+                not evc.is_eligible_for_failover_path()
+                or not evc.is_active()
+                or evc.failover_path
+                or not evc.current_path
+            ):
+                return
+            evc.setup_failover_path()
 
     @listen_to("kytos/topology.topology_loaded")
     def on_topology_loaded(self, event):  # pylint: disable=unused-argument

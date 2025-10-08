@@ -12,6 +12,7 @@ Fixed
 - Path tables now display ``link_name`` if available instead of ID
 - UI: k-toolbar primary and secondary constraints are now collapsed again
 - UI: Autocomplete no longer throws an error when typing in spaces
+- Consistency check setting up failover paths is now distributed across multiple threads through the event bus.
 
 Changed
 =======
@@ -23,6 +24,7 @@ Changed
 - UI: Path tables from ``Circuit Details`` now have accordion tables. At first only shows the links for each path which are collapsible to show details of the clicked link.
 - UI: Changed matching system in the table from ``View Connections``. Now every row will be displayed if it matches any filter entered specified.
 - UI: Added strict matching in the table from ``View Connections``. If a filter is checked, then only the rows that match the checked filters are going to be displayed.
+- ``mef_eline`` now listens to ``kytos/topology.interface.(enabled|up|disabled|down)`` events to update affected EVCs.
 
 Added
 =====
