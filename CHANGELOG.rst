@@ -6,6 +6,13 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2025.1.4] - 2025-10-15
+***********************
+
+Fixed
+=====
+- Fixed undeploy EVC flows procedure, now it will remove all expected flows. It was leaving UNI flows behind if the link failure affected both ``current_path`` and ``failover_path``
+
 [2025.1.3] - 2025-10-02
 ***********************
 
