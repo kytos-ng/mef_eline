@@ -1256,7 +1256,6 @@ class EVCDeploy(EVCBase):
         """Prepare flows to install UNIs."""
         uni_flows = {}
         if not path:
-            log.info("install uni flows without path.")
             return uni_flows
 
         # Determine VLANs
