@@ -2357,6 +2357,19 @@ class TestMain:
 
         emit_main_mock.assert_not_called()
 
+    def test_prepare_undeploy_flow(self):
+        """Test prepare_undeploy_flow method."""
+        evc = MagicMock(id="1")
+        assert not self.napp.prepare_undeploy_flow(evc)
+        evc._prepare_uni_flows.assert_has_calls([
+            call(evc.current_path, skip_in=False),
+            call(evc.failover_path, skip_in=True),
+        ])
+        evc._prepare_nni_flows.assert_has_calls([
+            call(evc.current_path),
+            call(evc.failover_path),
+        ])
+
     @patch("napps.kytos.mef_eline.main.emit_event")
     def test_handle_evc_affected_by_link_down(self, emit_event_mock):
         """Test handle_evc_affected_by_link_down method."""

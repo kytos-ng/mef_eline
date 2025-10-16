@@ -12,6 +12,7 @@ Fixed
 - Path tables now display ``link_name`` if available instead of ID
 - UI: k-toolbar primary and secondary constraints are now collapsed again
 - UI: Autocomplete no longer throws an error when typing in spaces
+- Fixed undeploy EVC flows procedure, now it will remove all expected flows. It was leaving UNI flows behind if the link failure affected both ``current_path`` and ``failover_path``
 - Consistency check setting up failover paths is now distributed across multiple threads through the event bus.
 
 Changed

@@ -966,7 +966,8 @@ class Main(KytosNApp):
         try:
             del_flows = prepare_delete_flow(
                 merge_flow_dicts(
-                    evc._prepare_uni_flows(evc.current_path, skip_in=True),
+                    evc._prepare_uni_flows(evc.current_path, skip_in=False),
+                    evc._prepare_uni_flows(evc.failover_path, skip_in=True),
                     evc._prepare_nni_flows(evc.current_path),
                     evc._prepare_nni_flows(evc.failover_path)
                 )
