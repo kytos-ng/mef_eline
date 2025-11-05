@@ -9,18 +9,28 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 Fixed
 =====
 - ``set_queue`` action is now set before ``output``
+- Path tables now display ``link_name`` if available instead of ID
 - UI: k-toolbar primary and secondary constraints are now collapsed again
 - UI: Autocomplete no longer throws an error when typing in spaces
+- Fixed undeploy EVC flows procedure, now it will remove all expected flows. It was leaving UNI flows behind if the link failure affected both ``current_path`` and ``failover_path``
+- Consistency check setting up failover paths is now distributed across multiple threads through the event bus.
 
 Changed
 =======
 - Internal refactoring updating UI components to use ``pinia`` and ``axios``
 - The redeploy button within the Circuit Details Menu was moved to the top of the menu for easier accessibility
 - In EVCs flows where VLAN translation (numeric VLAN to untagged and different numeric VLANs) is performed, there is not longer ``qinq`` encapsulation applied. The translation will happen in the egress switch.
+- UI: Table from ``View Connections`` has now sticky property. This means that the title of every column will always be on sight when scrolling vertically.
+- UI: Table columns from ``View Connections`` are resizeable now. The cursor will change when hovering over the title of the column edges.
+- UI: Path tables from ``Circuit Details`` now have accordion tables. At first only shows the links for each path which are collapsible to show details of the clicked link.
+- UI: Changed matching system in the table from ``View Connections``. Now every row will be displayed if it matches any filter entered specified.
+- UI: Added strict matching in the table from ``View Connections``. If a filter is checked, then only the rows that match the checked filters are going to be displayed.
+- ``mef_eline`` now listens to ``kytos/topology.interface.(enabled|up|disabled|down)`` events to update affected EVCs.
 
 Added
 =====
 - Filters can now search for multiple values at a time by using commas or spaces. If you type ``Switch1, Switch2, Switch3`` or ``Switch1 Switch2 Switch3`` or ``Switch1, Switch2, Switch3`` into the filter/search-bar, then your search will include all 3 options, Switch1, Switch2, and Switch3.
+- UI: integrated a dropdown to set INT proxy_port_enabled metadata option
 
 Fixed
 =====
@@ -29,6 +39,10 @@ Fixed
 Added
 =====
 - Added a new dropdown to choose EVC endpoints by name
+
+Added
+=====
+- Circuit Details Menu now has a table for EVC metadata
 
 [2025.1.0] - 2025-04-14
 ***********************
@@ -273,6 +287,7 @@ Changed
 - ``GET /v2/evc?archived=true`` will only return archived EVCs
 - k-toolbar UI component won't expose UNI tag type anymore, if a tag value is set, it'll assume it's tag type vlan.
 - Consistency check uses the new ``PUT /traces`` endpoint from `sdntrace_cp` for bulk requests.
+- Changed validation of EVCs. Will no longer check for disabled components on intra-switch EVCs.
 
 Removed
 =======
@@ -286,7 +301,7 @@ Fixed
 - Fixed found but unloaded message log attempt for archived EVCs
 - Fixed EVC validation to catch nonexistent links interfaces
 - Allowed ``primary_path`` to be empty on update when ``dynamic_backup_path`` is true and ``backup_path`` to be empty too
-
+- Fixed bug with updates to intra-switch EVCs failing into an inconsistent state due to disabled components.
 
 [2022.2.0] - 2022-08-12
 ***********************

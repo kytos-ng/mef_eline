@@ -183,8 +183,14 @@ class DynamicPathManager:
         except httpx.RequestError as err:
             raise PathFinderException(str(err)) from err
 
-        if api_reply.status_code >= 400:
+        if api_reply.status_code >= 500:
             raise PathFinderException(api_reply.text)
+        if api_reply.status_code >= 400:
+            log.error(
+                f"{circuit} failed to get paths from pathfinder. "
+                f"Error {api_reply.text}"
+            )
+            return []
         reply_data = api_reply.json()
         return reply_data.get("paths", [])
 
@@ -263,6 +269,8 @@ class DynamicPathManager:
             Generator of unwanted_path disjoint paths. If unwanted_path is
             not provided or empty, we return an empty list.
         """
+        if cutoff < 1:
+            return None
         unwanted_links = [
             (link.endpoint_a.id, link.endpoint_b.id) for link in unwanted_path
         ]

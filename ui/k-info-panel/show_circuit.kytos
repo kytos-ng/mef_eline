@@ -120,6 +120,49 @@
           </table>
         </div>
 
+        <div class="mef-circuit-table vertical-scroll" id="mef-unis">
+          <table class="table">
+            <tbody>
+              <tr>
+                <th>Metadata</th>
+                <th></th>
+                <th></th>
+              </tr>
+              <template v-for="(data, cindex) in metadata">
+                <tr>
+                  <th>{{cindex}}</th>
+                    <td>
+                      <k-input
+                        v-model:value="metadata[cindex]"
+                        :title="cindex">
+                      </k-input>
+                    </td>
+                    <td class="minusButtonWrapper">
+                      <k-button icon="minus" tooltip="Remove metadata" @click="removeMetadata(cindex)"></k-button>
+                    </td>
+                </tr>
+              </template>
+              <tr>
+                <th>
+                  <k-input
+                    v-model:value="metadata_key"
+                    title="Insert Metadata Key">
+                  </k-input>
+                </th>
+                <td>
+                  <k-input
+                    v-model:value="metadata_value"
+                    title="Insert Metadata Value">
+                  </k-input>
+                </td>
+                <td class="plusButtonWrapper">
+                  <k-button icon="plus" tooltip="Add metadata" @click="addMetadata"></k-button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <template v-for="(path, pindex) in paths">
           <div class="mef-circuit-table mef-circuit-table-path">
             <table class="table">
@@ -128,18 +171,23 @@
                   <th>{{pindex}}</th>
                   <td v-if="path && path.length > 0">
                     <template v-for="step in path">
-                      <table class="mef-path-table">
-                        <tr>
-                          <th></th><th>Endpoint A</th><th>Endpoint B</th>
-                        </tr>
-                        <template v-for="(attr, cindex) in step">
+                      <div class="mef-link-name" @click="onLinkClick(step, pindex)">
+                        {{step['Link'][0]}}
+                      </div>
+                      <div :id="`accordion-${pindex}-${step['CSS-ID']}`" style="display: none;">
+                        <table class="mef-path-table">
                           <tr>
-                            <th>{{cindex}}</th><td>{{attr[0]}}</td><td>{{attr[1]}}</td>
+                            <th></th><th>Endpoint A</th><th>Endpoint B</th>
                           </tr>
-                        </template>
-                      </table>
+                          <template v-for="(attr, cindex) in step">
+                            <tr v-if="cindex !== 'CSS-ID'">
+                              <th>{{cindex}}</th><td>{{attr[0]}}</td><td>{{attr[1]}}</td>
+                            </tr>
+                          </template>
+                        </table>
+                      </div>
                     </template>
-                </td>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -296,6 +344,9 @@ export default {
         link_options: [], // constraint link dropdown options
         form_constraints: {}, // constraint data vue object synchronization
         avoid_vlan: false, // Try to avoid previous s_vlan when redeploying. false so it is true by default.
+        metadata: {},
+        metadata_key: "",
+        metadata_value: ""
     }
   },
   methods: {
@@ -512,6 +563,7 @@ export default {
                     'Archived': {'value': data['archived']?true:false, 'editable':false},
                     'Dynamic backup path': {'value': data['dynamic_backup_path']?true:false, 'editable':true}
                    };
+      this.metadata = data.metadata;
       this.others = {'Owner': {'value': data['owner'], 'editable':false},
                      'Southbound priority': {'value': data['sb_priority'], 'editable':true, 'name':'sb_priority'},
                      'Bandwidth': {'value': data['bandwidth'], 'editable':true, 'name':'bandwidth'},
@@ -528,7 +580,6 @@ export default {
                     "Primary path": this.buildPathView(data['primary_path']),
                     "Backup path": this.buildPathView(data['backup_path'])
                    };
-
       this.links = {"Primary links": data['primary_links'],
                     "Backup links": data['backup_links']
                    };
@@ -565,7 +616,8 @@ export default {
             'Interface': [data_a['interface_name'], data_b['interface_name']],
             'Port': [data_a['port_name'], data_b['port_name']],
             'Link': [data_a['link_name'], data_b['link_name']],
-            'S-VLAN': [svlan, svlan]
+            'S-VLAN': [svlan, svlan],
+            'CSS-ID': dpid_a + "-" + dpid_b + "-" + svlan,
           };
           _path.push(_item);
         }
@@ -579,7 +631,7 @@ export default {
       var _this = this;
       return new Promise((resolve, reject) => {
           $.ajax({
-          url: this.$kytos_server_api + "kytos/topology/v3/switches",
+          url: this.$kytos_server_api + "kytos/topology/v3/",
           type:"GET",
           data: JSON.stringify(),
           dataType: "json",
@@ -587,7 +639,8 @@ export default {
           success: function(data){
             let _dpid_names = {};
             let _interface_data = {};
-            let switches = data.switches;
+            let links = data.topology.links;
+            let switches = data.topology.switches;
             $.each(switches, function(i , sw) {
               if(sw.metadata.node_name) {
                 _dpid_names[sw.dpid] = sw.metadata.node_name;
@@ -595,11 +648,13 @@ export default {
               if(sw.interfaces) {
                 $.each(sw.interfaces, function(j , k_interface) {
                   // store interface name data
-                  let metadata = k_interface.metadata;
+                  let switch_metadata = sw.metadata;
+                  let link_metadata = links[k_interface.link]?.metadata;
+                  let interface_metadata = k_interface.metadata;
                   _interface_data[k_interface.id] = {
                     "name": k_interface.name,
-                    "link_name": (metadata && "link_name" in metadata) ? k_interface.metadata.link_name : (k_interface.link || ""),
-                    "port_name": (metadata && "port_name" in metadata) ? k_interface.metadata.port_name : (k_interface.port_number || "")
+                    "link_name": (link_metadata && "link_name" in link_metadata && links[k_interface.link]) ? link_metadata.link_name : (switch_metadata && "node_name" in switch_metadata) ? `${switch_metadata.node_name}:${k_interface.port_number}` : (k_interface.link || ""),
+                    "port_name": (interface_metadata && "port_name" in interface_metadata) ? k_interface.metadata.port_name : (k_interface.port_number || "")
                   };
                   // store autocomplete dpids
                   let value = k_interface.id;
@@ -720,7 +775,7 @@ export default {
       let port = endpoint.substring(24);
       let node_name = (dpid in this.dpid_names) ? this.dpid_names[dpid] : dpid;
 
-      let interface_name =  port;
+      let interface_name = port;
       let link_name = "";
       let port_name = "";
       if(endpoint in this.interface_data) {
@@ -790,6 +845,7 @@ export default {
         uni_z: {
           interface_id: this.endpoints_data["DPID"][1]["value"],
         },
+        metadata: this.metadata
       };
 
       // Tag is optional
@@ -897,6 +953,36 @@ export default {
     toggle_avoid: function(){
       this.avoid_vlan = !this.avoid_vlan
     },
+    addMetadata() {
+      let request = {[this.metadata_key]: this.metadata_value};
+      this.$http.post(this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + this.content.id + "/metadata", request)
+        .then(response => {
+          this.initialize();
+        })
+        .catch(error => {
+          this.$http_helpers.post_error(this, error, 'Could Not Add Metadata');
+        });
+    },
+    removeMetadata(metadata_key) {
+      this.$http.delete(this.$kytos_server_api + "kytos/mef_eline/v2/evc/" + this.content.id + "/metadata/" + metadata_key)
+        .then(response => {
+          this.initialize();
+        })
+        .catch(error => {
+          this.$http_helpers.post_error(this, error, 'Could Not Remove Metadata');
+        });
+    },
+    onLinkClick: function(step, path_type) {
+      let table_div = document.getElementById("accordion-" + path_type + "-" + step['CSS-ID'])
+      if (!table_div) {
+        return
+      };
+      if (table_div.style.display === "block") {
+        table_div.style.display = "none"
+      } else {
+        table_div.style.display = "block"
+      };
+    }
   },
   mounted() {
     let _this = this;
@@ -1078,6 +1164,14 @@ export default {
     flex-direction: column;
     float: right;
   }
+  .plusButtonWrapper {
+    display: flex;
+    justify-content: center;
+  }
+  .minusButtonWrapper {
+    display: flex;
+    justify-content: center;
+  }
   #mef-flags {
     clear:both;
   }
@@ -1104,5 +1198,16 @@ export default {
   }
   .autocomplete-result-list li {
     white-space: nowrap;
+  }
+  .vertical-scroll {
+    overflow-y: auto;
+    max-height: 28rem;
+  }
+  .mef-link-name {
+    cursor: pointer;
+    font-size: 1.2em;
+  } 
+  .mef-link-name:hover {
+    background-color: #666;
   }
 </style>

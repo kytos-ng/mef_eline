@@ -105,12 +105,21 @@ class TestMain:
         mock_execute_consistency.assert_not_called()
         mock_log.info.assert_not_called()
 
+    @patch("napps.kytos.mef_eline.main.map_evc_event_content")
+    @patch("napps.kytos.mef_eline.main.emit_event")
     @patch('napps.kytos.mef_eline.main.settings')
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_list_traces")
     def test_execute_consistency(self, mock_check_list_traces, *args):
         """Test execute_consistency."""
-        (mongo_controller_upsert_mock, mock_settings) = args
+        (
+            mongo_controller_upsert_mock,
+            mock_settings,
+            mock_emit_event,
+            mock_map_evc,
+        ) = args
+
+        mock_map_evc.side_effect = lambda x: x
 
         stored_circuits = {'1': {'name': 'circuit_1'},
                            '2': {'name': 'circuit_2'},
@@ -121,6 +130,7 @@ class TestMain:
         }
 
         mock_settings.WAIT_FOR_OLD_PATH = -1
+
         evc1 = MagicMock(id=1, service_level=0, creation_time=1)
         evc1.is_enabled.return_value = True
         evc1.is_active.return_value = False
@@ -128,6 +138,7 @@ class TestMain:
         evc1.has_recent_removed_flow.return_value = False
         evc1.is_recent_updated.return_value = False
         evc1.execution_rounds = 0
+
         evc2 = MagicMock(id=2, service_level=7, creation_time=1)
         evc2.is_enabled.return_value = True
         evc2.is_active.return_value = False
@@ -135,20 +146,44 @@ class TestMain:
         evc2.has_recent_removed_flow.return_value = False
         evc2.is_recent_updated.return_value = False
         evc2.execution_rounds = 0
-        self.napp.circuits = {'1': evc1, '2': evc2}
-        assert self.napp.get_evcs_by_svc_level() == [evc2, evc1]
+
+        evc3 = MagicMock(id=3, service_level=0, creation_time=1)
+        evc3.is_enabled.return_value = True
+        evc3.is_active.return_value = True
+        evc3.lock.locked.return_value = False
+        evc3.has_recent_removed_flow.return_value = False
+        evc3.is_recent_updated.return_value = False
+        evc3.execution_rounds = 0
+        evc3.is_eligible_for_failover_path.return_value = True
+        evc3.failover_path = Path([])
+
+        self.napp.circuits = {
+            '1': evc1,
+            '2': evc2,
+            '3': evc3,
+        }
+        assert self.napp.get_evcs_by_svc_level() == [
+            evc2,
+            evc1,
+            evc3
+        ]
 
         mock_check_list_traces.return_value = {
-                                                1: True,
-                                                2: False
-                                            }
+            1: True,
+            2: False,
+            3: True,
+        }
 
         self.napp.execute_consistency()
         assert evc1.activate.call_count == 1
         assert evc1.sync.call_count == 1
-        evc1.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
         assert evc2.deploy.call_count == 1
-        evc2.try_setup_failover_path.assert_called_with(warn_if_not_path=False)
+
+        mock_emit_event.assert_called_once_with(
+            self.napp.controller,
+            "need_failover",
+            content=evc3
+        )
 
     @patch('napps.kytos.mef_eline.main.settings')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
@@ -569,26 +604,54 @@ class TestMain:
         response = await self.api_client.post(url, json=payload)
         assert 400 == response.status_code, response.data
 
+    @patch("napps.kytos.mef_eline.main.Main._check_no_tag_duplication")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
+    @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    @patch("napps.kytos.mef_eline.main.EVC.as_dict")
     @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
     async def test_create_a_circuit_case_5(
         self,
         validate_mock,
-        uni_from_dict_mock
+        evc_as_dict_mock,
+        mongo_controller_upsert_mock,
+        uni_from_dict_mock,
+        sched_add_mock,
+        evc_deploy_mock,
+        mock_use_uni_tags,
+        mock_tags_equal,
+        mock_check_duplicate
     ):
         """Test create a new intra circuit with a disabled switch"""
+        # pylint: disable=too-many-locals
         self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
+        evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
+        mock_tags_equal.return_value = True
+        mock_check_duplicate.return_value = True
         uni1 = create_autospec(UNI)
+        uni2 = create_autospec(UNI)
         uni1.interface = create_autospec(Interface)
-        uni1.interface.switch = MagicMock()
-        uni1.interface.switch.return_value = "00:00:00:00:00:00:00:01"
-        uni1.interface.switch.status = EntityStatus.DISABLED
-        uni_from_dict_mock.side_effect = [uni1, uni1]
+        uni2.interface = create_autospec(Interface)
+        switch = MagicMock()
+        switch.status = EntityStatus.DISABLED
+        switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch = switch
+        uni2.interface.switch = switch
+        uni_from_dict_mock.side_effect = [uni1, uni2]
+        evc_as_dict_mock.return_value = {}
+        sched_add_mock.return_value = True
+        self.napp.mongo_controller.get_circuits.return_value = {}
+
         url = f"{self.base_endpoint}/v2/evc/"
         payload = {
             "name": "my evc1",
-            "dynamic_backup_path": True,
+            "frequency": "* * * * *",
             "uni_a": {
                 "interface_id": "00:00:00:00:00:00:00:01:1",
                 "tag": {"tag_type": 'vlan', "value": 80},
@@ -597,10 +660,156 @@ class TestMain:
                 "interface_id": "00:00:00:00:00:00:00:01:2",
                 "tag": {"tag_type": 'vlan', "value": 1},
             },
+            "dynamic_backup_path": True,
+            "primary_constraints": {
+                "spf_max_path_cost": 8,
+                "mandatory_metrics": {
+                    "ownership": "red"
+                }
+            },
+            "secondary_constraints": {
+                "spf_attribute": "priority",
+                "mandatory_metrics": {
+                    "ownership": "blue"
+                }
+            }
         }
 
         response = await self.api_client.post(url, json=payload)
-        assert 409 == response.status_code, response.data
+        current_data = response.json()
+
+        # verify expected result from request
+        assert 201 == response.status_code
+        assert "circuit_id" in current_data
+
+        # verify uni called
+        uni_from_dict_mock.called_twice()
+        uni_from_dict_mock.assert_any_call(payload["uni_z"])
+        uni_from_dict_mock.assert_any_call(payload["uni_a"])
+
+        # verify validation called
+        validate_mock.assert_called_once()
+        validate_mock.assert_called_with(
+            table_group={'evpl': 0, 'epl': 0},
+            frequency="* * * * *",
+            name="my evc1",
+            uni_a=uni1,
+            uni_z=uni2,
+            dynamic_backup_path=True,
+            primary_constraints=payload["primary_constraints"],
+            secondary_constraints=payload["secondary_constraints"],
+        )
+        # verify save method is called
+        mongo_controller_upsert_mock.assert_called_once()
+
+        # verify evc as dict is called to save in the box
+        evc_as_dict_mock.assert_called()
+        # verify add circuit in sched
+        sched_add_mock.assert_called_once()
+
+    @patch("napps.kytos.mef_eline.main.Main._check_no_tag_duplication")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._tag_lists_equal")
+    @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.deploy")
+    @patch("napps.kytos.mef_eline.scheduler.Scheduler.add")
+    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    @patch("napps.kytos.mef_eline.main.EVC.as_dict")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._validate")
+    async def test_create_a_circuit_case_6(
+        self,
+        validate_mock,
+        evc_as_dict_mock,
+        mongo_controller_upsert_mock,
+        uni_from_dict_mock,
+        sched_add_mock,
+        evc_deploy_mock,
+        mock_use_uni_tags,
+        mock_tags_equal,
+        mock_check_duplicate
+    ):
+        """Test create a new intra circuit with a disabled interface"""
+        # pylint: disable=too-many-locals
+        self.napp.controller.loop = asyncio.get_running_loop()
+        validate_mock.return_value = True
+        mongo_controller_upsert_mock.return_value = True
+        evc_deploy_mock.return_value = True
+        mock_use_uni_tags.return_value = True
+        mock_tags_equal.return_value = True
+        mock_check_duplicate.return_value = True
+        uni1 = create_autospec(UNI)
+        uni2 = create_autospec(UNI)
+        uni1.interface = create_autospec(Interface)
+        uni2.interface = create_autospec(Interface)
+        switch = MagicMock()
+        switch.status = EntityStatus.UP
+        switch.return_value = "00:00:00:00:00:00:00:01"
+        uni1.interface.switch = switch
+        uni1.interface.status = EntityStatus.DISABLED
+        uni2.interface.switch = switch
+        uni_from_dict_mock.side_effect = [uni1, uni2]
+        evc_as_dict_mock.return_value = {}
+        sched_add_mock.return_value = True
+        self.napp.mongo_controller.get_circuits.return_value = {}
+
+        url = f"{self.base_endpoint}/v2/evc/"
+        payload = {
+            "name": "my evc1",
+            "frequency": "* * * * *",
+            "uni_a": {
+                "interface_id": "00:00:00:00:00:00:00:01:1",
+                "tag": {"tag_type": 'vlan', "value": 80},
+            },
+            "uni_z": {
+                "interface_id": "00:00:00:00:00:00:00:01:2",
+                "tag": {"tag_type": 'vlan', "value": 1},
+            },
+            "dynamic_backup_path": True,
+            "primary_constraints": {
+                "spf_max_path_cost": 8,
+                "mandatory_metrics": {
+                    "ownership": "red"
+                }
+            },
+            "secondary_constraints": {
+                "spf_attribute": "priority",
+                "mandatory_metrics": {
+                    "ownership": "blue"
+                }
+            }
+        }
+
+        response = await self.api_client.post(url, json=payload)
+        current_data = response.json()
+
+        # verify expected result from request
+        assert 201 == response.status_code
+        assert "circuit_id" in current_data
+
+        # verify uni called
+        uni_from_dict_mock.called_twice()
+        uni_from_dict_mock.assert_any_call(payload["uni_z"])
+        uni_from_dict_mock.assert_any_call(payload["uni_a"])
+
+        # verify validation called
+        validate_mock.assert_called_once()
+        validate_mock.assert_called_with(
+            table_group={'evpl': 0, 'epl': 0},
+            frequency="* * * * *",
+            name="my evc1",
+            uni_a=uni1,
+            uni_z=uni2,
+            dynamic_backup_path=True,
+            primary_constraints=payload["primary_constraints"],
+            secondary_constraints=payload["secondary_constraints"],
+        )
+        # verify save method is called
+        mongo_controller_upsert_mock.assert_called_once()
+
+        # verify evc as dict is called to save in the box
+        evc_as_dict_mock.assert_called()
+        # verify add circuit in sched
+        sched_add_mock.assert_called_once()
 
     async def test_create_a_circuit_invalid_queue_id(self):
         """Test create a new circuit with invalid queue_id."""
@@ -748,75 +957,6 @@ class TestMain:
             },
             "uni_z": {
                 "interface_id": "00:00:00:00:00:00:00:02:2",
-            },
-        }
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 400, response.data
-
-    @patch("napps.kytos.mef_eline.main.check_disabled_component")
-    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
-    async def test_create_circuit_case_7(
-        self,
-        mock_evc,
-        mock_check_disabled_component
-    ):
-        """Test create_circuit with InvalidPath"""
-        self.napp.controller.loop = asyncio.get_running_loop()
-        mock_check_disabled_component.return_value = True
-        url = f"{self.base_endpoint}/v2/evc/"
-        uni1 = get_uni_mocked()
-        uni2 = get_uni_mocked()
-        evc = MagicMock(uni_a=uni1, uni_z=uni2)
-        evc.primary_path = MagicMock()
-        evc.backup_path = MagicMock()
-
-        # Backup_path invalid
-        evc.backup_path.is_valid = MagicMock(side_effect=InvalidPath)
-        mock_evc.return_value = evc
-        payload = {
-            "name": "my evc1",
-            "uni_a": {
-                "interface_id": "00:00:00:00:00:00:00:01:1",
-            },
-            "uni_z": {
-                "interface_id": "00:00:00:00:00:00:00:02:2",
-            },
-        }
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 400, response.data
-
-        # Backup_path invalid
-        evc.primary_path.is_valid = MagicMock(side_effect=InvalidPath)
-        mock_evc.return_value = evc
-
-        response = await self.api_client.post(url, json=payload)
-        assert response.status_code == 400, response.data
-
-    @patch("napps.kytos.mef_eline.main.check_disabled_component")
-    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
-    async def test_create_circuit_case_8(
-        self,
-        mock_evc,
-        mock_check_disabled_component
-    ):
-        """Test create_circuit wit no equal tag lists"""
-        self.napp.controller.loop = asyncio.get_running_loop()
-        mock_check_disabled_component.return_value = True
-        url = f"{self.base_endpoint}/v2/evc/"
-        uni1 = get_uni_mocked()
-        uni2 = get_uni_mocked()
-        evc = MagicMock(uni_a=uni1, uni_z=uni2)
-        evc._tag_lists_equal = MagicMock(return_value=False)
-        mock_evc.return_value = evc
-        payload = {
-            "name": "my evc1",
-            "uni_a": {
-                "interface_id": "00:00:00:00:00:00:00:01:1",
-                "tag": {"tag_type": 'vlan', "value": [[50, 100]]},
-            },
-            "uni_z": {
-                "interface_id": "00:00:00:00:00:00:00:02:2",
-                "tag": {"tag_type": 'vlan', "value": [[1, 10]]},
             },
         }
         response = await self.api_client.post(url, json=payload)
@@ -1607,78 +1747,6 @@ class TestMain:
         assert 400 == response.status_code
         assert current_data["description"] == expected_data
 
-    @patch("napps.kytos.mef_eline.models.evc.EVC._get_unis_use_tags")
-    @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
-    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
-    @patch('napps.kytos.mef_eline.models.evc.EVC._validate')
-    @patch('napps.kytos.mef_eline.models.evc.EVCDeploy.deploy')
-    @patch('napps.kytos.mef_eline.main.Main._uni_from_dict')
-    async def test_update_disabled_intra_switch(
-        self,
-        uni_from_dict_mock,
-        evc_deploy,
-        _mock_validate,
-        _mongo_controller_upsert_mock,
-        mock_use_uni_tags,
-        mock_get_unis
-    ):
-        """Test update a circuit that result in an intra-switch EVC
-        with disabled switches or interfaces"""
-        evc_deploy.return_value = True
-        _mock_validate.return_value = True
-        _mongo_controller_upsert_mock.return_value = True
-        mock_use_uni_tags.return_value = True
-        self.napp.controller.loop = asyncio.get_running_loop()
-        # Interfaces from get_uni_mocked() are disabled
-        uni_a = get_uni_mocked(
-            switch_dpid="00:00:00:00:00:00:00:01",
-            switch_id="00:00:00:00:00:00:00:01"
-        )
-        uni_z = get_uni_mocked(
-            switch_dpid="00:00:00:00:00:00:00:02",
-            switch_id="00:00:00:00:00:00:00:02"
-        )
-        unis = [uni_a, uni_z]
-        uni_from_dict_mock.side_effect = 2 * unis
-
-        evc_payload = {
-            "name": "Intra-EVC",
-            "dynamic_backup_path": True,
-            "uni_a": {
-                "tag": {"value": 101, "tag_type": 'vlan'},
-                "interface_id": "00:00:00:00:00:00:00:02:2"
-            },
-            "uni_z": {
-                "tag": {"value": 101, "tag_type": 'vlan'},
-                "interface_id": "00:00:00:00:00:00:00:01:1"
-            }
-        }
-
-        # With this update the EVC will be intra-switch
-        update_payload = {
-            "uni_z": {
-                "tag": {"value": 101, "tag_type": 'vlan'},
-                "interface_id": "00:00:00:00:00:00:00:02:1"
-            }
-        }
-        # Same mocks = intra-switch
-        mock_get_unis.return_value = [uni_z, uni_z]
-        response = await self.api_client.post(
-            f"{self.base_endpoint}/v2/evc/",
-            json=evc_payload,
-        )
-        assert 201 == response.status_code
-        current_data = response.json()
-        circuit_id = current_data["circuit_id"]
-
-        response = await self.api_client.patch(
-            f"{self.base_endpoint}/v2/evc/{circuit_id}",
-            json=update_payload,
-        )
-        assert 409 == response.status_code
-        description = "00:00:00:00:00:00:00:02:1 is disabled"
-        assert description in response.json()["description"]
-
     def test_link_from_dict_non_existent_intf(self):
         """Test _link_from_dict non existent intf."""
         self.napp.controller.get_interface_by_id = MagicMock(return_value=None)
@@ -2289,6 +2357,19 @@ class TestMain:
 
         emit_main_mock.assert_not_called()
 
+    def test_prepare_undeploy_flow(self):
+        """Test prepare_undeploy_flow method."""
+        evc = MagicMock(id="1")
+        assert not self.napp.prepare_undeploy_flow(evc)
+        evc._prepare_uni_flows.assert_has_calls([
+            call(evc.current_path, skip_in=False),
+            call(evc.failover_path, skip_in=True),
+        ])
+        evc._prepare_nni_flows.assert_has_calls([
+            call(evc.current_path),
+            call(evc.failover_path),
+        ])
+
     @patch("napps.kytos.mef_eline.main.emit_event")
     def test_handle_evc_affected_by_link_down(self, emit_event_mock):
         """Test handle_evc_affected_by_link_down method."""
@@ -2766,7 +2847,7 @@ class TestMain:
         mock_intf = Mock()
         mock_intf.id = "mock_intf"
 
-        # Created/link_up
+        # Created/link_up/enabled
         name = '.*.switch.interface.created'
         content = {"interface": mock_intf}
         event = KytosEvent(name=name, content=content)
@@ -2774,29 +2855,85 @@ class TestMain:
         assert mock_down.call_count == 0
         assert mock_up.call_count == 1
 
-        # Deleted/link_down
+        name = '.*.interface.enabled'
+        content = {"interface": mock_intf}
+        event = KytosEvent(name=name, content=content)
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 0
+        assert mock_up.call_count == 2
+
+        # Deleted/link_down/disabled
         name = '.*.switch.interface.deleted'
         event = KytosEvent(name=name, content=content)
         self.napp.handle_on_interface_link_change(event)
         assert mock_down.call_count == 1
-        assert mock_up.call_count == 1
+        assert mock_up.call_count == 2
+
+        name = '.*.interface.down'
+        event = KytosEvent(name=name, content=content)
+        self.napp.handle_on_interface_link_change(event)
+        assert mock_down.call_count == 2
+        assert mock_up.call_count == 2
 
         # Event delay
         self.napp._intf_events[mock_intf.id]["last_acquired"] = "mock_time"
         for _ in range(1, 6):
             self.napp.handle_on_interface_link_change(event)
-        assert mock_down.call_count == 1
-        assert mock_up.call_count == 1
+        assert mock_down.call_count == 2
+        assert mock_up.call_count == 2
 
         self.napp._intf_events[mock_intf.id].pop("last_acquired")
         self.napp.handle_on_interface_link_change(event)
-        assert mock_down.call_count == 2
-        assert mock_up.call_count == 1
+        assert mock_down.call_count == 3
+        assert mock_up.call_count == 2
 
         # Out of order event
         event = KytosEvent(name=name, content=content)
         self.napp._intf_events[mock_intf.id]["event"] = Mock(timestamp=now())
 
         self.napp.handle_on_interface_link_change(event)
-        assert mock_down.call_count == 2
-        assert mock_up.call_count == 1
+        assert mock_down.call_count == 3
+        assert mock_up.call_count == 2
+
+    def test_handle_evc_deployed(
+        self,
+    ):
+        """
+        Test setting up failover path with need_failover event.
+        """
+        evc1 = MagicMock()
+        evc1.is_eligible_for_failover_path.return_value = True
+        evc1.is_active.return_value = True
+        evc1.failover_path = Path([])
+        evc1.current_path = ["LINK"]
+
+        evc2 = MagicMock()
+        evc2.is_eligible_for_failover_path.return_value = False
+        evc2.is_active.return_value = True
+        evc2.failover_path = Path([])
+        evc2.current_path = ["LINK"]
+
+        self.napp.circuits = {
+            "evc_1": evc1,
+            "evc_2": evc2,
+        }
+
+        event = KytosEvent(
+            name="kytos/mef_eline.need_failover",
+            content={
+                "evc_id": "evc_1",
+            }
+        )
+
+        self.napp.handle_evc_deployed(event)
+        evc1.setup_failover_path.assert_called()
+
+        event = KytosEvent(
+            name="kytos/mef_eline.need_failover",
+            content={
+                "evc_id": "evc_2",
+            }
+        )
+
+        self.napp.handle_evc_deployed(event)
+        evc2.setup_failover_path.assert_not_called()

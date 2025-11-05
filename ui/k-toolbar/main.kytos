@@ -69,6 +69,8 @@
            <k-checkbox title="Enable INT" v-model:model="enable_int" :value="'enable'"
                        tooltip="Enable In-band Network Telemetry (INT)"
            ></k-checkbox>
+           <k-dropdown v-if="enable_int.includes('enable')" class="compact-dropdown" title="Inter EVC Proxy Port Enabled: " :options="int_proxy_port_options"
+           v-model:value="int_proxy_port_option"></k-dropdown>
           </form>
         </k-accordion-item>
 
@@ -240,6 +242,7 @@ export default {
         max_paths: "",
         queue_id: "",
         enable_int: [],
+        int_proxy_port_option: null,
         dpids: [""],
         hasAutoComplete:false,
         link_options: [],
@@ -308,6 +311,13 @@ export default {
           x => queue_ids.push({value:x?.toString(), description:String(x)})
       )
       return queue_ids;
+    },
+    int_proxy_port_options(){
+      return [
+        {value: null, description: "none", selected: true},
+        {value: true, description: "true"},
+        {value: false, description: "false"}
+      ];
     }
   },
   methods: {
@@ -467,6 +477,7 @@ export default {
       this.sb_priority = "";
       this.queue_id = "";
       this.enable_int = [],
+      this.int_proxy_port_option = null,
       this.link_options = [];
       this.max_paths = "";
 
@@ -519,6 +530,9 @@ export default {
         }
         if (this.enable_int.includes('enable')) {
           request.metadata = {telemetry_request: {}}
+          if (this.int_proxy_port_option !== null) {
+              request.metadata["proxy_port_enabled"] = this.int_proxy_port_option
+          }
         }
 
         ['primary_constraints', 'secondary_constraints'].forEach(_type => {
@@ -602,7 +616,7 @@ export default {
           }
         });
       } catch (err) {
-        console.error(err);
+        this.$http_helpers.post_error(this, error, 'Could Not Create Topology');
       }
     },
   },

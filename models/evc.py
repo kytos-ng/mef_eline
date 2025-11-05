@@ -26,7 +26,6 @@ from napps.kytos.mef_eline.exceptions import (ActivationError,
                                               EVCPathNotInstalled,
                                               FlowModException, InvalidPath)
 from napps.kytos.mef_eline.utils import (_does_uni_affect_evc,
-                                         check_disabled_component,
                                          compare_endpoint_trace,
                                          compare_uni_out_trace, emit_event,
                                          make_uni_list, map_dl_vlan,
@@ -157,7 +156,6 @@ class EVCBase(GenericEntity):
         self.current_links_cache = set()
         self.primary_links_cache = set()
         self.backup_links_cache = set()
-        self.affected_by_link_at = get_time("0001-01-01T00:00:00")
         self.old_path = Path([])
         self.max_paths = kwargs.get("max_paths", 2)
 
@@ -243,7 +241,6 @@ class EVCBase(GenericEntity):
                 "UNI_A and UNI_Z tag lists should be the same."
             )
         uni_a, uni_z = self._get_unis_use_tags(**kwargs)
-        check_disabled_component(uni_a, uni_z)
         self._validate_has_primary_or_dynamic(
             primary_path=kwargs.get("primary_path"),
             dynamic_backup_path=kwargs.get("dynamic_backup_path"),
@@ -982,21 +979,6 @@ class EVCDeploy(EVCBase):
         log.info(msg)
         return True
 
-    def try_setup_failover_path(
-        self,
-        wait=settings.DEPLOY_EVCS_INTERVAL,
-        warn_if_not_path=True
-    ):
-        """Try setup failover_path whenever possible."""
-        if (
-                self.failover_path or not self.current_path
-                or not self.is_active()
-                ):
-            return
-        if (now() - self.affected_by_link_at).seconds >= wait:
-            with self.lock:
-                self.setup_failover_path(warn_if_not_path)
-
     # pylint: disable=too-many-statements
     def setup_failover_path(self, warn_if_not_path=True):
         """Install flows for the failover path of this EVC.
@@ -1260,7 +1242,6 @@ class EVCDeploy(EVCBase):
         """Prepare flows to install UNIs."""
         uni_flows = {}
         if not path:
-            log.info("install uni flows without path.")
             return uni_flows
 
         # Determine VLANs

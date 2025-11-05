@@ -1,29 +1,36 @@
 <template>
     <div v-if="component_key > 0">
       <div class="mef_container">
-        <div class="mef-table no-compact">
+        <div class="mef-table-tip">
+          Hint: If any filter is used, any row that matches any of the filters will be displayed. To strict match a filter, check the box along the input area.
+          This way, only rows that match the checked filters will be displayed.
+        </div>
+        <div class="mef-table">
           <div class="mef-table-divisor">
             <table id="mef-table-list-circuit" class="table mef-table-list-circuit">
               <thead>
                 <tr>
                   <template v-for="(header, index) in data_headers">
-                    <th scope="col" v-if="header == 'id'">#</th>
-                    <th scope="col" class="header" @click="defineSort(index)" v-else>
+                    <th v-if="header == 'id'">#</th>
+                    <th class="header" @click="defineSort(index)" v-else>
                       {{ header }}
                       <span class="order-dir" v-if="currentSort === index">
                         {{ spanDir(index) }}
                       </span>
+                      <div class="my_slider" @mousedown="sliderSelected"></div>
                     </th>
                   </template>
                 </tr>
                 <tr class="header-filter">
                   <template v-for="(header, index) in data_header_id">
-                    <th scope="col" v-if="header == 'mef_dpid_id'"></th>
-                    <th scope="col" v-else>
-                      <input :id="header + '_search'" v-model="search_cols[header]"
-                        tooltip="DPID"
-                        v-if="!(['mef_lst_enabled', 'mef_lst_active'].includes(header))">
-                      </input>
+                    <th v-if="header == 'mef_dpid_id'"></th>
+                    <th v-else>
+                      <div v-if="!(['mef_lst_enabled', 'mef_lst_active'].includes(header))">
+                        <k-checkbox :action="toggle_check_column" :checked="false" :value="header"></k-checkbox>
+                        <input :id="header + '_search'" v-model="search_cols[header]"
+                          tooltip="DPID">
+                        </input>
+                      </div>
                     </th>
                   </template>
                 </tr>
@@ -66,7 +73,7 @@ export default {
     return {
       flag_loading: false,
       component_key: 0,
-      search_cols: [], 
+      search_cols: {}, 
       data_header_id:  ['mef_dpid_id', 'mef_lst_name', 
                       'mef_lst_sw_a', 'mef_lst_prt_a', 'mef_lst_int_a', 'mef_lst_tag_a',
                       'mef_lst_sw_z', 'mef_lst_prt_z', 'mef_lst_int_z', 'mef_lst_tag_z', 
@@ -79,7 +86,21 @@ export default {
       currentSort: 0,
       currentSortDir: [],
       dpid_names: {},  // DPIDs names
-      interface_names: {} // DPIDs and interface data and metadata
+      interface_names: {}, // DPIDs and interface data and metadata
+      thSliding: undefined, // th which was clicked on to be slided
+      startOffset: 0, // Initial position to start sliding from
+      strict_filter: {
+        'mef_lst_name': false,
+        'mef_lst_sw_a': false,
+        'mef_lst_prt_a': false,
+        'mef_lst_int_a': false,
+        'mef_lst_tag_a': false,
+        'mef_lst_sw_z': false,
+        'mef_lst_prt_z': false,
+        'mef_lst_int_z': false,
+        'mef_lst_tag_z': false,
+        'path_types': false,
+      }
     }
   },
   methods: {
@@ -186,6 +207,7 @@ export default {
 
         _this.data_rows = tableRows;
         _this.forceRerender();
+        _this.attachEvent();
       });
 
       request.fail(function( jqXHR, textStatus ) {
@@ -254,7 +276,36 @@ export default {
         // Load EVCs
       this.listEVCs();
       this.flag_loading = false;
-    }
+    },
+    sliderSelected: function (event) {
+      /**
+       * Save which th was selected to be expanded
+       * Save the starting poing of the click/selection
+       */
+      this.thSliding = event.currentTarget.parentElement;
+      this.startOffset = this.thSliding.offsetWidth - event.pageX
+    },
+    attachEvent: function () {
+      /**
+       * Attach Events listeners to document.
+       * MouseMove event will change a th width if any was selected
+       * MouseUp will remove selected th
+       */
+      let _this = this
+      document.addEventListener('mousemove', function(e) {
+        if (_this.thSliding) {
+          let number = _this.startOffset + e.pageX + 'px';
+          _this.thSliding.style.width = number;
+          _this.thSliding.style.minWidth = number;
+        }
+      });
+      document.addEventListener('mouseup', function (e) {
+        _this.thSliding = undefined;
+      })
+    },
+    toggle_check_column: function(header) {
+      this.strict_filter[header] = !this.strict_filter[header];
+    },
   },
   computed: {
     rowsOfPage: function() {
@@ -263,22 +314,38 @@ export default {
        * selected column
        */
       // list all seach properties
-      let properties = Object.keys(this.search_cols);
+      let filtered = []
+      let values = Object.values(this.search_cols);
 
-      let filtered = this.data_rows.filter((item)=>
-        {
-          // for every property check if search is not empty and item[prop] has search[prop]
-          // Cast to string to search VLAN numbers
-          // Regular Expression searches for comas and spaces
-          let checks = properties.map(i => 
-            !this.search_cols[i] || 
-            this.search_cols[i].toString().toUpperCase().split(/[\s,]+/).some(element => item[i].toString().toUpperCase().includes(element))
-          );
-          
-          // check if no property is false
-          return !checks.includes(false);
-        }
-      );
+      // If there is no filter entered
+      if (values.every(i => Boolean(i) == false)) {
+        filtered = this.data_rows
+      }
+      else {
+        let properties = Object.keys(this.search_cols);
+        filtered = this.data_rows.filter((item)=>
+          {
+            // Flag to indicate if matches with column checked (strict match).
+            let match_strict = true;
+            // for every property check if search is not empty and item[prop] has search[prop]
+            // Cast to string to search VLAN numbers
+            // Regular Expression searches for comas and spaces
+            let checks = properties.map(i => {
+              if (!this.search_cols[i] || !match_strict) {
+                return false;
+              }
+
+              const matches = this.search_cols[i].toString().toUpperCase().split(/[\s,]+/).some(element => item[i].toString().toUpperCase().includes(element))
+              if (this.strict_filter[i]) {
+                match_strict = matches;
+              }
+              return matches
+            });
+            // If a check is true and matches strict column, include it
+            return checks.includes(true) && match_strict;
+          }
+        );
+      };
 
       return filtered.sort((a, b) => {
         let modifier = 1,
@@ -327,6 +394,10 @@ export default {
 /* Import icons */
 @import "https://fonts.googleapis.com/icon?family=Material+Icons";
 
+.mef-table-tip {
+  color: #ccc
+}
+
 .mef-k-info-panel {
   width: calc(100% - 300px);
 }
@@ -336,26 +407,33 @@ export default {
   color: #ccc;
   font-size: 0.8rem;
 }
-
+.mef-table .my_slider {
+  top: 0px;
+  right: 0px;
+  bottom: 0px;
+  width: 10px;
+  position: absolute;
+  cursor: col-resize;
+}
 .mef-table {
   color: #ccc;
-  max-height: 250px;
   text-align: center;
   margin: 0 auto;
-  display: block;
   padding: 0.5em 0 1em 0.3em;
   font-size: .8em;
-  height: 190px;
 }
 .mef-table table {
-  display: table;
   width: 100%;
 }
 .mef-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 100; /* Without this property, # th will be overelapped by tbody when scrolling */
   font-weight: bold;
   background: #554077;
 }
 .mef-table th {
+  position: relative;
   padding: 0.6em 0 0.6em  0;
 }
 .mef-table tr {
@@ -371,12 +449,16 @@ export default {
   padding: 0 0 0.5em 0;
   background: #554077;
 }
+.mef-table .header-filter .k-checkbox-wrap {
+  min-height: 0px;
+}
 .mef-table .header-filter input {
   background: lightgray;
   border: 1px solid gray;
   border-radius: 3px;
   font-size: 0.9em;
-  margin: 0 0.2em 0 0.2em;
+  margin: 0 0.3em 0 0;
+  width: 78%;
 }
 .mef-table tbody tr:nth-child(even) {
   background: #313131;
@@ -384,18 +466,9 @@ export default {
 .mef-table tbody tr.inactive {
   background-color: #600000;
 }
-.mef-table-divisor {
-  height: 190px;
-}
 .mef-table-list-circuit tbody tr:hover {
     color: #eee;
     background-color: #666;
-}
-#mef_lst_prt_a_search,
-#mef_lst_prt_z_search,
-#mef_lst_tag_a_search,
-#mef_lst_tag_z_search {
-  width: 4em;
 }
 
 .mef_container .order-dir {

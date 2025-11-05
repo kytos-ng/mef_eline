@@ -2261,21 +2261,6 @@ class TestEVC():
         assert actual == ('No available path was found. 2 paths were'
                           f' rejected with messages: {tag_errors}')
 
-    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.setup_failover_path")
-    def test_try_setup_failover_path(self, setup_failover_mock):
-        """Test try_setup_failover_path"""
-        self.evc_deploy.failover_path = True
-        self.evc_deploy.current_path = False
-        self.evc_deploy.is_active = MagicMock(return_value=False)
-        self.evc_deploy.try_setup_failover_path()
-        assert setup_failover_mock.call_count == 0
-
-        self.evc_deploy.failover_path = False
-        self.evc_deploy.current_path = True
-        self.evc_deploy.is_active = MagicMock(return_value=True)
-        self.evc_deploy.try_setup_failover_path()
-        assert setup_failover_mock.call_count == 1
-
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy._send_flow_mods")
     @patch(
         "napps.kytos.mef_eline.models.evc.EVCDeploy._prepare_direct_uni_flows"
