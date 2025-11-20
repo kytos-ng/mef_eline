@@ -26,6 +26,8 @@ Changed
 - UI: Changed matching system in the table from ``View Connections``. Now every row will be displayed if it matches any filter entered specified.
 - UI: Added strict matching in the table from ``View Connections``. If a filter is checked, then only the rows that match the checked filters are going to be displayed.
 - ``mef_eline`` now listens to ``kytos/topology.interface.(enabled|up|disabled|down)`` events to update affected EVCs.
+- UI: Disabled unused inputs of UNI table.
+- UI: Changed UNI table DPID row to ID.
 
 Added
 =====
