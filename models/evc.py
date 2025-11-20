@@ -227,6 +227,7 @@ class EVCBase(GenericEntity):
             uni_a = self.uni_a
         return uni_a, uni_z
 
+    # pylint: disable=too-many-branches
     def update(self, **kwargs):
         """Update evc attributes.
 
@@ -270,18 +271,17 @@ class EVCBase(GenericEntity):
                         f"{attribute} is not a valid path: {exception}"
                     )
         if not valid_path:
-            try:
-                self.primary_path.is_valid(
-                    uni_a.interface.switch, uni_z.interface.switch
-                )
-                self.backup_path.is_valid(
-                    uni_a.interface.switch, uni_z.interface.switch
-                )
-                valid_path = True
-            except InvalidPath as exception:
-                raise ValueError(  # pylint: disable=raise-missing-from
-                        f"{attribute} is not a valid path: {exception}"
+            for path_name in ("primary_path", "backup_path"):
+                try:
+                    path = getattr(self, path_name)
+                    path.is_valid(
+                        uni_a.interface.switch, uni_z.interface.switch
                     )
+                except InvalidPath as exception:
+                    raise ValueError(  # pylint: disable=raise-missing-from
+                            f"{path_name} is not a valid path: {exception}"
+                        )
+            valid_path = True
         uni_a, uni_z = self._get_unis_use_tags(uni_a, uni_z)
         for attribute, value in kwargs.items():
             if attribute == "enabled":

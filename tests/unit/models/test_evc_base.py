@@ -11,7 +11,7 @@ from napps.kytos.mef_eline.models import Path
 # pylint: disable=wrong-import-position
 sys.path.insert(0, "/var/lib/kytos/napps/..")
 # pylint: enable=wrong-import-position, disable=ungrouped-imports
-from napps.kytos.mef_eline.exceptions import DuplicatedNoTagUNI  # NOQA  pycodestyle
+from napps.kytos.mef_eline.exceptions import DuplicatedNoTagUNI, InvalidPath  # NOQA  pycodestyle
 from napps.kytos.mef_eline.models import EVC  # NOQA  pycodestyle
 from napps.kytos.mef_eline.scheduler import \
     CircuitSchedule  # NOQA  pycodestyle
@@ -506,7 +506,7 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         evc.make_uni_vlan_available = MagicMock()
         new_uni_a = get_uni_mocked(tag_value=200, is_valid=True)
         new_uni_z = get_uni_mocked(tag_value=200, is_valid=True)
-        unis = {"uni_a": new_uni_a}
+        unis = {"uni_a": new_uni_a, "uni_z": evc.uni_z}
         evc._get_unis_use_tags(**unis)
         assert evc._use_uni_vlan.call_count == 1
         assert evc._use_uni_vlan.call_args[0][0] == new_uni_a
@@ -707,3 +707,52 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
 
         other_uni = get_uni_mocked(interface_port=1, switch_dpid="02")
         assert evc.check_no_tag_duplicate(other_uni) is None
+
+    def test_update_invalid_path_uni(self):
+        """Test update by modifying a UNI
+         so path is invalid."""
+        intf_a = MagicMock()
+        intf_a.endpoint_a.switch = "00:01"
+        intf_b = MagicMock()
+        intf_b.endpoint_a.switch = "00:02"
+        uni_a = get_uni_mocked(is_valid=True, switch_id="00:01")
+        uni_z = get_uni_mocked(is_valid=True, switch_id="00:02")
+        primary_path = Path([intf_a, intf_b])
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "dynamic_backup_path": False,
+            "primary_path": primary_path,
+            "enable": True,
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+        }
+        evc = EVC(**attributes)
+
+        # Modify uni that makes path invalid
+        new_uni_a = get_uni_mocked(is_valid=True, switch_id="00:03")
+        update = {"uni_a": new_uni_a}
+        with pytest.raises(ValueError):
+            evc.update(**update)
+
+    @patch("napps.kytos.mef_eline.models.EVC._get_unis_use_tags")
+    def test_update_invalid_path_vlan(self, mock_use_tags):
+        """Test update a VLAN with invalid path."""
+        uni_a = get_uni_mocked(is_valid=True, switch_id="00:01")
+        uni_z = get_uni_mocked(is_valid=True, switch_id="00:02")
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "dynamic_backup_path": False,
+            "primary_path": MagicMock(),
+            "enable": True,
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+        }
+        evc = EVC(**attributes)
+
+        new_primary_path = MagicMock()
+        new_primary_path.is_valid.side_effect = InvalidPath()
+        with pytest.raises(ValueError):
+            evc.update(**{"primary_path": new_primary_path})
+        mock_use_tags.assert_not_called()

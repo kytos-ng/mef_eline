@@ -372,7 +372,7 @@ class Main(KytosNApp):
             result = f"circuit_id {circuit_id} not found"
             log.debug("update result %s %s", result, 404)
             raise HTTPException(404, detail=result) from KeyError
-        
+
         with evc.lock:
             try:
                 updated_data = self._evc_dict_with_instances(data)
@@ -396,16 +396,16 @@ class Main(KytosNApp):
             redeployed = False
             if evc.is_active():
                 if enable is False:  # disable if active
-                        evc.remove()
+                    evc.remove()
                 elif redeploy is not None:  # redeploy if active
-                        evc.remove()
-                        redeployed = evc.deploy()
+                    evc.remove()
+                    redeployed = evc.deploy()
             else:
                 if enable is True:  # enable if inactive
-                        redeployed = evc.deploy()
+                    redeployed = evc.deploy()
                 elif evc.is_enabled() and redeploy:
-                        evc.remove()
-                        redeployed = evc.deploy()
+                    evc.remove()
+                    redeployed = evc.deploy()
             result = {evc.id: evc.as_dict(), 'redeployed': redeployed}
             status = 200
 
