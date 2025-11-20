@@ -196,17 +196,21 @@ class EVCBase(GenericEntity):
             return
         self._mongo_controller.upsert_evc(self.as_dict())
 
-    def _get_unis_use_tags(self, **kwargs) -> tuple[UNI, UNI]:
+    def _get_unis(self, **kwargs) -> tuple[UNI, UNI]:
+        """Get the updated UNIs."""
+        uni_a = kwargs.get("uni_a", None) or self.uni_a
+        uni_z = kwargs.get("uni_z", None) or self.uni_z
+        return uni_a, uni_z
+
+    def _get_unis_use_tags(self, uni_a, uni_z) -> tuple[UNI, UNI]:
         """Obtain both UNIs (uni_a, uni_z).
         If a UNI is changing, verify tags"""
-        uni_a = kwargs.get("uni_a", None)
         uni_a_flag = False
-        if uni_a and uni_a != self.uni_a:
+        if uni_a != self.uni_a:
             uni_a_flag = True
             self._use_uni_vlan(uni_a, uni_dif=self.uni_a)
 
-        uni_z = kwargs.get("uni_z", None)
-        if uni_z and uni_z != self.uni_z:
+        if uni_z != self.uni_z:
             try:
                 self._use_uni_vlan(uni_z, uni_dif=self.uni_z)
                 self.make_uni_vlan_available(self.uni_z, uni_dif=uni_z)
@@ -243,13 +247,15 @@ class EVCBase(GenericEntity):
             raise ValueError(
                 "UNI_A and UNI_Z tag lists should be the same."
             )
-        uni_a, uni_z = self._get_unis_use_tags(**kwargs)
+
+        uni_a, uni_z = self._get_unis(**kwargs)
         self._validate_has_primary_or_dynamic(
             primary_path=kwargs.get("primary_path"),
             dynamic_backup_path=kwargs.get("dynamic_backup_path"),
             uni_a=uni_a,
             uni_z=uni_z,
         )
+        valid_path = False
         for attribute, value in kwargs.items():
             if attribute not in self.updatable_attributes:
                 raise ValueError(f"{attribute} can't be updated.")
@@ -258,10 +264,25 @@ class EVCBase(GenericEntity):
                     value.is_valid(
                         uni_a.interface.switch, uni_z.interface.switch
                     )
+                    valid_path = True
                 except InvalidPath as exception:
                     raise ValueError(  # pylint: disable=raise-missing-from
-                        f"{attribute} is not a " f"valid path: {exception}"
+                        f"{attribute} is not a valid path: {exception}"
                     )
+        if not valid_path:
+            try:
+                self.primary_path.is_valid(
+                    uni_a.interface.switch, uni_z.interface.switch
+                )
+                self.backup_path.is_valid(
+                    uni_a.interface.switch, uni_z.interface.switch
+                )
+                valid_path = True
+            except InvalidPath as exception:
+                raise ValueError(  # pylint: disable=raise-missing-from
+                        f"{attribute} is not a valid path: {exception}"
+                    )
+        uni_a, uni_z = self._get_unis_use_tags(uni_a, uni_z)
         for attribute, value in kwargs.items():
             if attribute == "enabled":
                 if value:
