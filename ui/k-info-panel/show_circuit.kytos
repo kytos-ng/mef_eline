@@ -107,10 +107,11 @@
                     <td>
                       <k-input-auto
                         v-model:value="col.value"
-                        title="col.name"
+                        :title="col.name"
                         :candidates="dpids"
                         @focus="loadDpidNames"
-                        @blur="onblur_dpid">
+                        @blur="onblur_dpid"
+                        :isEditable="col.editable">
                       </k-input-auto>
                     </td>
                   </template>
@@ -531,19 +532,20 @@ export default {
       let uni_z = this.circuit['uni_z']['interface_id'];
       let uni_z_data = this.getEndpointData(uni_z);
 
+      // The last parameter in the arrays is for disabling inputs if true.
       this.endpoints_data = {
-        'DPID': [
+        'ID': [
          {'value': uni_a, 'editable':true, 'name':'uni_a'},
          {'value': uni_z, 'editable':true, 'name':'uni_z'}],
         'Node': [
-         {'value': uni_a_data['node_name']},
-         {'value': uni_z_data['node_name']}],
+         {'value': uni_a_data['node_name'], 'editable':false},
+         {'value': uni_z_data['node_name'], 'editable':false}],
         'Interface': [
-         {'value': uni_a_data['interface_name']},
-         {'value': uni_z_data['interface_name']}],
-        'Port':[
-         {'value': uni_a_data['port_name']},
-         {'value': uni_z_data['port_name']}]
+         {'value': uni_a_data['interface_name'], 'editable':false},
+         {'value': uni_z_data['interface_name'], 'editable':false}],
+        'Port': [
+         {'value': uni_a_data['port_name'], 'editable':false},
+         {'value': uni_z_data['port_name'], 'editable':false}],
       };
 
       // Tag is optional, but can be edited
