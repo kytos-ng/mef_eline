@@ -163,8 +163,8 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
             "dynamic_backup_path": True,
             "primary_path": initial_primary_path,
             "enable": True,
-            "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True),
+            "uni_a": get_uni_mocked(is_valid=True, switch_id="00:01"),
+            "uni_z": get_uni_mocked(is_valid=True, switch_id="00:02"),
         }
         update_dict = {"primary_path": Path([])}
         evc = EVC(**attributes)
@@ -217,8 +217,15 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
     @patch("napps.kytos.mef_eline.models.EVC.sync")
     def test_update_empty_backup_path_non_dynamic(self, _sync_mock):
         """Test if an empty backup path can be set even if it's non dynamic."""
-        initial_backup_path = Path([MagicMock(id=1), MagicMock(id=2)])
-        primary_path = Path([MagicMock(id=3), MagicMock(id=4)])
+        uni_a = get_uni_mocked(is_valid=True, switch_id="00:01")
+        uni_z = get_uni_mocked(is_valid=True, switch_id="00:02")
+        link = MagicMock()
+        link.endpoint_a.switch = uni_a.interface.switch
+        link.endpoint_a.link = link
+        link.endpoint_b.switch = uni_z.interface.switch
+        link.endpoint_b.link = link
+        primary_path = Path([link])
+        initial_backup_path = Path([link])
         attributes = {
             "controller": get_controller_mock(),
             "name": "circuit_name",
@@ -226,13 +233,13 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
             "primary_path": primary_path,
             "backup_path": initial_backup_path,
             "enable": True,
-            "uni_a": get_uni_mocked(is_valid=True),
-            "uni_z": get_uni_mocked(is_valid=True),
+            "uni_a": uni_a,
+            "uni_z": uni_z,
         }
-        update_dict = {"backup_path": Path([])}
         evc = EVC(**attributes)
         assert evc.primary_path == primary_path
         assert evc.backup_path == initial_backup_path
+        update_dict = {"backup_path": Path([])}
         evc.update(**update_dict)
         assert evc.primary_path == primary_path
         assert len(evc.backup_path) == 0
@@ -708,16 +715,18 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         other_uni = get_uni_mocked(interface_port=1, switch_dpid="02")
         assert evc.check_no_tag_duplicate(other_uni) is None
 
-    def test_update_invalid_path_uni(self):
+    @patch("napps.kytos.mef_eline.models.EVC.sync")
+    def test_update_invalid_path_uni(self, _sync_mock):
         """Test update by modifying a UNI
          so path is invalid."""
-        intf_a = MagicMock()
-        intf_a.endpoint_a.switch = "00:01"
-        intf_b = MagicMock()
-        intf_b.endpoint_a.switch = "00:02"
         uni_a = get_uni_mocked(is_valid=True, switch_id="00:01")
         uni_z = get_uni_mocked(is_valid=True, switch_id="00:02")
-        primary_path = Path([intf_a, intf_b])
+        link = MagicMock()
+        link.endpoint_a.switch = uni_a.interface.switch
+        link.endpoint_a.link = link
+        link.endpoint_b.switch = uni_z.interface.switch
+        link.endpoint_b.link = link
+        primary_path = Path([link])
         attributes = {
             "controller": get_controller_mock(),
             "name": "circuit_name",
@@ -728,6 +737,10 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
             "uni_z": uni_z,
         }
         evc = EVC(**attributes)
+
+        # Modify with valid UNI, no exception raised
+        update = {"uni_a": uni_a}
+        evc.update(**update)
 
         # Modify uni that makes path invalid
         new_uni_a = get_uni_mocked(is_valid=True, switch_id="00:03")

@@ -244,6 +244,7 @@ class EVCBase(GenericEntity):
 
         """
         enable, redeploy = (None, None)
+        # Verification of the attributes
         if not self._tag_lists_equal(**kwargs):
             raise ValueError(
                 "UNI_A and UNI_Z tag lists should be the same."
@@ -256,32 +257,26 @@ class EVCBase(GenericEntity):
             uni_a=uni_a,
             uni_z=uni_z,
         )
-        valid_path = False
         for attribute, value in kwargs.items():
             if attribute not in self.updatable_attributes:
                 raise ValueError(f"{attribute} can't be updated.")
-            if attribute in ("primary_path", "backup_path"):
-                try:
-                    value.is_valid(
-                        uni_a.interface.switch, uni_z.interface.switch
+
+        # Alway verify primary_path and backup_path.
+        # If a UNI has changed, they need to connect with paths
+        # If path has changed, they need to be valid and connect with UNIs
+        for path_name in ("primary_path", "backup_path"):
+            path = getattr(self, path_name)
+            path = kwargs.get(path_name, path)
+            try:
+                path.is_valid(
+                    uni_a.interface.switch, uni_z.interface.switch
+                )
+            except InvalidPath as exception:
+                raise ValueError(  # pylint: disable=raise-missing-from
+                        f"{path_name} is not a valid path: {exception}"
                     )
-                    valid_path = True
-                except InvalidPath as exception:
-                    raise ValueError(  # pylint: disable=raise-missing-from
-                        f"{attribute} is not a valid path: {exception}"
-                    )
-        if not valid_path:
-            for path_name in ("primary_path", "backup_path"):
-                try:
-                    path = getattr(self, path_name)
-                    path.is_valid(
-                        uni_a.interface.switch, uni_z.interface.switch
-                    )
-                except InvalidPath as exception:
-                    raise ValueError(  # pylint: disable=raise-missing-from
-                            f"{path_name} is not a valid path: {exception}"
-                        )
-            valid_path = True
+
+        # Changing/Updating with the new values
         uni_a, uni_z = self._get_unis_use_tags(uni_a, uni_z)
         for attribute, value in kwargs.items():
             if attribute == "enabled":
