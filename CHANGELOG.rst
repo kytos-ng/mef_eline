@@ -14,6 +14,9 @@ Fixed
 - UI: Autocomplete no longer throws an error when typing in spaces
 - Fixed undeploy EVC flows procedure, now it will remove all expected flows. It was leaving UNI flows behind if the link failure affected both ``current_path`` and ``failover_path``
 - Consistency check setting up failover paths is now distributed across multiple threads through the event bus.
+- ``primary_path`` was not verified when only the UNIs were patched in an EVC.
+- Patching an EVC no longer uses VLANs if the patch failed with invalid paths.
+- Patching an EVC is no longer prone to errors if said EVC was being modified in another process at the same time.
 
 Changed
 =======
