@@ -383,44 +383,41 @@ class Main(KytosNApp):
             log.debug("update result %s %s", result, 404)
             raise HTTPException(404, detail=result) from KeyError
 
-        try:
-            updated_data = self._evc_dict_with_instances(data)
-            self._check_no_tag_duplication(
-                circuit_id, updated_data.get("uni_a"),
-                updated_data.get("uni_z")
-            )
-            enable, redeploy = evc.update(**updated_data)
-        except (ValueError, KytosTagError, ValidationError) as exception:
-            log.debug("update result %s %s", exception, 400)
-            raise HTTPException(400, detail=str(exception)) from exception
-        except DuplicatedNoTagUNI as exception:
-            log.debug("update result %s %s", exception, 409)
-            raise HTTPException(409, detail=str(exception)) from exception
-        except DisabledSwitch as exception:
-            log.debug("update result %s %s", exception, 409)
-            raise HTTPException(
-                    409,
-                    detail=f"Path is not valid: {exception}"
-                ) from exception
-        redeployed = False
-        if evc.is_active():
-            if enable is False:  # disable if active
-                with evc.lock:
+        with evc.lock:
+            try:
+                updated_data = self._evc_dict_with_instances(data)
+                self._check_no_tag_duplication(
+                    circuit_id, updated_data.get("uni_a"),
+                    updated_data.get("uni_z")
+                )
+                enable, redeploy = evc.update(**updated_data)
+            except (ValueError, KytosTagError, ValidationError) as exception:
+                log.debug("update result %s %s", exception, 400)
+                raise HTTPException(400, detail=str(exception)) from exception
+            except DuplicatedNoTagUNI as exception:
+                log.debug("update result %s %s", exception, 409)
+                raise HTTPException(409, detail=str(exception)) from exception
+            except DisabledSwitch as exception:
+                log.debug("update result %s %s", exception, 409)
+                raise HTTPException(
+                        409,
+                        detail=f"Path is not valid: {exception}"
+                    ) from exception
+            redeployed = False
+            if evc.is_active():
+                if enable is False:  # disable if active
                     evc.remove()
-            elif redeploy is not None:  # redeploy if active
-                with evc.lock:
-                    evc.remove()
-                    redeployed = evc.deploy()
-        else:
-            if enable is True:  # enable if inactive
-                with evc.lock:
-                    redeployed = evc.deploy()
-            elif evc.is_enabled() and redeploy:
-                with evc.lock:
+                elif redeploy is not None:  # redeploy if active
                     evc.remove()
                     redeployed = evc.deploy()
-        result = {evc.id: evc.as_dict(), 'redeployed': redeployed}
-        status = 200
+            else:
+                if enable is True:  # enable if inactive
+                    redeployed = evc.deploy()
+                elif evc.is_enabled() and redeploy:
+                    evc.remove()
+                    redeployed = evc.deploy()
+            result = {evc.id: evc.as_dict(), 'redeployed': redeployed}
+            status = 200
 
         log.debug("update result %s %s", result, status)
         emit_event(self.controller, "updated",

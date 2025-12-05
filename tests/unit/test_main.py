@@ -1673,7 +1673,7 @@ class TestMain:
             switch_dpid="00:00:00:00:00:00:00:02",
             switch_id="00:00:00:00:00:00:00:02"
         )
-        unis = [uni_a, uni_z]
+        unis = [uni_z, uni_a]
         uni_from_dict_mock.side_effect = 2 * unis
 
         evc_payload = {
