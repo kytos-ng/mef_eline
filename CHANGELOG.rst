@@ -14,6 +14,9 @@ Fixed
 - UI: Autocomplete no longer throws an error when typing in spaces
 - Fixed undeploy EVC flows procedure, now it will remove all expected flows. It was leaving UNI flows behind if the link failure affected both ``current_path`` and ``failover_path``
 - Consistency check setting up failover paths is now distributed across multiple threads through the event bus.
+- ``primary_path`` was not verified when only the UNIs were patched in an EVC.
+- Patching an EVC no longer uses VLANs if the patch failed with invalid paths.
+- Patching an EVC is no longer prone to errors if said EVC was being modified in another process at the same time.
 
 Changed
 =======
@@ -26,6 +29,8 @@ Changed
 - UI: Changed matching system in the table from ``View Connections``. Now every row will be displayed if it matches any filter entered specified.
 - UI: Added strict matching in the table from ``View Connections``. If a filter is checked, then only the rows that match the checked filters are going to be displayed.
 - ``mef_eline`` now listens to ``kytos/topology.interface.(enabled|up|disabled|down)`` events to update affected EVCs.
+- UI: Disabled unused inputs of UNI table.
+- UI: Changed UNI table DPID row to ID.
 
 Added
 =====
