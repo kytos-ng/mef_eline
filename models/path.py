@@ -53,14 +53,11 @@ class Path(list[Link], GenericEntity):
                 real_link = controller.get_link(link.id)
                 if real_link is None:
                     raise KytosNoTagAvailableError(link)
-                with real_link.tag_lock:
-                    tag_value = real_link.get_next_available_tag(
-                        "vlan",
-                        try_avoid_value=old_path_dict.get(link.id)
-                    )
-                    real_link.notify_tag_listeners(
-                        controller
-                    )
+                tag_value = real_link.atomic_get_next_available_tag(
+                    controller,
+                    "vlan",
+                    try_avoid_value=old_path_dict.get(link.id)
+                )
                 tag = TAG('vlan', tag_value)
                 link.add_metadata("s_vlan", tag)
         except KytosNoTagAvailableError as exc:
@@ -78,15 +75,12 @@ class Path(list[Link], GenericEntity):
                 continue
             real_link = controller.get_link(link.id)
             if real_link is not None:
-                with real_link.tag_lock:
-                    conflict = real_link.make_tags_available(
-                        tag.tag_type,
-                        tag.value,
-                        check_order=False
-                    )
-                    real_link.notify_tag_listeners(
-                        controller
-                    )
+                conflict = real_link.atomic_make_tags_available(
+                    controller,
+                    tag.tag_type,
+                    tag.value,
+                    check_order=False
+                )
                 if conflict:
                     log.error(
                         f"Tags {conflict} was already available in "
