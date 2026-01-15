@@ -4,7 +4,6 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from datetime import datetime
 from operator import eq, ne
-from threading import Lock
 from typing import Union
 from uuid import uuid4
 
@@ -159,8 +158,6 @@ class EVCBase(GenericEntity):
         self.backup_links_cache = set()
         self.old_path = Path([])
         self.max_paths = kwargs.get("max_paths", 2)
-
-        self.lock = Lock()
 
         self.archived = kwargs.get("archived", False)
 
@@ -482,8 +479,11 @@ class EVCBase(GenericEntity):
             tag = range_difference(tag, uni_dif.user_tag.value)
             if not tag:
                 return
-        uni.interface.use_tags(
-            self._controller, tag, tag_type, use_lock=True, check_order=False
+        uni.interface.atomic_use_tags(
+            self._controller,
+            tag_type,
+            tag,
+            check_order=False
         )
 
     def make_uni_vlan_available(
@@ -502,8 +502,10 @@ class EVCBase(GenericEntity):
             if not tag:
                 return
         try:
-            conflict = uni.interface.make_tags_available(
-                self._controller, tag, tag_type, use_lock=True,
+            conflict = uni.interface.atomic_make_tags_available(
+                self._controller,
+                tag_type,
+                tag,
                 check_order=False
             )
         except KytosTagError as err:

@@ -5,6 +5,7 @@ from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
+from kytos.core.controller import Controller
 from kytos.core.exceptions import KytosNoTagAvailableError
 from kytos.core.interface import TAG
 from kytos.core.link import Link
@@ -37,7 +38,11 @@ class Path(list[Link], GenericEntity):
                 return link
         return None
 
-    def choose_vlans(self, controller, old_path_dict: dict = None):
+    def choose_vlans(
+        self,
+        controller: Controller,
+        old_path_dict: dict = None
+    ):
         """Choose the VLANs to be used for the circuit.
         If any of the links next tag isn't available, it'll release
         all vlans of the path that have been allocated, all or nothing.
@@ -45,8 +50,12 @@ class Path(list[Link], GenericEntity):
         old_path_dict = old_path_dict if old_path_dict else {}
         try:
             for link in self:
-                tag_value = link.get_next_available_tag(
-                    controller, link.id,
+                real_link = controller.get_link(link.id)
+                if real_link is None:
+                    raise KytosNoTagAvailableError(link)
+                tag_value = real_link.atomic_get_next_available_tag(
+                    controller,
+                    "vlan",
                     try_avoid_value=old_path_dict.get(link.id)
                 )
                 tag = TAG('vlan', tag_value)
@@ -55,22 +64,28 @@ class Path(list[Link], GenericEntity):
             self.make_vlans_available(controller)
             raise exc
 
-    def make_vlans_available(self, controller):
+    def make_vlans_available(
+        self,
+        controller: Controller
+    ):
         """Make the VLANs used in a path available when undeployed."""
         for link in self:
-            tag = link.get_metadata("s_vlan")
+            tag: TAG = link.get_metadata("s_vlan")
             if not tag:
                 continue
-            conflict_a, conflict_b = link.make_tags_available(
-                controller, tag.value, link.id, tag.tag_type,
-                check_order=False
-            )
-            if conflict_a:
-                log.error(f"Tags {conflict_a} was already available in"
-                          f"{link.endpoint_a.id}")
-            if conflict_b:
-                log.error(f"Tags {conflict_b} was already available in"
-                          f"{link.endpoint_b.id}")
+            real_link = controller.get_link(link.id)
+            if real_link is not None:
+                conflict = real_link.atomic_make_tags_available(
+                    controller,
+                    tag.tag_type,
+                    tag.value,
+                    check_order=False
+                )
+                if conflict:
+                    log.error(
+                        f"Tags {conflict} was already available in "
+                        f"{link.id}"
+                    )
             link.remove_metadata("s_vlan")
 
     def is_valid(self, switch_a, switch_z, is_scheduled=False):
