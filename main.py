@@ -96,8 +96,7 @@ class Main(KytosNApp):
         defaul_values: dict,
         allowed_default_keys: dict
     ):
-        """Load default EVC values from settings. Check
-         format with OpenAPI spec."""
+        """Load default EVC values from settings."""
         dynamic_schema = {
             "openapi": self.spec["openapi"],
             "components": self.spec['components'],
@@ -106,8 +105,6 @@ class Main(KytosNApp):
         for key, value in defaul_values.items():
             if key not in allowed_default_keys:
                 # log.error
-                continue
-            if not value:
                 continue
             schema = allowed_default_keys[key]
             dynamic_schema["$ref"] = f"#/components/schemas/{schema}"
@@ -1291,7 +1288,6 @@ class Main(KytosNApp):
         # Add default values
         if created:
             for key, value in self.default_values.items():
-                # Only add default if key is not present
                 if key not in data:
                     data[key] = value
         data["table_group"] = self.table_group

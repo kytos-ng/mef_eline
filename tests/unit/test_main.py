@@ -2963,6 +2963,7 @@ class TestMain:
         assert not self.napp.default_values
         assert mock_log.error.call_count == 1
 
+
         default_value = {
             "flexible_metrics": {"bandwith": 50}
         }

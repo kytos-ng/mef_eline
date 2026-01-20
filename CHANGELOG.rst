@@ -36,6 +36,7 @@ Added
 =====
 - Filters can now search for multiple values at a time by using commas or spaces. If you type ``Switch1, Switch2, Switch3`` or ``Switch1 Switch2 Switch3`` or ``Switch1, Switch2, Switch3`` into the filter/search-bar, then your search will include all 3 options, Switch1, Switch2, and Switch3.
 - UI: integrated a dropdown to set INT proxy_port_enabled metadata option
+- Added default values to EVCs from settings. They will be applied to created EVC if the key is not present in the request body. Allowed default keys are ``primary_constraints`` and ``secondary_constraints``.
 
 Fixed
 =====
