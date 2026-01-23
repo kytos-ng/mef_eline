@@ -31,6 +31,7 @@ Changed
 - ``mef_eline`` now listens to ``kytos/topology.interface.(enabled|up|disabled|down)`` events to update affected EVCs.
 - UI: Disabled unused inputs of UNI table.
 - UI: Changed UNI table DPID row to ID.
+- If a key from ``EVC_DEFAULT`` is not allowed, ``mef_eline`` will fail setup.
 
 Added
 =====

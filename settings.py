@@ -53,6 +53,6 @@ UNI_STATE_CHANGE_DELAY = 0.1
 
 # Default EVC values, they will be applied to every EVC which key is missing
 EVC_DEFAULT = {
-    "primary_constraints": {"undesired_links": 123},
-    "secondary_constraints": {"mandatory_metrics": {"ownership": "red"}}
+    # "primary_constraints": {"undesired_links": ["74bbc9527a0e309a86c9570"]},
+    # "secondary_constraints": {"mandatory_metrics": {"ownership": "red"}}
 }

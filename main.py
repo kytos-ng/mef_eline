@@ -104,8 +104,7 @@ class Main(KytosNApp):
         }
         for key, value in defaul_values.items():
             if key not in allowed_default_keys:
-                # log.error
-                continue
+                raise ValueError(f"Invalid {key} is not allowed.")
             schema = allowed_default_keys[key]
             dynamic_schema["$ref"] = f"#/components/schemas/{schema}"
             try:

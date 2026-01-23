@@ -2963,10 +2963,21 @@ class TestMain:
         assert not self.napp.default_values
         assert mock_log.error.call_count == 1
 
-
         default_value = {
             "flexible_metrics": {"bandwith": 50}
         }
         self.napp.load_default_evc_values(default_value, allowed_default)
         assert "flexible_metrics" in self.napp.default_values
         assert mock_log.error.call_count == 1
+
+    def test_load_default_evc_values_error(self):
+        """Test load_default_evc_values with not allowed key."""
+        allowed_default = {
+            "flexible_metrics": "Attributes"
+        }
+        default_value = {
+            "mocked_key": [1, 2, 3]
+        }
+        self.napp.default_values = {}
+        with pytest.raises(ValueError):
+            self.napp.load_default_evc_values(default_value, allowed_default)
