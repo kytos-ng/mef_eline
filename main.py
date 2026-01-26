@@ -111,8 +111,8 @@ class Main(KytosNApp):
                 validate(value, dynamic_schema)
                 self.default_values[key] = value
             except OpenapiValidationError as err:
-                log.error(f"Invalid {key} with error: {err.message}")
-                continue
+                msg = f"Invalid {key} with error: {err.message}"
+                raise ValueError(msg) from err
 
     def get_evcs_by_svc_level(self, enable_filter: bool = True) -> list[EVC]:
         """Get circuits sorted by desc service level and asc creation_time.

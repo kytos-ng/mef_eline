@@ -2948,27 +2948,18 @@ class TestMain:
         self.napp.handle_evc_deployed(event)
         evc2.setup_failover_path.assert_not_called()
 
-    @patch('napps.kytos.mef_eline.main.log')
-    def test_load_default_evc_values(self, mock_log):
+    def test_load_default_evc_values(self):
         """Test load_default_evc_values using Attributes scheme from
          the yml file."""
         allowed_default = {
             "flexible_metrics": "Attributes"
         }
-        default_value = {
-            "flexible_metrics": {"bandwidth": "wrong_type"}
-        }
-        self.napp.default_values = {}
-        self.napp.load_default_evc_values(default_value, allowed_default)
-        assert not self.napp.default_values
-        assert mock_log.error.call_count == 1
 
         default_value = {
             "flexible_metrics": {"bandwith": 50}
         }
         self.napp.load_default_evc_values(default_value, allowed_default)
         assert "flexible_metrics" in self.napp.default_values
-        assert mock_log.error.call_count == 1
 
     def test_load_default_evc_values_error(self):
         """Test load_default_evc_values with not allowed key."""
@@ -2979,5 +2970,11 @@ class TestMain:
             "mocked_key": [1, 2, 3]
         }
         self.napp.default_values = {}
+        with pytest.raises(ValueError):
+            self.napp.load_default_evc_values(default_value, allowed_default)
+
+        default_value = {
+            "flexible_metrics": {"bandwidth": "wrong_type"}
+        }
         with pytest.raises(ValueError):
             self.napp.load_default_evc_values(default_value, allowed_default)
