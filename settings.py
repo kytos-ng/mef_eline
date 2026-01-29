@@ -50,3 +50,9 @@ SPF_ATTRIBUTE = "hop"
 # Time (seconds) to update EVC after interface event
 # ".*.switch.interface.(link_up|link_down|created|deleted)"
 UNI_STATE_CHANGE_DELAY = 0.1
+
+# Default EVC values, they will be applied to every EVC which key is missing
+EVC_DEFAULT = {
+    # "primary_constraints": {"undesired_links": ["74bbc9527a0e309a86c9570"]},
+    # "secondary_constraints": {"mandatory_metrics": {"ownership": "red"}}
+}
