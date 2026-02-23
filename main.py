@@ -12,6 +12,8 @@ from copy import deepcopy
 from threading import Lock
 from typing import Optional
 
+from jsonschema.exceptions import ValidationError as OpenapiValidationError
+from openapi_schema_validator import validate
 from pydantic import ValidationError
 
 from kytos.core import KytosNApp, log, rest
@@ -45,6 +47,10 @@ class Main(KytosNApp):
     This class is the entry point for this napp.
     """
 
+    allowed_default_keys = {
+        "primary_constraints": 'PathConstraints',
+        "secondary_constraints": 'PathConstraints'
+    }
     spec = load_spec(pathlib.Path(__file__).parent / "openapi.yml")
 
     def setup(self):
@@ -57,6 +63,12 @@ class Main(KytosNApp):
         """
         # object used to scheduler circuit events
         self.sched = Scheduler()
+
+        # EVC default values
+        self.default_values = {}
+        self.load_default_evc_values(
+            settings.EVC_DEFAULT, self.allowed_default_keys
+        )
 
         # object to save and load circuits
         self.mongo_controller = self.get_eline_controller()
@@ -78,6 +90,29 @@ class Main(KytosNApp):
 
         self.load_all_evcs()
         self._topology_updated_at = None
+
+    def load_default_evc_values(
+        self,
+        defaul_values: dict,
+        allowed_default_keys: dict
+    ):
+        """Load default EVC values from settings."""
+        dynamic_schema = {
+            "openapi": self.spec["openapi"],
+            "components": self.spec['components'],
+            "$ref": ""
+        }
+        for key, value in defaul_values.items():
+            if key not in allowed_default_keys:
+                raise ValueError(f"Invalid {key} is not allowed.")
+            schema = allowed_default_keys[key]
+            dynamic_schema["$ref"] = f"#/components/schemas/{schema}"
+            try:
+                validate(value, dynamic_schema)
+                self.default_values[key] = value
+            except OpenapiValidationError as err:
+                msg = f"Invalid {key} with error: {err.message}"
+                raise ValueError(msg) from err
 
     def get_evcs_by_svc_level(self, enable_filter: bool = True) -> list[EVC]:
         """Get circuits sorted by desc service level and asc creation_time.
@@ -256,7 +291,7 @@ class Main(KytosNApp):
         data = get_json_or_400(request, self.controller.loop)
 
         try:
-            evc = self._evc_from_dict(data)
+            evc = self._evc_from_dict(data, created=True)
         except (ValueError, KytosTagError) as exception:
             log.debug("create_circuit result %s %s", exception, 400)
             raise HTTPException(400, detail=str(exception)) from exception
@@ -1247,8 +1282,13 @@ class Main(KytosNApp):
 
         return data
 
-    def _evc_from_dict(self, evc_dict):
+    def _evc_from_dict(self, evc_dict, created=False):
         data = self._evc_dict_with_instances(evc_dict)
+        # Add default values
+        if created:
+            for key, value in self.default_values.items():
+                if key not in data:
+                    data[key] = value
         data["table_group"] = self.table_group
         return EVC(self.controller, **data)
 

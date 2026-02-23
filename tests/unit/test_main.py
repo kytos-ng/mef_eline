@@ -228,7 +228,7 @@ class TestMain:
         Verify object creation with circuit data and schedule data.
         """
         _validate_mock.return_value = True
-        uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
+        uni_from_dict_mock.side_effect = ["uni_a", "uni_z"] * 2
         payload = {
             "name": "my evc1",
             "uni_a": {
@@ -252,6 +252,16 @@ class TestMain:
         assert evc_response.circuit_scheduler is not None
         assert evc_response.name is not None
         assert evc_response.queue_id is not None
+        assert evc_response.secondary_constraints == {}
+
+        # When EVC is created
+        self.napp.default_values = {
+            "secondary_constraints": {
+                "mandatory_metrics": {"ownership": "red"}
+            }
+        }
+        evc_response = self.napp._evc_from_dict(payload, created=True)
+        assert evc_response.secondary_constraints != {}
 
     @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
     @patch("napps.kytos.mef_eline.models.evc.EVCBase._validate")
@@ -2937,3 +2947,34 @@ class TestMain:
 
         self.napp.handle_evc_deployed(event)
         evc2.setup_failover_path.assert_not_called()
+
+    def test_load_default_evc_values(self):
+        """Test load_default_evc_values using Attributes scheme from
+         the yml file."""
+        allowed_default = {
+            "flexible_metrics": "Attributes"
+        }
+
+        default_value = {
+            "flexible_metrics": {"bandwith": 50}
+        }
+        self.napp.load_default_evc_values(default_value, allowed_default)
+        assert "flexible_metrics" in self.napp.default_values
+
+    def test_load_default_evc_values_error(self):
+        """Test load_default_evc_values with not allowed key."""
+        allowed_default = {
+            "flexible_metrics": "Attributes"
+        }
+        default_value = {
+            "mocked_key": [1, 2, 3]
+        }
+        self.napp.default_values = {}
+        with pytest.raises(ValueError):
+            self.napp.load_default_evc_values(default_value, allowed_default)
+
+        default_value = {
+            "flexible_metrics": {"bandwidth": "wrong_type"}
+        }
+        with pytest.raises(ValueError):
+            self.napp.load_default_evc_values(default_value, allowed_default)
