@@ -86,6 +86,10 @@ class Path(list[Link], GenericEntity):
                         f"Tags {conflict} was already available in "
                         f"{link.id}"
                     )
+            else:
+                log.error(
+                    f"Link {link.id} was missing, while vlans were being freed."
+                )
             link.remove_metadata("s_vlan")
 
     def is_valid(self, switch_a, switch_z, is_scheduled=False):
