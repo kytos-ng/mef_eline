@@ -603,8 +603,8 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         uni.interface.atomic_use_tags = MagicMock()
         evc._use_uni_vlan(uni)
         args = uni.interface.atomic_use_tags.call_args[0]
-        assert args[1] == uni.user_tag.tag_type
-        assert args[2] == uni.user_tag.value
+        assert args[0] == uni.user_tag.tag_type
+        assert args[1] == uni.user_tag.value
         assert uni.interface.atomic_use_tags.call_count == 1
 
         uni.user_tag.value = "any"
@@ -647,8 +647,8 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
 
         evc.make_uni_vlan_available(uni)
         args = mock_iface.atomic_make_tags_available.call_args[0]
-        assert args[1] == uni.user_tag.tag_type
-        assert args[2] == uni.user_tag.value
+        assert args[0] == uni.user_tag.tag_type
+        assert args[1] == uni.user_tag.value
         assert mock_iface.atomic_make_tags_available.call_count == 1
 
         uni.user_tag.value = [[1, 10]]

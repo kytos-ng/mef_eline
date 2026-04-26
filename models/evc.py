@@ -480,7 +480,6 @@ class EVCBase(GenericEntity):
             if not tag:
                 return
         uni.interface.atomic_use_tags(
-            self._controller,
             tag_type,
             tag,
             check_order=False
@@ -503,7 +502,6 @@ class EVCBase(GenericEntity):
                 return
         try:
             conflict = uni.interface.atomic_make_tags_available(
-                self._controller,
                 tag_type,
                 tag,
                 check_order=False
