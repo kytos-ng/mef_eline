@@ -142,15 +142,20 @@ class TestPath():
         link2 = get_link_mocked(status=EntityStatus.UP)
         link1.id = "def"
         link2.id = "abc"
+        links_by_id = {
+            link1.id: link1,
+            link2.id: link2
+        }
+        controller.get_link = links_by_id.get
         links = [link1, link2]
         path = Path(links)
-        path.make_vlans_available = MagicMock()
         path.choose_vlans(controller)
         assert link1.get_next_available_tag.call_count == 1
         assert link1.add_metadata.call_count == 1
         assert link2.get_next_available_tag.call_count == 1
         assert link2.add_metadata.call_count == 1
-        assert not path.make_vlans_available.call_count
+        assert not link1.make_tags_available.call_count
+        assert not link2.make_tags_available.call_count
 
     def test_choose_vlans_tags_not_available(self) -> None:
         """Test choose vlans rollback if tags not available."""
@@ -159,18 +164,23 @@ class TestPath():
         link2 = get_link_mocked(status=EntityStatus.UP)
         link1.id = "def"
         link2.id = "abc"
+        links_by_id = {
+            link1.id: link1,
+            link2.id: link2
+        }
+        controller.get_link = links_by_id.get
         links = [link1, link2]
         path = Path(links)
-        path.make_vlans_available = MagicMock()
         exc = KytosNoTagAvailableError(link2)
         link2.get_next_available_tag.side_effect = exc
         with pytest.raises(KytosNoTagAvailableError):
             path.choose_vlans(controller)
         assert link1.get_next_available_tag.call_count == 1
-        assert link1.add_metadata.call_count == 1
+        assert not link1.add_metadata.call_count
         assert link2.get_next_available_tag.call_count == 1
         assert not link2.add_metadata.call_count
-        assert path.make_vlans_available.call_count == 1
+        assert link1.make_tags_available.call_count == 1
+        assert link2.make_tags_available.call_count == 0
 
     def test_compare_same_paths(self):
         """Test compare paths with same links."""
