@@ -415,7 +415,7 @@ class Main(KytosNApp):
                     circuit_id, updated_data.get("uni_a"),
                     updated_data.get("uni_z")
                 )
-                enable, redeploy = evc.update(**updated_data)
+                enable, redeploy, force_removal = evc.update(**updated_data)
             except (ValueError, KytosTagError, ValidationError) as exception:
                 log.debug("update result %s %s", exception, 400)
                 raise HTTPException(400, detail=str(exception)) from exception
@@ -431,15 +431,15 @@ class Main(KytosNApp):
             redeployed = False
             if evc.is_active():
                 if enable is False:  # disable if active
-                    evc.remove()
+                    evc.remove(force_removal)
                 elif redeploy is not None:  # redeploy if active
-                    evc.remove()
+                    evc.remove(force_removal)
                     redeployed = evc.deploy()
             else:
                 if enable is True:  # enable if inactive
                     redeployed = evc.deploy()
                 elif evc.is_enabled() and redeploy:
-                    evc.remove()
+                    evc.remove(force_removal)
                     redeployed = evc.deploy()
             result = {evc.id: evc.as_dict(), 'redeployed': redeployed}
             status = 200
