@@ -741,7 +741,8 @@ class EVCDeploy(EVCBase):
         current_path = self.current_path if not current_path else current_path
 
         # if force_removal=True, then an intra EVC was changed to inter EVC
-        if not force_removal and not current_path:
+        if (not force_removal and not current_path and
+                not self.is_intra_switch()):
             return old_path_dict
 
         if return_path:
