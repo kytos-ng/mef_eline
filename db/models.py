@@ -119,6 +119,7 @@ class EVCBaseDoc(DocumentBaseModel):
     end_date: Optional[datetime] = None
     queue_id: Optional[int] = None
     flow_removed_at: Optional[datetime] = None
+    last_deployed_at: Optional[datetime] = None
     execution_rounds: int = 0
     bandwidth: int = 0
     primary_path: Optional[list] = None
@@ -192,6 +193,11 @@ class EVCBaseDoc(DocumentBaseModel):
             "flow_removed_at": {"$dateToString": {
                 "format": time_fmt, "date": {
                     "$ifNull": ["$flow_removed_at", None]
+                }
+            }},
+            "last_deployed_at": {"$dateToString": {
+                "format": time_fmt, "date": {
+                    "$ifNull": ["$last_deployed_at", None]
                 }
             }},
             "updated_at": {"$dateToString": {

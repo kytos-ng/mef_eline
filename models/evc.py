@@ -152,6 +152,7 @@ class EVCBase(GenericEntity):
         self.service_level = kwargs.get("service_level", 0)
         self.circuit_scheduler = kwargs.get("circuit_scheduler", [])
         self.flow_removed_at = get_time(kwargs.get("flow_removed_at")) or None
+        self.last_deployed_at = get_time(kwargs.get("last_deployed_at")) or None
         self.updated_at = get_time(kwargs.get("updated_at")) or now()
         self.execution_rounds = kwargs.get("execution_rounds", 0)
         self.current_links_cache = set()
@@ -985,6 +986,7 @@ class EVCDeploy(EVCBase):
 
         self.current_path = use_path
         msg = f"{self} was deployed."
+        self.last_deployed_at = datetime.now()
         try:
             self.try_to_activate()
         except ActivationError as exc:
@@ -1890,6 +1892,9 @@ class LinkProtection(EVCDeploy):
                 )
             log.info(msg)
             return True
+        if self.intra_evc_needs_redeployment():
+            succeeded = self.deploy_to_path()
+            return succeeded
         return False
 
     def handle_interface_link_up(self, interface: Interface):
@@ -1944,6 +1949,12 @@ class LinkProtection(EVCDeploy):
         emit_event(self._controller, "uni_active_updated",
                    content=map_evc_event_content(self))
         self.sync()
+
+    def intra_evc_needs_redeployment(self) -> bool:
+        """Determine whether an intra-switch EVC needs redeployment."""
+        if not self.is_intra_switch():
+            return False
+        return not self.last_deployed_at or self.last_deployed_at < self.flow_removed_at
 
 
 class EVC(LinkProtection):
