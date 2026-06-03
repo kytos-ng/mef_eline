@@ -1,4 +1,5 @@
 """Method to thest EVCDeploy class."""
+from datetime import datetime, timezone
 import sys
 from unittest.mock import MagicMock, Mock, call, patch
 import operator
@@ -861,6 +862,7 @@ class TestEVC():
 
         deployed = evc.deploy_to_path()
 
+        assert evc.last_deployed_at is not None
         assert should_deploy_mock.call_count == 1
         assert discover_new_paths_mocked.call_count == 1
         assert activate_mock.call_count == 1
@@ -2290,3 +2292,28 @@ class TestEVC():
         send_flow_mock.assert_called_with(
             expected_installed_flows, "install", by_switch=True
         )
+
+    def test_intra_evc_needs_redeployment(self):
+        """Test intra_evc_needs_redeployment"""
+        uni_a = get_uni_mocked()
+        uni_z = get_uni_mocked()
+        uni_z.interface.switch = uni_a.interface.switch
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "dynamic_backup_path": False,
+            "primary_path": MagicMock(),
+            "enable": True,
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "flow_removed_at": None,
+            "last_deployed_at": None,
+        }
+        tzone = timezone.utc
+        evc = EVC(**attributes)
+
+        assert evc.intra_evc_needs_redeployment() is True
+        evc.last_deployed_at = datetime.now(tzone)
+        assert evc.intra_evc_needs_redeployment() is False
+        evc.flow_removed_at = datetime.now(tzone)
+        assert evc.intra_evc_needs_redeployment() is True

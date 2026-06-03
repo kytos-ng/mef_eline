@@ -6,6 +6,14 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+Added
+=====
+- Added new EVC field called ``last_deployed_at`` to help identify if EVC needs deployment based on time.
+
+Fixed
+=====
+- Intra EVC now redeploys when it gets activated because UNI status changed to ``UP``.
+
 [2025.2.0] - 2026-02-02
 ***********************
 
