@@ -243,6 +243,7 @@ class EVCBase(GenericEntity):
             ValueError: message with error detail.
 
         """
+        prev_intra = self.is_intra_switch()
         enable, redeploy = (None, None)
         # Verification of the attributes
         if not self._tag_lists_equal(**kwargs):
@@ -290,7 +291,7 @@ class EVCBase(GenericEntity):
                 if attribute in self.attributes_requiring_redeploy:
                     redeploy = True
         self.sync(set(kwargs.keys()))
-        return enable, redeploy
+        return enable, redeploy, (prev_intra and not self.is_intra_switch())
 
     def set_flow_removed_at(self):
         """Update flow_removed_at attribute."""
@@ -673,9 +674,9 @@ class EVCDeploy(EVCBase):
     #    def discover_new_path(self):
     #        # TODO: discover a new path to satisfy this circuit and deploy
 
-    def remove(self):
+    def remove(self, force_removal=False):
         """Remove EVC path and disable it."""
-        self.remove_current_flows(sync=False)
+        self.remove_current_flows(force_removal=force_removal, sync=False)
         self.remove_failover_flows(sync=False)
         self.disable()
         self.sync()
@@ -725,19 +726,24 @@ class EVCDeploy(EVCBase):
         if sync:
             self.sync()
 
+    # pylint: disable=too-many-arguments
     def remove_current_flows(
         self,
         current_path=None,
         force=True,
         sync=True,
-        return_path=False
+        return_path=False,
+        force_removal=False,
     ) -> dict[str, int]:
         """Remove all flows from current path or path intended for
          current path if exists."""
         switches, old_path_dict = set(), {}
         current_path = self.current_path if not current_path else current_path
-        if not current_path and not self.is_intra_switch():
-            return {}
+
+        # if force_removal=True, then an intra EVC was changed to inter EVC
+        if (not force_removal and not current_path and
+                not self.is_intra_switch()):
+            return old_path_dict
 
         if return_path:
             for link in self.current_path:

@@ -6,6 +6,10 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+Fixed
+=====
+- Fixed leftover flows when changing from intra-EVC to inter-EVC by detecting the change and removing UNI flows from intra switch.
+
 [2025.2.0] - 2026-02-02
 ***********************
 
