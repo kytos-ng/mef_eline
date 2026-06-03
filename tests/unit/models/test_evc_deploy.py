@@ -916,7 +916,7 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
     @patch("napps.kytos.mef_eline.models.evc.log.error")
     def test_remove_current_flows(self, *args):
-        """Test remove current flows."""
+        """Test remove current flows from inter EVC."""
         # pylint: disable=too-many-locals
         (log_error_mock, send_flow_mods_mocked, _) = args
         uni_a = get_uni_mocked(
@@ -2317,3 +2317,83 @@ class TestEVC():
         assert evc.intra_evc_needs_redeployment() is False
         evc.flow_removed_at = datetime.now(tzone)
         assert evc.intra_evc_needs_redeployment() is True
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
+    def test_remove_current_flows_intra(self, *args):
+        """Remove flows from intra EVC"""
+        # pylint: disable=too-many-locals
+        (send_flow_mods_mocked, _,) = args
+        uni_a = get_uni_mocked()
+        uni_z = get_uni_mocked()
+        uni_z.interface.switch = uni_a.interface.switch
+
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "active": True,
+            "enabled": True,
+            "current_path": []
+
+        }
+
+        evc = EVC(**attributes)
+
+        old_path = evc.remove_current_flows(return_path=True)
+        assert not old_path
+        assert send_flow_mods_mocked.call_count == 1
+        assert evc.is_active() is False
+        flows = [
+            {"cookie": evc.get_cookie(), "cookie_mask": 18446744073709551615,
+             "owner": "mef_eline"}
+        ]
+        expected_flows = {
+            "switches": [uni_a.interface.switch.id],
+            "flows": flows
+        }
+        args = send_flow_mods_mocked.call_args[0]
+        assert set(expected_flows["switches"]) == set(args[0]["switches"])
+        assert expected_flows["flows"] == args[0]["flows"]
+        assert 'delete' == args[1]
+
+    @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
+    def test_remove_current_flows_force_removal(self, *args):
+        """Remove flows from inter EVC without current path
+        because it was recently changed from intra EVC."""
+        # pylint: disable=too-many-locals
+        (send_flow_mods_mocked, _,) = args
+        uni_a = get_uni_mocked()
+        uni_z = get_uni_mocked()
+
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "custom_name",
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+            "active": True,
+            "enabled": True,
+            "current_path": []
+        }
+
+        evc = EVC(**attributes)
+
+        evc.remove_current_flows(force_removal=True)
+        assert send_flow_mods_mocked.call_count == 1
+        assert evc.is_active() is False
+        flows = [
+            {"cookie": evc.get_cookie(), "cookie_mask": 18446744073709551615,
+             "owner": "mef_eline"}
+        ]
+        expected_flows = {
+            "switches": [
+                uni_a.interface.switch.id,
+                uni_z.interface.switch.id
+            ],
+            "flows": flows
+        }
+        args = send_flow_mods_mocked.call_args[0]
+        assert set(expected_flows["switches"]) == set(args[0]["switches"])
+        assert expected_flows["flows"] == args[0]["flows"]
+        assert 'delete' == args[1]

@@ -13,6 +13,7 @@ Added
 Fixed
 =====
 - Intra EVC now redeploys when it gets activated because UNI status changed to ``UP``.
+- Fixed leftover flows when changing from intra-EVC to inter-EVC by detecting the change and removing UNI flows from intra switch.
 
 [2025.2.0] - 2026-02-02
 ***********************
