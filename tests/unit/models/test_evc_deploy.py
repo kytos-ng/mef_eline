@@ -2317,6 +2317,7 @@ class TestEVC():
         assert evc.intra_evc_needs_redeployment() is False
         evc.flow_removed_at = datetime.now(tzone)
         assert evc.intra_evc_needs_redeployment() is True
+
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
     def test_remove_current_flows_intra(self, *args):
