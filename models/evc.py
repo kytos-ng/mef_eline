@@ -155,6 +155,7 @@ class EVCBase(GenericEntity):
         self.last_deployed_at = (
             get_time(kwargs.get("last_deployed_at")) or None
         )
+        self.last_removed_at = get_time(kwargs.get("last_removed_at")) or None
         self.updated_at = get_time(kwargs.get("updated_at")) or now()
         self.execution_rounds = kwargs.get("execution_rounds", 0)
         self.current_links_cache = set()
@@ -452,6 +453,7 @@ class EVCBase(GenericEntity):
         evc_dict["secondary_constraints"] = self.secondary_constraints
         evc_dict["flow_removed_at"] = self.flow_removed_at
         evc_dict["last_deployed_at"] = self.last_deployed_at
+        evc_dict["last_removed_at"] = self.last_removed_at
         evc_dict["updated_at"] = self.updated_at
         evc_dict["max_paths"] = self.max_paths
 
@@ -779,6 +781,7 @@ class EVCDeploy(EVCBase):
         except KytosTagError as err:
             log.error(f"Error removing {self} current_path: {err}")
         self.current_path = Path([])
+        self.last_removed_at = now()
         self.deactivate()
         if sync:
             self.sync()
@@ -1757,9 +1760,13 @@ class EVCDeploy(EVCBase):
         """Determine whether an intra-switch EVC needs redeployment."""
         if not self.is_intra_switch():
             return False
-        flows_removed = bool(self.flow_removed_at) and \
-            self.last_deployed_at < self.flow_removed_at
-        return not self.last_deployed_at or flows_removed
+        if not self.last_deployed_at:
+            return True
+
+        return bool(
+            self.last_removed_at
+            and self.last_deployed_at < self.last_removed_at
+        )
 
 
 class LinkProtection(EVCDeploy):

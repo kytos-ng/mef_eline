@@ -2306,7 +2306,7 @@ class TestEVC():
             "enable": True,
             "uni_a": uni_a,
             "uni_z": uni_z,
-            "flow_removed_at": None,
+            "last_removed_at": None,
             "last_deployed_at": None,
         }
         tzone = timezone.utc
@@ -2315,7 +2315,7 @@ class TestEVC():
         assert evc.intra_evc_needs_redeployment() is True
         evc.last_deployed_at = datetime.now(tzone)
         assert evc.intra_evc_needs_redeployment() is False
-        evc.flow_removed_at = datetime.now(tzone)
+        evc.last_removed_at = datetime.now(tzone)
         assert evc.intra_evc_needs_redeployment() is True
 
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
@@ -2357,6 +2357,7 @@ class TestEVC():
         assert set(expected_flows["switches"]) == set(args[0]["switches"])
         assert expected_flows["flows"] == args[0]["flows"]
         assert 'delete' == args[1]
+        assert evc.last_removed_at is not None
 
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
@@ -2382,6 +2383,7 @@ class TestEVC():
 
         evc.remove_current_flows(force_removal=True)
         assert send_flow_mods_mocked.call_count == 1
+        assert evc.last_removed_at is not None
         assert evc.is_active() is False
         flows = [
             {"cookie": evc.get_cookie(), "cookie_mask": 18446744073709551615,
