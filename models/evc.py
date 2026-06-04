@@ -152,6 +152,10 @@ class EVCBase(GenericEntity):
         self.service_level = kwargs.get("service_level", 0)
         self.circuit_scheduler = kwargs.get("circuit_scheduler", [])
         self.flow_removed_at = get_time(kwargs.get("flow_removed_at")) or None
+        self.last_deployed_at = (
+            get_time(kwargs.get("last_deployed_at")) or None
+        )
+        self.last_removed_at = get_time(kwargs.get("last_removed_at")) or None
         self.updated_at = get_time(kwargs.get("updated_at")) or now()
         self.execution_rounds = kwargs.get("execution_rounds", 0)
         self.current_links_cache = set()
@@ -448,6 +452,8 @@ class EVCBase(GenericEntity):
         evc_dict["primary_constraints"] = self.primary_constraints
         evc_dict["secondary_constraints"] = self.secondary_constraints
         evc_dict["flow_removed_at"] = self.flow_removed_at
+        evc_dict["last_deployed_at"] = self.last_deployed_at
+        evc_dict["last_removed_at"] = self.last_removed_at
         evc_dict["updated_at"] = self.updated_at
         evc_dict["max_paths"] = self.max_paths
 
@@ -775,6 +781,7 @@ class EVCDeploy(EVCBase):
         except KytosTagError as err:
             log.error(f"Error removing {self} current_path: {err}")
         self.current_path = Path([])
+        self.last_removed_at = now()
         self.deactivate()
         if sync:
             self.sync()
@@ -991,6 +998,7 @@ class EVCDeploy(EVCBase):
 
         self.current_path = use_path
         msg = f"{self} was deployed."
+        self.last_deployed_at = now()
         try:
             self.try_to_activate()
         except ActivationError as exc:
@@ -1748,6 +1756,18 @@ class EVCDeploy(EVCBase):
             return link.endpoint_a
         return link.endpoint_b
 
+    def intra_evc_needs_redeployment(self) -> bool:
+        """Determine whether an intra-switch EVC needs redeployment."""
+        if not self.is_intra_switch():
+            return False
+        if not self.last_deployed_at:
+            return True
+
+        return bool(
+            self.last_removed_at
+            and self.last_deployed_at < self.last_removed_at
+        )
+
 
 class LinkProtection(EVCDeploy):
     """Class to handle link protection."""
@@ -1896,6 +1916,9 @@ class LinkProtection(EVCDeploy):
                 )
             log.info(msg)
             return True
+        if self.intra_evc_needs_redeployment():
+            succeeded = self.deploy_to_path()
+            return succeeded
         return False
 
     def handle_interface_link_up(self, interface: Interface):
