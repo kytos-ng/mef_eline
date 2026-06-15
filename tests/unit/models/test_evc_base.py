@@ -257,7 +257,7 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         }
         update_dict = {"queue_id": 3}
         evc = EVC(**attributes)
-        _, redeploy, __ = evc.update(**update_dict)
+        _, redeploy = evc.update(**update_dict)
         assert redeploy
 
     @patch("napps.kytos.mef_eline.models.EVC.sync")
@@ -273,7 +273,7 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         }
         update_dict = {"queue_id": None}
         evc = EVC(**attributes)
-        _, redeploy, __ = evc.update(**update_dict)
+        _, redeploy = evc.update(**update_dict)
         assert redeploy
 
     def test_update_different_tag_lists(self):
@@ -772,8 +772,8 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
 
     @patch("napps.kytos.mef_eline.models.EVC._get_unis_use_tags")
     @patch("napps.kytos.mef_eline.models.EVC.sync")
-    def test_from_intra_to_inter(self, _mock_sync, mock_use_tags):
-        """Test _tag_lists_equal"""
+    def test_from_intra_to_inter_1_uni(self, _mock_sync, mock_use_tags):
+        """Test change evc from intra to inter by changing only one UNI."""
         mock_use_tags.return_value = False, False
         uni_a = get_uni_mocked(is_valid=True)
         uni_z = get_uni_mocked(is_valid=True)
@@ -789,9 +789,39 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
             "uni_z": uni_z,
         }
         evc = EVC(**attributes)
+        expected_switch = uni_a.interface.switch.id
         update_dict = {"uni_z": get_uni_mocked(is_valid=True)}
-        _, __, force_removal = evc.update(**update_dict)
-        assert force_removal is True
+        evc.update(**update_dict)
+        assert evc.leftover_switch is not None
+        assert evc.leftover_switch == expected_switch
+
+    @patch("napps.kytos.mef_eline.models.EVC._get_unis_use_tags")
+    @patch("napps.kytos.mef_eline.models.EVC.sync")
+    def test_from_intra_to_inter_2_uni(self, _mock_sync, mock_use_tags):
+        """Test change evc from intra to inter by changing only two UNI."""
+        mock_use_tags.return_value = False, False
+        uni_a = get_uni_mocked(is_valid=True)
+        uni_z = get_uni_mocked(is_valid=True)
+        uni_z.interface.switch = uni_a.interface.switch
+        primary_path = Path([])
+        attributes = {
+            "controller": get_controller_mock(),
+            "name": "circuit_name",
+            "dynamic_backup_path": True,
+            "primary_path": primary_path,
+            "enable": True,
+            "uni_a": uni_a,
+            "uni_z": uni_z,
+        }
+        evc = EVC(**attributes)
+        expected_switch = uni_a.interface.switch.id
+        update_dict = {
+            "uni_a": get_uni_mocked(is_valid=True),
+            "uni_z": get_uni_mocked(is_valid=True)
+        }
+        evc.update(**update_dict)
+        assert evc.leftover_switch is not None
+        assert evc.leftover_switch == expected_switch
 
     @patch("napps.kytos.mef_eline.models.EVC._get_unis_use_tags")
     @patch("napps.kytos.mef_eline.models.EVC.sync")
@@ -815,5 +845,5 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         new_uni_z = get_uni_mocked(is_valid=True)
         new_uni_z.interface.switch = uni_a_switch
         update_dict = {"uni_z": new_uni_z}
-        _, __, force_removal = evc.update(**update_dict)
-        assert force_removal is False
+        evc.update(**update_dict)
+        assert evc.leftover_switch is None

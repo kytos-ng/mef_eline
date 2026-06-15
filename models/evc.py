@@ -163,6 +163,7 @@ class EVCBase(GenericEntity):
         self.backup_links_cache = set()
         self.old_path = Path([])
         self.max_paths = kwargs.get("max_paths", 2)
+        self.leftover_switch = kwargs.get("leftover_switch", None)
 
         self.lock = Lock()
 
@@ -247,7 +248,9 @@ class EVCBase(GenericEntity):
             ValueError: message with error detail.
 
         """
-        prev_intra = self.is_intra_switch()
+        leftover_switch = None
+        if self.is_intra_switch():
+            leftover_switch = self.uni_a.interface.switch.id
         enable, redeploy = (None, None)
         # Verification of the attributes
         if not self._tag_lists_equal(**kwargs):
@@ -294,8 +297,16 @@ class EVCBase(GenericEntity):
                 setattr(self, attribute, value)
                 if attribute in self.attributes_requiring_redeploy:
                     redeploy = True
+        self.save_leftover_switch(leftover_switch)
         self.sync(set(kwargs.keys()))
-        return enable, redeploy, (prev_intra and not self.is_intra_switch())
+        return enable, redeploy
+
+    def save_leftover_switch(self, leftover_switch):
+        """Save the leftover switch if the circuit has changed to inter.
+        The flows from the saved switch will be removed."""
+        if not leftover_switch or self.is_intra_switch():
+            return
+        self.leftover_switch = leftover_switch
 
     def set_flow_removed_at(self):
         """Update flow_removed_at attribute."""
@@ -456,6 +467,7 @@ class EVCBase(GenericEntity):
         evc_dict["last_removed_at"] = self.last_removed_at
         evc_dict["updated_at"] = self.updated_at
         evc_dict["max_paths"] = self.max_paths
+        evc_dict["leftover_switch"] = self.leftover_switch
 
         if keys:
             selected = {}
@@ -680,9 +692,9 @@ class EVCDeploy(EVCBase):
     #    def discover_new_path(self):
     #        # TODO: discover a new path to satisfy this circuit and deploy
 
-    def remove(self, force_removal=False):
+    def remove(self):
         """Remove EVC path and disable it."""
-        self.remove_current_flows(force_removal=force_removal, sync=False)
+        self.remove_current_flows(sync=False)
         self.remove_failover_flows(sync=False)
         self.disable()
         self.sync()
@@ -739,17 +751,19 @@ class EVCDeploy(EVCBase):
         force=True,
         sync=True,
         return_path=False,
-        force_removal=False,
     ) -> dict[str, int]:
         """Remove all flows from current path or path intended for
          current path if exists."""
         switches, old_path_dict = set(), {}
         current_path = self.current_path if not current_path else current_path
 
-        # if force_removal=True, then an intra EVC was changed to inter EVC
-        if (not force_removal and not current_path and
+        if (not self.leftover_switch and not current_path and
                 not self.is_intra_switch()):
             return old_path_dict
+
+        if self.leftover_switch:
+            switches.add(self.leftover_switch)
+            self.leftover_switch = None
 
         if return_path:
             for link in self.current_path:

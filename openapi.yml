@@ -703,6 +703,10 @@ components:
           description: "QoS Egress Queue ID. Value -1 can be use to set this field to default."
           minimum: -1
           maximum: 7
+        leftover_switch:
+          type: string
+          nullable: true
+          description: "Switch ID to remove leftover flows in case of a change from intra to inter switch circuit."
 
         circuit_scheduler:
           type: array

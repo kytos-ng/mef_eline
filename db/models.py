@@ -142,6 +142,7 @@ class EVCBaseDoc(DocumentBaseModel):
     active: bool
     enabled: bool
     max_paths: Optional[int] = 2
+    leftover_switch: Optional[str] = None
 
     @staticmethod
     def projection() -> Dict:
@@ -170,6 +171,7 @@ class EVCBaseDoc(DocumentBaseModel):
             "execution_rounds": {"$ifNull": ["$execution_rounds", 0]},
             "owner": {"$ifNull": ["$owner", None]},
             "queue_id": {"$ifNull": ["$queue_id", None]},
+            "leftover_switch": {"$ifNull": ["$leftover_switch", 0]},
             "primary_constraints": {"$ifNull": ["$primary_constraints", {}]},
             "secondary_constraints": {"$ifNull": ["$secondary_constraints",
                                       {}]},

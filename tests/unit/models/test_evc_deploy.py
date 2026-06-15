@@ -2361,14 +2361,14 @@ class TestEVC():
 
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
-    def test_remove_current_flows_force_removal(self, *args):
+    def test_remove_current_flows_leftover_switch(self, *args):
         """Remove flows from inter EVC without current path
         because it was recently changed from intra EVC."""
         # pylint: disable=too-many-locals
         (send_flow_mods_mocked, _,) = args
         uni_a = get_uni_mocked()
         uni_z = get_uni_mocked()
-
+        leftover_switch = get_uni_mocked().interface.switch.id
         attributes = {
             "controller": get_controller_mock(),
             "name": "custom_name",
@@ -2380,8 +2380,9 @@ class TestEVC():
         }
 
         evc = EVC(**attributes)
+        evc.leftover_switch = leftover_switch
 
-        evc.remove_current_flows(force_removal=True)
+        evc.remove_current_flows()
         assert send_flow_mods_mocked.call_count == 1
         assert evc.last_removed_at is not None
         assert evc.is_active() is False
@@ -2392,7 +2393,8 @@ class TestEVC():
         expected_flows = {
             "switches": [
                 uni_a.interface.switch.id,
-                uni_z.interface.switch.id
+                uni_z.interface.switch.id,
+                leftover_switch
             ],
             "flows": flows
         }
@@ -2400,3 +2402,4 @@ class TestEVC():
         assert set(expected_flows["switches"]) == set(args[0]["switches"])
         assert expected_flows["flows"] == args[0]["flows"]
         assert 'delete' == args[1]
+        assert evc.leftover_switch is None
