@@ -171,7 +171,7 @@ class EVCBaseDoc(DocumentBaseModel):
             "execution_rounds": {"$ifNull": ["$execution_rounds", 0]},
             "owner": {"$ifNull": ["$owner", None]},
             "queue_id": {"$ifNull": ["$queue_id", None]},
-            "leftover_switch": {"$ifNull": ["$leftover_switch", 0]},
+            "leftover_switch": {"$ifNull": ["$leftover_switch", None]},
             "primary_constraints": {"$ifNull": ["$primary_constraints", {}]},
             "secondary_constraints": {"$ifNull": ["$secondary_constraints",
                                       {}]},
