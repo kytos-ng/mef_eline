@@ -8,7 +8,8 @@ from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
 from kytos.core.controller import Controller
-from kytos.core.exceptions import KytosNoTagAvailableError
+from kytos.core.exceptions import (KytosDBWriteException,
+                                   KytosNoTagAvailableError)
 from kytos.core.interface import TAG
 from kytos.core.link import Link
 from kytos.core.retry import before_sleep
@@ -69,7 +70,13 @@ class Path(list[Link], GenericEntity):
                     )
                     tag = TAG("vlan", tag_value)
                     modified_links.append((path_link, real_link, tag))
-            except KytosNoTagAvailableError as exc:
+                Link.bulk_notify_tag_listeners(
+                    [
+                        real_link
+                        for _, real_link, _ in modified_links
+                    ]
+                )
+            except (KytosNoTagAvailableError, KytosDBWriteException) as exc:
                 for path_link, real_link, tag in modified_links:
                     real_link.make_tags_available(
                         tag.tag_type,
@@ -80,7 +87,6 @@ class Path(list[Link], GenericEntity):
 
             for path_link, real_link, tag in modified_links:
                 path_link.add_metadata('s_vlan', tag)
-                real_link.notify_tag_listeners()
 
     def make_vlans_available(
         self,
@@ -112,16 +118,31 @@ class Path(list[Link], GenericEntity):
                             f"Tags {conflict} was already available in "
                             f"{path_link.id}"
                         )
-                    modified_links.append(real_link)
+                    else:
+                        modified_links.append(path_link, real_link, tag)
                 else:
                     log.error(
                         f"Link {path_link.id} was missing,"
                         " while vlans were being freed."
                     )
-                path_link.remove_metadata("s_vlan")
+            try:
+                Link.bulk_notify_tag_listeners(
+                    [
+                        real_link
+                        for _, real_link, _ in modified_links
+                    ]
+                )
+            except KytosDBWriteException as exc:
+                for path_link, real_link, tag in modified_links:
+                    real_link.use_tags(
+                        tag.tag_type,
+                        tag.value,
+                        check_order=False
+                    )
+                raise exc
 
-            for real_link in modified_links:
-                real_link.notify_tag_listeners()
+            for path_link, real_link, tag in modified_links:
+                path_link.remove_metadata("s_vlan")
 
     def is_valid(self, switch_a, switch_z, is_scheduled=False):
         """Check if this is a valid path."""
