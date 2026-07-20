@@ -6,6 +6,21 @@ All notable changes to the MEF_ELine NApp will be documented in this file.
 [UNRELEASED] - Under development
 ********************************
 
+[2025.2.1] - 2026-07-20
+***********************
+
+Added
+=====
+- Added new EVC field called ``last_deployed_at`` to help identify if EVC was ever deployed and install flows.
+- Added new EVC field called ``last_removed_at`` to help identify if EVC did ever remove flows.
+
+Fixed
+=====
+- Intra EVC now redeploys when it gets activated because UNI status changed to ``UP``.
+- Fixed leftover flows when changing from intra-EVC to inter-EVC by detecting the change and removing UNI flows from intra switch.
+- Fixed leftover flow when both EVC UNI were patched and the circuit changed from intra to inter switch.
+- Redeploying intra EVC when when it has not flows and UNI gets activated.
+
 [2025.2.0] - 2026-02-02
 ***********************
 

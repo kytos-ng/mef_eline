@@ -703,6 +703,10 @@ components:
           description: "QoS Egress Queue ID. Value -1 can be use to set this field to default."
           minimum: -1
           maximum: 7
+        leftover_switch:
+          type: string
+          nullable: true
+          description: "Switch ID to remove leftover flows in case of a change from intra to inter switch circuit."
 
         circuit_scheduler:
           type: array
@@ -718,6 +722,34 @@ components:
           default: 2
           minimum: 2
           maximum: 10
+        metadata:
+          type: object
+          description: "Custom metadata in the form of key:value pairs to store information about the circuit."
+        archived:
+          type: boolean
+          description: "True if the circuit is archived."
+        flow_removed_at:
+          type: string
+          format: date-time
+          description: "Time when the flow was removed from the switch by flow_manager."
+        last_deployed_at:
+          type: string
+          format: date-time
+          description: "Time when the circuit was last deployed and flows were sent to be installed."
+        last_removed_at:
+          type: string
+          format: date-time
+          description: "Time when the circuit current path was last removed and flows were sent to be removed."
+        updated_at:
+          type: string
+          format: date-time
+          description: "Time when the circuit was last updated."
+        execution_rounds:
+          type: integer
+          description: ""
+        table_group:
+          type: object
+          description: "Table groups associated with the circuit."
 
     UpdateCircuit: # Can be referenced via '#/components/schemas/UpdateCircuit'
       type: object
