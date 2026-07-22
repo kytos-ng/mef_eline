@@ -119,6 +119,8 @@ class EVCBaseDoc(DocumentBaseModel):
     end_date: Optional[datetime] = None
     queue_id: Optional[int] = None
     flow_removed_at: Optional[datetime] = None
+    last_deployed_at: Optional[datetime] = None
+    last_removed_at: Optional[datetime] = None
     execution_rounds: int = 0
     bandwidth: int = 0
     primary_path: Optional[list] = None
@@ -140,6 +142,7 @@ class EVCBaseDoc(DocumentBaseModel):
     active: bool
     enabled: bool
     max_paths: Optional[int] = 2
+    leftover_switch: Optional[str] = None
 
     @staticmethod
     def projection() -> Dict:
@@ -168,6 +171,7 @@ class EVCBaseDoc(DocumentBaseModel):
             "execution_rounds": {"$ifNull": ["$execution_rounds", 0]},
             "owner": {"$ifNull": ["$owner", None]},
             "queue_id": {"$ifNull": ["$queue_id", None]},
+            "leftover_switch": {"$ifNull": ["$leftover_switch", None]},
             "primary_constraints": {"$ifNull": ["$primary_constraints", {}]},
             "secondary_constraints": {"$ifNull": ["$secondary_constraints",
                                       {}]},
@@ -192,6 +196,16 @@ class EVCBaseDoc(DocumentBaseModel):
             "flow_removed_at": {"$dateToString": {
                 "format": time_fmt, "date": {
                     "$ifNull": ["$flow_removed_at", None]
+                }
+            }},
+            "last_deployed_at": {"$dateToString": {
+                "format": time_fmt, "date": {
+                    "$ifNull": ["$last_deployed_at", None]
+                }
+            }},
+            "last_removed_at": {"$dateToString": {
+                "format": time_fmt, "date": {
+                    "$ifNull": ["$last_removed_at", None]
                 }
             }},
             "updated_at": {"$dateToString": {
