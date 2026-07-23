@@ -18,6 +18,10 @@ Fixed
 - Fixed leftover flow when both EVC UNI were patched and the circuit changed from intra to inter switch.
 - Redeploying intra EVC when when it has not flows and UNI gets activated.
 
+Changed
+=======
+- Modified to use ``TAGCapable`` for acquiring and releasing tags.
+
 [2025.2.0] - 2026-02-02
 ***********************
 

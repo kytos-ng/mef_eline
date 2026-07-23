@@ -1,11 +1,15 @@
 """Classes related to paths"""
+from contextlib import ExitStack
+
 import httpx
 from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
                       wait_combine, wait_fixed, wait_random)
 
 from kytos.core import log
 from kytos.core.common import EntityStatus, GenericEntity
-from kytos.core.exceptions import KytosNoTagAvailableError
+from kytos.core.controller import Controller
+from kytos.core.exceptions import (KytosDBWriteException,
+                                   KytosNoTagAvailableError)
 from kytos.core.interface import TAG
 from kytos.core.link import Link
 from kytos.core.retry import before_sleep
@@ -37,41 +41,108 @@ class Path(list[Link], GenericEntity):
                 return link
         return None
 
-    def choose_vlans(self, controller, old_path_dict: dict = None):
+    def choose_vlans(
+        self,
+        controller: Controller,
+        old_path_dict: dict = None
+    ):
         """Choose the VLANs to be used for the circuit.
         If any of the links next tag isn't available, it'll release
         all vlans of the path that have been allocated, all or nothing.
         """
         old_path_dict = old_path_dict if old_path_dict else {}
-        try:
-            for link in self:
-                tag_value = link.get_next_available_tag(
-                    controller, link.id,
-                    try_avoid_value=old_path_dict.get(link.id)
-                )
-                tag = TAG('vlan', tag_value)
-                link.add_metadata("s_vlan", tag)
-        except KytosNoTagAvailableError as exc:
-            self.make_vlans_available(controller)
-            raise exc
+        with ExitStack() as stack:
+            link_list = []
+            with controller.switches_lock:
+                for path_link in self:
+                    real_link = controller.get_link(path_link.id)
+                    if real_link is None:
+                        raise KytosNoTagAvailableError(path_link)
+                    stack.enter_context(real_link.tag_lock)
+                    link_list.append((path_link, real_link))
 
-    def make_vlans_available(self, controller):
+            modified_links = []
+            try:
+                for path_link, real_link in link_list:
+                    tag_value = real_link.get_next_available_tag(
+                        "vlan",
+                        try_avoid_value=old_path_dict.get(real_link.id)
+                    )
+                    tag = TAG("vlan", tag_value)
+                    modified_links.append((path_link, real_link, tag))
+                Link.bulk_notify_tag_listeners(
+                    [
+                        real_link
+                        for _, real_link, _ in modified_links
+                    ]
+                )
+            except (KytosNoTagAvailableError, KytosDBWriteException) as exc:
+                for path_link, real_link, tag in modified_links:
+                    real_link.make_tags_available(
+                        tag.tag_type,
+                        tag.value,
+                        check_order=False
+                    )
+                raise exc
+
+            for path_link, real_link, tag in modified_links:
+                path_link.add_metadata('s_vlan', tag)
+
+    def make_vlans_available(
+        self,
+        controller: Controller
+    ):
         """Make the VLANs used in a path available when undeployed."""
-        for link in self:
-            tag = link.get_metadata("s_vlan")
-            if not tag:
-                continue
-            conflict_a, conflict_b = link.make_tags_available(
-                controller, tag.value, link.id, tag.tag_type,
-                check_order=False
-            )
-            if conflict_a:
-                log.error(f"Tags {conflict_a} was already available in"
-                          f"{link.endpoint_a.id}")
-            if conflict_b:
-                log.error(f"Tags {conflict_b} was already available in"
-                          f"{link.endpoint_b.id}")
-            link.remove_metadata("s_vlan")
+        with ExitStack() as stack:
+            link_list = []
+            with controller.switches_lock:
+                for path_link in self:
+                    real_link = controller.get_link(path_link.id)
+                    if real_link is not None:
+                        stack.enter_context(real_link.tag_lock)
+                    link_list.append((path_link, real_link))
+
+            modified_links = []
+            for path_link, real_link in link_list:
+                tag: TAG = path_link.get_metadata("s_vlan")
+                if not tag:
+                    continue
+                if real_link is not None:
+                    conflict = real_link.make_tags_available(
+                        tag.tag_type,
+                        tag.value,
+                        check_order=False
+                    )
+                    if conflict:
+                        log.error(
+                            f"Tags {conflict} was already available in "
+                            f"{path_link.id}"
+                        )
+                    else:
+                        modified_links.append(path_link, real_link, tag)
+                else:
+                    log.error(
+                        f"Link {path_link.id} was missing,"
+                        " while vlans were being freed."
+                    )
+            try:
+                Link.bulk_notify_tag_listeners(
+                    [
+                        real_link
+                        for _, real_link, _ in modified_links
+                    ]
+                )
+            except KytosDBWriteException as exc:
+                for path_link, real_link, tag in modified_links:
+                    real_link.use_tags(
+                        tag.tag_type,
+                        tag.value,
+                        check_order=False
+                    )
+                raise exc
+
+            for path_link, real_link, tag in modified_links:
+                path_link.remove_metadata("s_vlan")
 
     def is_valid(self, switch_a, switch_z, is_scheduled=False):
         """Check if this is a valid path."""

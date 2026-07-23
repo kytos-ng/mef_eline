@@ -1,5 +1,5 @@
 """Module to help to create tests."""
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 from kytos.core import Controller
 from kytos.core.common import EntityStatus
@@ -48,7 +48,8 @@ def get_link_mocked(**kwargs):
         switch_b,
     )
     link = Mock(spec=Link, endpoint_a=endpoint_a, endpoint_b=endpoint_b)
-    link.make_tags_available.return_value = True, True
+    link.make_tags_available.return_value = True
+    link.tag_lock = MagicMock()
     link.endpoint_a.link = link
     link.endpoint_b.link = link
     link.as_dict.return_value = kwargs.get(
@@ -102,6 +103,7 @@ def get_uni_mocked(**kwargs):
     switch.id = kwargs.get("switch_id", "custom_switch_id")
     switch.dpid = kwargs.get("switch_dpid", "custom_switch_dpid")
     interface = Interface(interface_name, interface_port, switch)
+    interface.notify_tag_listeners = MagicMock()
     if isinstance(tag_value, list):
         tag = TAGRange(tag_type, tag_value)
     else:
