@@ -2044,7 +2044,8 @@ class TestEVC():
     )
     def test_get_failover_path_vandidates(self, get_disjoint_paths_mock):
         """Test get_failover_path_candidates method"""
-        self.evc_deploy.get_failover_path_candidates()
+        self.evc_deploy.dynamic_backup_path = True
+        list(self.evc_deploy.get_failover_path_candidates())
         get_disjoint_paths_mock.assert_called_once()
 
     def test_is_failover_path_affected_by_link(self):
@@ -2060,10 +2061,201 @@ class TestEVC():
     def test_is_eligible_for_failover_path(self):
         """Test is_eligible_for_failover_path method"""
         assert self.evc_deploy.is_eligible_for_failover_path() is False
+        self.evc_deploy.current_path = Path([get_link_mocked()])
         self.evc_deploy.dynamic_backup_path = True
         self.evc_deploy.primary_path = Path([])
         self.evc_deploy.backup_path = Path([])
         assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.get_reactivation_path")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.has_dual_static_paths")
+    def test_is_eligible_for_failover_path_dual_static(
+        self, dual_mock, react_mock
+    ):
+        """Dual static EVCs skip failover_path, except as a last-resort
+        dynamic escape when both configured paths are down (EP041)."""
+        self.evc_deploy.current_path = Path([get_link_mocked()])
+        self.evc_deploy.dynamic_backup_path = True
+        dual_mock.return_value = True
+
+        # a configured static path is still usable -> no failover
+        react_mock.return_value = Path([get_link_mocked()])
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+
+        # both configured paths down + dynamic backup -> dynamic escape allowed
+        react_mock.return_value = Path([])
+        assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+        # both down but no dynamic backup -> still no failover
+        self.evc_deploy.dynamic_backup_path = False
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+
+        # a non-dual EVC keeps the plain dynamic/backup eligibility
+        dual_mock.return_value = False
+        self.evc_deploy.dynamic_backup_path = True
+        assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.is_using_primary_path")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy"
+           ".has_single_static_dynamic_path")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.has_dual_static_paths")
+    def test_is_eligible_for_failover_path_ssd(
+        self, dual_mock, ssd_mock, using_primary_mock
+    ):
+        """single static + dynamic pre-installs a dynamic failover only while
+        forwarding on primary; on the dynamic it is not eligible - the dynamic
+        is a bridge back to primary, protected only by the last-resort cold
+        escape (EP041)."""
+        self.evc_deploy.current_path = Path([get_link_mocked()])
+        self.evc_deploy.dynamic_backup_path = True
+        dual_mock.return_value = False
+        ssd_mock.return_value = True
+
+        # on primary -> eligible (arm a dynamic failover to protect primary)
+        using_primary_mock.return_value = True
+        assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+        # on the dynamic (primary down) -> NOT eligible (no second dynamic)
+        using_primary_mock.return_value = False
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+
+    @patch("napps.kytos.mef_eline.models.path.DynamicPathManager"
+           ".get_disjointness")
+    def test_validate_paths_distinct(self, get_disjointness_mock):
+        """_validate_paths_distinct rejects non-disjoint primary+backup."""
+        p1 = Path([get_link_mocked()])
+        p2 = Path([get_link_mocked(endpoint_a_port=7, endpoint_b_port=8)])
+
+        # not disjoint (identical or fully overlapping) -> rejected
+        get_disjointness_mock.return_value = 0
+        with pytest.raises(ValueError):
+            self.evc_deploy._validate_paths_distinct(
+                primary_path=p1, backup_path=p1
+            )
+        # disjoint paths are accepted
+        get_disjointness_mock.return_value = 1.0
+        self.evc_deploy._validate_paths_distinct(
+            primary_path=p1, backup_path=p2
+        )
+        # a missing path is accepted (rule only applies when both are set)
+        get_disjointness_mock.return_value = 0
+        self.evc_deploy._validate_paths_distinct(
+            primary_path=p1, backup_path=Path([])
+        )
+
+    @patch("napps.kytos.mef_eline.models.evc.emit_event")
+    def test_deploy_static_standby(self, emit_mock):
+        """Test deploy_static_standby installs the standby path (EP041)."""
+        evc = self.evc_deploy
+        evc.sync = MagicMock()
+        evc._install_flows = MagicMock(return_value={"s1": ["flow"]})
+
+        # no standby -> no install
+        evc.get_static_standby_path = MagicMock(return_value=Path([]))
+        assert evc.deploy_static_standby() is False
+        evc._install_flows.assert_not_called()
+
+        # standby DOWN -> no install
+        down = MagicMock(status=EntityStatus.DOWN)
+        evc.get_static_standby_path = MagicMock(return_value=down)
+        assert evc.deploy_static_standby() is False
+        evc._install_flows.assert_not_called()
+
+        # standby UP already deployed -> true no op
+        standby = MagicMock(status=EntityStatus.UP)
+        standby.is_deployed.return_value = True
+        evc.get_static_standby_path = MagicMock(return_value=standby)
+        assert evc.deploy_static_standby() is True
+        standby.choose_vlans.assert_not_called()
+        evc._install_flows.assert_not_called()
+
+        # standby UP not yet deployed (cold) -> choose_vlans then install
+        standby2 = MagicMock(status=EntityStatus.UP)
+        standby2.is_deployed.return_value = False
+        evc.get_static_standby_path = MagicMock(return_value=standby2)
+        assert evc.deploy_static_standby() is True
+        standby2.choose_vlans.assert_called_once()
+        evc._install_flows.assert_called_once_with(standby2, skip_in=True)
+        assert emit_mock.call_args[0][1] == "failover_deployed"
+
+        # cold install failure -> the VLANs chosen this call are rolled back
+        evc._install_flows = MagicMock(side_effect=EVCPathNotInstalled("x"))
+        evc.remove_path_flows = MagicMock()
+        cold = MagicMock(status=EntityStatus.UP)
+        cold.is_deployed.return_value = False
+        evc.get_static_standby_path = MagicMock(return_value=cold)
+        assert evc.deploy_static_standby() is False
+        evc.remove_path_flows.assert_called_once_with(cold)
+
+    def test_remove_static_standby_flows(self):
+        """Every kept static that is not current is swept (EP041)."""
+        evc = self.evc_deploy
+        evc.remove_path_flows = MagicMock()
+        primary = Path([get_link_mocked()])
+        backup = Path([get_link_mocked()])
+        escape = Path([get_link_mocked()])
+
+        # no configured statics -> no-op
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_not_called()
+
+        # dual static on primary -> sweeps only the backup standby
+        evc.primary_path, evc.backup_path = primary, backup
+        evc.current_path = primary
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_called_once_with(backup)
+
+        # dual static on backup -> sweeps only the primary standby
+        evc.remove_path_flows.reset_mock()
+        evc.current_path = backup
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_called_once_with(primary)
+
+        # single static + dynamic on its dynamic -> sweeps only primary
+        evc.remove_path_flows.reset_mock()
+        evc.backup_path = Path([])
+        evc.current_path = escape
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_called_once_with(primary)
+
+    def test_remove_static_standby_flows_dual_dyn_escape(self):
+        """A dual static + dynamic EVC on a cold dynamic escape keeps both
+        statics installed, so teardown must sweep both primary and backup, or
+        the un-swept one leaks its NNI flows and s_vlan (EP041)."""
+        evc = self.evc_deploy
+        evc.remove_path_flows = MagicMock()
+        primary = Path([get_link_mocked()])
+        backup = Path([get_link_mocked()])
+        escape = Path([get_link_mocked()])
+        evc.primary_path, evc.backup_path = primary, backup
+        evc.current_path = escape
+
+        evc.remove_static_standby_flows()
+
+        assert evc.remove_path_flows.call_count == 2
+        evc.remove_path_flows.assert_has_calls(
+            [call(primary), call(backup)], any_order=True
+        )
+
+    def test_remove_static_standby_flows_skips_never_deployed(self):
+        """A configured path never deployed (no s_vlan) has no flows to
+        sweep and must be skipped. On an admin path update the new path is
+        already set when the redeploy's sweep runs; sweeping it crashed on
+        the missing s_vlan and triggered an empty-delete retry storm (EP041).
+        """
+        evc = self.evc_deploy
+        evc.remove_path_flows = MagicMock()
+        old_primary = Path([get_link_mocked()])
+        new_primary = Path([get_link_mocked()])
+        new_primary[0].get_metadata = Mock(return_value=None)  # no s_vlan
+        assert not new_primary.is_deployed()
+        evc.primary_path = new_primary      # already overwritten by update
+        evc.current_path = old_primary      # still forwarding on the old
+        evc.backup_path = Path([])
+
+        evc.remove_static_standby_flows()
+
+        evc.remove_path_flows.assert_not_called()
 
     def test_get_value_from_uni_tag(self):
         """Test _get_value_from_uni_tag"""

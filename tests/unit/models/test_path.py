@@ -104,6 +104,18 @@ class TestPath():
         current_path = Path(links)
         assert current_path.status == EntityStatus.DISABLED
 
+    def test_is_deployed(self):
+        """Test is_deployed: a chosen s_vlan means the path is installed."""
+        assert Path([]).is_deployed() is False
+
+        cold = get_link_mocked()
+        cold.get_metadata = MagicMock(return_value=None)
+        assert Path([cold]).is_deployed() is False
+
+        warm = get_link_mocked()
+        warm.get_metadata = MagicMock(return_value="tag")
+        assert Path([warm]).is_deployed() is True
+
     def test_status_case_6(self):
         """Test if link status is UP."""
         link1 = get_link_mocked(status=EntityStatus.DISABLED)
