@@ -49,7 +49,7 @@ async def test_on_table_enabled():
 
 
 # pylint: disable=too-many-public-methods, too-many-lines
-# pylint: disable=too-many-arguments,too-many-locals
+# pylint: disable=too-many-arguments
 class TestMain:
     """Test the Main class."""
 
@@ -134,18 +134,22 @@ class TestMain:
         evc1 = MagicMock(id=1, service_level=0, creation_time=1)
         evc1.is_enabled.return_value = True
         evc1.is_active.return_value = False
+        evc1.is_inactive_on_static.return_value = False
         evc1.lock.locked.return_value = False
         evc1.has_recent_removed_flow.return_value = False
         evc1.is_recent_updated.return_value = False
         evc1.execution_rounds = 0
+        evc1.current_path.status = EntityStatus.UP
 
         evc2 = MagicMock(id=2, service_level=7, creation_time=1)
         evc2.is_enabled.return_value = True
         evc2.is_active.return_value = False
+        evc2.is_inactive_on_static.return_value = False
         evc2.lock.locked.return_value = False
         evc2.has_recent_removed_flow.return_value = False
         evc2.is_recent_updated.return_value = False
         evc2.execution_rounds = 0
+        evc2.current_path.status = EntityStatus.UP
 
         evc3 = MagicMock(id=3, service_level=0, creation_time=1)
         evc3.is_enabled.return_value = True
@@ -154,6 +158,7 @@ class TestMain:
         evc3.has_recent_removed_flow.return_value = False
         evc3.is_recent_updated.return_value = False
         evc3.execution_rounds = 0
+        evc3.current_path.status = EntityStatus.UP
         evc3.is_eligible_for_failover_path.return_value = True
         evc3.failover_path = Path([])
 
@@ -185,6 +190,38 @@ class TestMain:
             content=evc3
         )
 
+    @patch("napps.kytos.mef_eline.main.map_evc_event_content")
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_list_traces")
+    def test_execute_consistency_installs_missing_standby(
+        self, mock_check_list_traces, mock_emit_event, mock_map_evc
+    ):
+        """An active dual static EVC whose standby was never installed is
+        asked for one, even though it is not failover eligible (EP041)."""
+        mock_map_evc.side_effect = lambda x: x
+        mock_check_list_traces.return_value = {}
+
+        evc = MagicMock(id=1, service_level=0, creation_time=1)
+        evc.is_enabled.return_value = True
+        evc.is_active.return_value = True
+        evc.lock.locked.return_value = False
+        evc.is_eligible_for_failover_path.return_value = False
+        evc.failover_path = Path([])
+        evc.needs_static_standby.return_value = True
+        self.napp.circuits = {"1": evc}
+
+        self.napp.execute_consistency()
+
+        mock_emit_event.assert_called_once_with(
+            self.napp.controller, "need_failover", content=evc
+        )
+
+        # standby already installed -> nothing asked for
+        evc.needs_static_standby.return_value = False
+        mock_emit_event.reset_mock()
+        self.napp.execute_consistency()
+        mock_emit_event.assert_not_called()
+
     @patch('napps.kytos.mef_eline.main.settings')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
@@ -203,10 +240,12 @@ class TestMain:
         evc1 = MagicMock(id=1, service_level=0, creation_time=1)
         evc1.is_enabled.return_value = True
         evc1.is_active.return_value = False
+        evc1.is_inactive_on_static.return_value = False
         evc1.lock.locked.return_value = False
         evc1.has_recent_removed_flow.return_value = False
         evc1.is_recent_updated.return_value = False
         evc1.execution_rounds = 0
+        evc1.current_path.status = EntityStatus.UP
         evc1.deploy.call_count = 0
         self.napp.circuits = {'1': evc1}
         assert self.napp.get_evcs_by_svc_level() == [evc1]
@@ -474,7 +513,6 @@ class TestMain:
         mock_check_duplicate
     ):
         """Test create a new circuit."""
-        # pylint: disable=too-many-locals
         self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
@@ -586,7 +624,6 @@ class TestMain:
         """Test create a new circuit trying to send request with an
         invalid value."""
         self.napp.controller.loop = asyncio.get_running_loop()
-        # pylint: disable=too-many-locals
         uni_from_dict_mock.side_effect = ValueError("Could not instantiate")
         mongo_controller_upsert_mock.return_value = True
         url = f"{self.base_endpoint}/v2/evc/"
@@ -636,7 +673,6 @@ class TestMain:
         mock_check_duplicate
     ):
         """Test create a new intra circuit with a disabled switch"""
-        # pylint: disable=too-many-locals
         self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
@@ -739,7 +775,6 @@ class TestMain:
         mock_check_duplicate
     ):
         """Test create a new intra circuit with a disabled interface"""
-        # pylint: disable=too-many-locals
         self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
@@ -867,7 +902,6 @@ class TestMain:
         mock_check_duplicate
     ):
         """Test create an already created circuit."""
-        # pylint: disable=too-many-locals
         self.napp.controller.loop = asyncio.get_running_loop()
         validate_mock.return_value = True
         mongo_controller_upsert_mock.return_value = True
@@ -971,6 +1005,31 @@ class TestMain:
         }
         response = await self.api_client.post(url, json=payload)
         assert response.status_code == 400, response.data
+
+    @patch("napps.kytos.mef_eline.main.Main._evc_from_dict")
+    async def test_create_circuit_backup_without_primary(self, mock_evc):
+        """Creating an EVC with a backup_path but no primary_path is
+        rejected (EP041)."""
+        self.napp.controller.loop = asyncio.get_running_loop()
+        evc = MagicMock()
+        evc.primary_path = Path([])
+        evc._tag_lists_equal.return_value = True
+        evc._validate_static_paths.side_effect = ValueError(
+            "backup_path requires a primary_path."
+        )
+        mock_evc.return_value = evc
+        payload = {
+            "name": "backup only",
+            "uni_a": {"interface_id": "00:00:00:00:00:00:00:01:1"},
+            "uni_z": {"interface_id": "00:00:00:00:00:00:00:02:2"},
+            "dynamic_backup_path": True,
+        }
+        response = await self.api_client.post(
+            f"{self.base_endpoint}/v2/evc/", json=payload
+        )
+        assert response.status_code == 400, response.data
+        assert "requires a primary_path" in response.json()["description"]
+        evc.deploy.assert_not_called()
 
     async def test_redeploy_evc(self):
         """Test endpoint to redeploy an EVC."""
@@ -1772,8 +1831,9 @@ class TestMain:
             self.napp._link_from_dict(link_dict, "current_path")
 
     def test_link_from_dict_vlan_metadata(self):
-        """Test that link_from_dict only accepts vlans for current_path
-         and failover_path."""
+        """s_vlan is restored for every path attribute loaded from the DB so
+        is_deployed() survives a restart, but a request payload can only
+        carry it on the non configurable paths (EP041)."""
         intf = MagicMock(id="01:1")
         self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
         link_dict = {
@@ -1782,14 +1842,75 @@ class TestMain:
             'endpoint_b': {'id': '00:00:00:00:00:00:00:05:2'},
             'metadata': {'s_vlan': {'tag_type': 'vlan', 'value': 1}}
         }
-        link = self.napp._link_from_dict(link_dict, "current_path")
-        assert link.metadata.get('s_vlan', None)
+        for attribute in ("current_path", "failover_path",
+                          "primary_path", "backup_path"):
+            link = self.napp._link_from_dict(link_dict, attribute, True)
+            assert link.metadata.get('s_vlan', None), attribute
+        for attribute in ("current_path", "failover_path"):
+            link = self.napp._link_from_dict(link_dict, attribute)
+            assert link.metadata.get('s_vlan', None), attribute
+        for attribute in ("primary_path", "backup_path"):
+            link = self.napp._link_from_dict(link_dict, attribute)
+            assert not link.metadata.get('s_vlan', None), attribute
 
-        link = self.napp._link_from_dict(link_dict, "failover_path")
-        assert link.metadata.get('s_vlan', None)
+    @staticmethod
+    def _deployed_path(link_id, s_vlan=None):
+        """Path of one link, deployed when s_vlan is given."""
+        link = MagicMock(id=link_id)
+        link.__eq__ = lambda self, other: self.id == other.id
+        link.get_metadata.return_value = s_vlan
+        return Path([link])
 
-        link = self.napp._link_from_dict(link_dict, "primary_path")
-        assert link.metadata.get('s_vlan', None) is None
+    def test_realias_static_paths(self):
+        """current_path/failover_path are re-aliased to the equal static
+        Path object, keeping whichever copy holds the s_vlan (EP041)."""
+        evc = MagicMock()
+        evc.primary_path = self._deployed_path("p", 10)
+        evc.backup_path = self._deployed_path("b", 20)
+        evc.current_path = self._deployed_path("p", 10)
+        evc.failover_path = self._deployed_path("b", 20)
+        self.napp._realias_static_paths(evc)
+        assert evc.current_path is evc.primary_path
+        assert evc.failover_path is evc.backup_path
+
+        # pre-EP041 stored statics have no s_vlan: keep the deployed copy
+        evc.primary_path = self._deployed_path("p")
+        current = self._deployed_path("p", 10)
+        evc.current_path = current
+        evc.failover_path = Path([])
+        self.napp._realias_static_paths(evc)
+        assert evc.current_path is current
+        assert evc.primary_path is current
+
+        # a dynamic current_path is left alone
+        dynamic = self._deployed_path("d", 30)
+        evc.current_path = dynamic
+        self.napp._realias_static_paths(evc)
+        assert evc.current_path is dynamic
+
+    @patch("napps.kytos.mef_eline.main.EVC")
+    def test_evc_from_dict_realias_only_from_db(self, _evc_mock):
+        """Only EVCs rebuilt from the DB are re-aliased."""
+        self.napp._evc_dict_with_instances = MagicMock(return_value={})
+        self.napp._realias_static_paths = MagicMock()
+        self.napp._evc_from_dict({})
+        self.napp._evc_dict_with_instances.assert_called_with({}, False)
+        self.napp._realias_static_paths.assert_not_called()
+        self.napp._evc_from_dict({}, from_db=True)
+        self.napp._evc_dict_with_instances.assert_called_with({}, True)
+        self.napp._realias_static_paths.assert_called_once()
+
+    def test_get_circuits_buffer_from_db(self):
+        """The circuits buffer loads EVCs as DB data (EP041)."""
+        self.napp.circuits = {}
+        self.napp.mongo_controller.get_circuits.return_value = {
+            "circuits": {"1": {"id": "1"}}
+        }
+        self.napp._evc_from_dict = MagicMock()
+        self.napp._get_circuits_buffer()
+        self.napp._evc_from_dict.assert_called_once_with(
+            {"id": "1"}, from_db=True
+        )
 
     def test_uni_from_dict_non_existent_intf(self):
         """Test _link_from_dict non existent intf."""
@@ -1984,20 +2105,134 @@ class TestMain:
         assert emit_event_mock.call_count == 1
 
     def test_handle_link_up(self):
-        """Test handle_link_up method."""
-        evc_mock = create_autospec(EVC)
-        evc_mock.service_level, evc_mock.creation_time = 0, 1
-        evc_mock.is_enabled = MagicMock(side_effect=[
-            True, False, True, True, True
-        ])
-        evc_mock.lock = MagicMock()
-        evc_mock.archived = False
-        evcs = [evc_mock, evc_mock, evc_mock]
-        event = KytosEvent(name="test", content={"link": "abc"})
-        self.napp.circuits = dict(zip(["1", "2", "3"], evcs))
+        """Test handle_link_up routes fast-revert vs redeploy (EP041)."""
+        link = MagicMock(id="123")
+
+        evc_slow = MagicMock(id="slow")
+        evc_slow.is_enabled.return_value = True
+        evc_slow.archived = False
+        evc_slow.is_eligible_for_static_revert.return_value = False
+        evc_slow.is_eligible_for_static_resume.return_value = False
+        evc_slow.is_eligible_for_dyn_failover_recovery.return_value = False
+        evc_slow.has_dual_static_paths.return_value = False
+
+        evc_fast = MagicMock(id="fast")
+        evc_fast.is_enabled.return_value = True
+        evc_fast.archived = False
+        evc_fast.is_eligible_for_static_revert.return_value = True
+        evc_fast.has_single_static_dynamic_path.return_value = False
+
+        evc_disabled = MagicMock(id="disabled")
+        evc_disabled.is_enabled.return_value = False
+        evc_disabled.archived = False
+
+        self.napp.get_evcs_by_svc_level = MagicMock(
+            return_value=[evc_slow, evc_fast, evc_disabled]
+        )
+        self.napp.install_static_standby = MagicMock()
+        self.napp.execute_swap_to_standby = MagicMock(
+            return_value=([evc_fast], [])
+        )
+
+        event = KytosEvent(name="test", content={"link": link})
         self.napp.handle_link_up(event)
-        assert evc_mock.handle_link_up.call_count == 2
-        evc_mock.handle_link_up.assert_called_with("abc")
+
+        # fast-revert candidate is batched into execute_swap_to_standby
+        self.napp.execute_swap_to_standby.assert_called_once_with([evc_fast])
+        evc_fast.handle_link_up.assert_not_called()
+        # ineligible enabled EVC takes the traditional redeploy path
+        evc_slow.handle_link_up.assert_called_once_with(link)
+        # not dual static, no standby to install
+        self.napp.install_static_standby.assert_not_called()
+        # disabled EVC is skipped entirely
+        evc_disabled.is_eligible_for_static_revert.assert_not_called()
+        evc_disabled.handle_link_up.assert_not_called()
+        # reverted EVC persisted once
+        self.napp.mongo_controller.update_evcs.assert_called_once()
+
+    def test_handle_link_up_failed_revert_left_as_is(self):
+        """A failed fast revert keeps forwarding where it is, retried by the
+        next link_up, never through the ladder which does nothing for an EVC
+        still on backup (EP041).
+        """
+        link = MagicMock(id="123")
+        evc = MagicMock(id="fast")
+        evc.is_enabled.return_value = True
+        evc.archived = False
+        evc.is_eligible_for_static_revert.return_value = True
+        evc.has_dual_static_paths.return_value = True
+
+        self.napp.get_evcs_by_svc_level = MagicMock(return_value=[evc])
+        self.napp.execute_swap_to_standby = MagicMock(
+            return_value=([], [evc])
+        )
+
+        event = KytosEvent(name="test", content={"link": link})
+        self.napp.handle_link_up(event)
+
+        evc.handle_link_up.assert_not_called()
+        # stored, e.g. a primary cold installed before the failed swap
+        stored = self.napp.mongo_controller.update_evcs.call_args[0][0]
+        assert stored == [evc.as_dict.return_value]
+
+    def test_handle_link_up_static_resume(self):
+        """A static EVC down on its kept paths resumes on a recovered one with
+        an ingress install, never through the redeploy ladder; one that fails
+        to resume is left for the consistency routine, never undeployed
+        (EP041)."""
+        link = MagicMock(id="123")
+        evc = MagicMock(id="react")
+        evc.is_enabled.return_value = True
+        evc.archived = False
+        evc.is_eligible_for_static_revert.return_value = False
+        evc.is_eligible_for_static_resume.return_value = True
+
+        self.napp.get_evcs_by_svc_level = MagicMock(return_value=[evc])
+        self.napp.resume_on_static = MagicMock(return_value=[evc])
+        self.napp.execute_undeploy = MagicMock()
+
+        event = KytosEvent(name="test", content={"link": link})
+        self.napp.handle_link_up(event)
+
+        self.napp.resume_on_static.assert_called_once_with([evc])
+        evc.handle_link_up.assert_not_called()
+
+        self.napp.resume_on_static = MagicMock(return_value=[])
+        self.napp.handle_link_up(event)
+        self.napp.execute_undeploy.assert_not_called()
+        evc.remove_static_standby_flows.assert_not_called()
+        evc.handle_link_up.assert_not_called()
+
+    def test_handle_link_up_ladder_installs_missing_standby(self):
+        """An active dual static EVC left to the ladder gets a missing
+        standby installed; an inactive or non dual static one doesn't
+        (EP041)."""
+        link = MagicMock(id="l")
+
+        def make(evc_id, dual, active):
+            evc = MagicMock(id=evc_id)
+            evc.is_enabled.return_value = True
+            evc.archived = False
+            evc.is_eligible_for_static_revert.return_value = False
+            evc.is_eligible_for_static_resume.return_value = False
+            evc.is_eligible_for_dyn_failover_recovery.return_value = False
+            evc.has_dual_static_paths.return_value = dual
+            evc.is_active.return_value = active
+            return evc
+        dual, inactive, dynamic = (
+            make("1", True, True), make("2", True, False),
+            make("3", False, True),
+        )
+        self.napp.get_evcs_by_svc_level = MagicMock(
+            return_value=[dual, inactive, dynamic]
+        )
+        self.napp.install_static_standby = MagicMock()
+
+        self.napp.handle_link_up(KytosEvent(content={"link": link}))
+
+        self.napp.install_static_standby.assert_called_once_with(dual)
+        for evc in (dual, inactive, dynamic):
+            evc.handle_link_up.assert_called_once_with(link)
 
     def test_handle_link_down(
         self
@@ -2043,6 +2278,11 @@ class TestMain:
             evc5,
             evc6,
         ]
+        for evc in (evc1, evc2, evc3, evc4, evc5, evc6):
+            evc.keeps_static_paths.return_value = False
+        # swap candidates need an UP, unaffected failover_path
+        evc3.failover_path.status = EntityStatus.UP
+        evc4.failover_path.status = EntityStatus.UP
 
         self.napp.execute_swap_to_failover = MagicMock()
 
@@ -2094,6 +2334,121 @@ class TestMain:
             evc4.as_dict(),
             evc6.as_dict(),
         ])
+
+    def test_handle_link_down_dual_static(self):
+        """Dual static EVCs swap to standby and never clear (EP041)."""
+        link = MagicMock(id="123")
+
+        # affected on current, standby UP and unaffected -> swap_to_standby
+        standby_up = MagicMock(status=EntityStatus.UP)
+        standby_up.is_affected_by_link.return_value = False
+        evc_swap = MagicMock(id="swap")
+        evc_swap.keeps_static_paths.return_value = True
+        evc_swap.is_affected_by_link.return_value = True
+        evc_swap.get_static_standby_path.return_value = standby_up
+
+        # affected on current, standby DOWN -> ingress-only removal, the
+        # configured paths' egress/NNI stay installed (EP041)
+        standby_down = MagicMock(status=EntityStatus.DOWN)
+        evc_ingress = MagicMock(id="ingress")
+        evc_ingress.keeps_static_paths.return_value = True
+        evc_ingress.has_single_static_dynamic_path.return_value = False
+        evc_ingress.is_inactive_on_static.return_value = False
+        evc_ingress.dynamic_backup_path = False  # plain dual, no escape
+        evc_ingress.is_affected_by_link.return_value = True
+        evc_ingress.get_static_standby_path.return_value = standby_down
+
+        # not affected on current -> no action (standby kept installed)
+        evc_idle = MagicMock(id="idle")
+        evc_idle.keeps_static_paths.return_value = True
+        evc_idle.is_affected_by_link.return_value = False
+        evc_idle.get_kept_standby_paths.return_value = []
+        # a dual static EVC has no failover_path (it uses the standby lane)
+        evc_idle.failover_path = Path([])
+
+        self.napp.get_evcs_by_svc_level = MagicMock(
+            return_value=[evc_swap, evc_ingress, evc_idle]
+        )
+        self.napp.execute_swap_to_standby = MagicMock(
+            return_value=([evc_swap], [])
+        )
+        self.napp.execute_swap_to_failover = MagicMock(return_value=([], []))
+        self.napp.execute_clear_failover = MagicMock()
+        self.napp.execute_remove_ingress = MagicMock(
+            return_value=([evc_ingress], [])
+        )
+        self.napp.execute_undeploy = MagicMock(return_value=([], []))
+
+        event = KytosEvent(name="test", content={"link": link})
+        self.napp.handle_link_down(event)
+
+        self.napp.execute_swap_to_standby.assert_called_once_with([evc_swap])
+        # static EVCs are never cleared (clear-bucket hazard guard)
+        self.napp.execute_clear_failover.assert_not_called()
+        # both-down EVC drops only its ingress, paths kept installed
+        self.napp.execute_remove_ingress.assert_called_once_with([evc_ingress])
+        self.napp.execute_undeploy.assert_not_called()
+        # no teardown of the kept standby on the ingress-only path
+        evc_ingress.remove_static_standby_flows.assert_not_called()
+        # idle EVC (only standby affected) is untouched, standby kept installed
+        evc_idle.remove_static_standby_flows.assert_not_called()
+
+    def test_handle_link_down_dual_static_swap_failure(self):
+        """A failed dual-static swap is undeployed, its standby swept by the
+        same batched undeploy (EP041)."""
+        link = MagicMock(id="123")
+        standby_up = MagicMock(status=EntityStatus.UP)
+        standby_up.is_affected_by_link.return_value = False
+        evc = MagicMock(id="swap")
+        evc.has_dual_static_paths.return_value = True
+        evc.is_affected_by_link.return_value = True
+        evc.get_static_standby_path.return_value = standby_up
+
+        self.napp.get_evcs_by_svc_level = MagicMock(return_value=[evc])
+        self.napp.execute_swap_to_standby = MagicMock(return_value=([], [evc]))
+        self.napp.execute_undeploy = MagicMock(return_value=([evc], []))
+
+        event = KytosEvent(name="test", content={"link": link})
+        self.napp.handle_link_down(event)
+
+        evc.remove_static_standby_flows.assert_not_called()
+        self.napp.execute_undeploy.assert_called_once_with([evc])
+
+    def test_handle_link_down_single_static_dyn_detaches_primary(self):
+        """A single static + dynamic EVC on primary swaps to its dynamic
+        failover; the swap moves primary into failover_path, which is detached
+        (kept installed as standby, not cleared) (EP041)."""
+        link = MagicMock(id="123")
+        primary = MagicMock(id="P")
+        failover = MagicMock(status=EntityStatus.UP)
+        failover.__contains__.return_value = False
+        evc = MagicMock(id="single_static_dyn")
+        evc.has_dual_static_paths.return_value = False
+        evc.has_single_static_dynamic_path.return_value = True
+        evc.is_affected_by_link.return_value = True
+        evc.primary_path = primary
+        evc.failover_path = failover
+        evc.is_failover_path_affected_by_link.return_value = False
+
+        self.napp.get_evcs_by_svc_level = MagicMock(return_value=[evc])
+
+        # simulate the swap moving the old current (primary) to failover_path
+        def _swap(evcs):
+            for e in evcs:
+                e.failover_path = e.primary_path
+            return (list(evcs), [])
+        self.napp.execute_swap_to_failover = MagicMock(side_effect=_swap)
+        self.napp.execute_clear_failover = MagicMock()
+        self.napp.execute_undeploy = MagicMock(return_value=([], []))
+
+        event = KytosEvent(name="test", content={"link": link})
+        self.napp.handle_link_down(event)
+
+        self.napp.execute_swap_to_failover.assert_called_once_with([evc])
+        # that path is primary -> detached to empty (primary stays installed
+        # via primary_path), never routed through the clear bucket
+        assert not evc.failover_path
+        self.napp.execute_clear_failover.assert_not_called()
 
     @patch("napps.kytos.mef_eline.main.emit_event")
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
@@ -2180,6 +2535,207 @@ class TestMain:
         assert evc1.failover_path == good_path
 
         emit_main_mock.assert_not_called()
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_swap_to_standby(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Test execute_swap_to_standby repoints current_path (EP041)."""
+        old_active = MagicMock(id="OldActive")
+        standby = MagicMock(id="Standby")
+        evc1 = MagicMock(id="1")
+        evc1.current_path = old_active
+        evc1.get_static_standby_path.return_value = standby
+        evc1._prepare_uni_flows.return_value = {"1": ["Flow1"]}
+
+        evc2 = MagicMock(id="2")  # no ingress flows -> not swapped
+        evc2.get_static_standby_path.return_value = MagicMock()
+        evc2._prepare_uni_flows.return_value = {}
+
+        self.napp.prepare_swap_to_failover_event = {evc1: "StandbyEvent1"}.get
+        self.napp.execute_install_standby = MagicMock(
+            side_effect=lambda items: ([evc for evc, _ in items], [])
+        )
+
+        success, failure = self.napp.execute_swap_to_standby([evc1, evc2])
+
+        assert success == [evc1]
+        assert failure == [evc2]
+        send_flow_mods_mock.assert_called_with({"1": ["Flow1"]}, "install")
+        # current_path repointed to the standby, no failover_path involved
+        assert evc1.current_path == standby
+        # the swap alone never activates; callers only swap active EVCs
+        evc1.activate.assert_not_called()
+        emit_main_mock.assert_called_with(
+            self.napp.controller,
+            "static.ingress_swapped",
+            content={"1": "StandbyEvent1"}
+        )
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_swap_to_standby_exception(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """A FlowMod error leaves current_path unchanged (EP041)."""
+        old_active = MagicMock(id="OldActive")
+        standby = MagicMock(id="Standby")
+        evc1 = MagicMock(id="1")
+        evc1.current_path = old_active
+        evc1.get_static_standby_path.return_value = standby
+        evc1._prepare_uni_flows.return_value = {"1": ["Flow1"]}
+        self.napp.prepare_swap_to_failover_event = {evc1: "StandbyEvent1"}.get
+        # standby installed, it's the ingress install that fails
+        self.napp.execute_install_standby = MagicMock(
+            return_value=([evc1], [])
+        )
+        send_flow_mods_mock.side_effect = FlowModException("boom")
+
+        success, failure = self.napp.execute_swap_to_standby([evc1])
+
+        send_flow_mods_mock.assert_called_once_with(
+            {"1": ["Flow1"]}, "install"
+        )
+        assert success == []
+        assert failure == [evc1]
+        assert evc1.current_path == old_active
+        emit_main_mock.assert_not_called()
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.prepare_delete_flow")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_remove_ingress(
+        self,
+        send_flow_mods_mock: MagicMock,
+        prepare_delete_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Ingress-only removal keeps egress/NNI and deactivates (EP041)."""
+        prepare_delete_mock.side_effect = \
+            lambda flows: {"1": ["DelIngress1"]} if flows else {}
+        evc1 = MagicMock(id="1")
+        evc1._prepare_uni_flows.return_value = {"1": ["Ingress1"]}
+
+        evc2 = MagicMock(id="2")  # no ingress flow prepared -> not removed
+        evc2._prepare_uni_flows.return_value = {}
+
+        removed, not_removed = self.napp.execute_remove_ingress([evc1, evc2])
+
+        assert removed == [evc1]
+        assert not_removed == [evc2]
+        # only the current_path UNI ingress is prepared for deletion
+        evc1._prepare_uni_flows.assert_called_once_with(
+            evc1.current_path, skip_out=True
+        )
+        send_flow_mods_mock.assert_called_once_with(
+            {"1": ["DelIngress1"]}, "delete"
+        )
+        # EVC stops forwarding but its egress/NNI stay installed
+        evc1.deactivate.assert_called_once_with()
+        evc1.remove_static_standby_flows.assert_not_called()
+        evc2.deactivate.assert_not_called()
+        # the removal is announced so telemetry_int drops its INT ingress
+        assert emit_main_mock.call_args[0][1] == "static.ingress_removed"
+        content = emit_main_mock.call_args[1]["content"]
+        assert list(content) == ["1"]
+        assert content["1"]["removed_flows"] == {"1": ["DelIngress1"]}
+
+    @patch("napps.kytos.mef_eline.main.prepare_delete_flow")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_remove_ingress_exception(
+        self,
+        send_flow_mods_mock: MagicMock,
+        prepare_delete_mock: MagicMock,
+    ):
+        """A FlowMod error leaves the EVC active (falls back to teardown)."""
+        prepare_delete_mock.side_effect = lambda flows: {"del": flows}
+        send_flow_mods_mock.side_effect = FlowModException("boom")
+        evc1 = MagicMock(id="1")
+        evc1._prepare_uni_flows.return_value = {"1": ["Ingress1"]}
+
+        removed, not_removed = self.napp.execute_remove_ingress([evc1])
+
+        assert removed == []
+        assert not_removed == [evc1]
+        evc1.deactivate.assert_not_called()
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_resume_on_static_installs_ingress(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """Resuming installs only the UNI ingress onto the configured path
+        picked once and installed, then reactivates; an EVC whose path can't
+        be installed isn't resumed (EP041)."""
+        old_current = MagicMock(id="OldDown")
+        target = MagicMock(id="Primary")
+        evc1 = MagicMock(id="1")
+        evc1.current_path = evc1.backup_path = old_current
+        evc1.get_reactivation_path.return_value = target
+        evc1.failover_path = Path([])
+        evc1._prepare_uni_flows.return_value = {"1": ["Ingress1"]}
+        evc2 = MagicMock(id="2")
+        self.napp.execute_install_standby = MagicMock(
+            return_value=([evc1], [evc2])
+        )
+        self.napp.request_failover_path = MagicMock()
+
+        resumed = self.napp.resume_on_static([evc1, evc2])
+
+        assert resumed == [evc1]
+        self.napp.execute_install_standby.assert_called_once_with(
+            [(evc1, target), (evc2, evc2.get_reactivation_path.return_value)]
+        )
+        evc1._prepare_uni_flows.assert_called_once_with(target, skip_out=True)
+        send_flow_mods_mock.assert_called_once_with(
+            {"1": ["Ingress1"]}, "install"
+        )
+        # current_path repointed onto the recovered path and reactivated
+        assert evc1.current_path == target
+        evc1.activate.assert_called_once_with()
+        assert emit_main_mock.call_args[0][1] == "static.ingress_installed"
+        content = emit_main_mock.call_args[1]["content"]
+        assert list(content) == ["1"]
+        assert content["1"]["flows"] == {"1": ["Ingress1"]}
+        self.napp.request_failover_path.assert_called_once_with(evc1)
+        # installed ones are stored, new s_vlans included
+        self.napp.mongo_controller.update_evcs.assert_called_once_with(
+            [evc1.as_dict.return_value]
+        )
+
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_resume_on_static_exception(
+        self,
+        send_flow_mods_mock: MagicMock,
+        emit_main_mock: MagicMock,
+    ):
+        """A FlowMod error leaves the EVC unchanged and inactive, still
+        storing its installed path (EP041)."""
+        send_flow_mods_mock.side_effect = FlowModException("boom")
+        old_current = MagicMock(id="OldDown")
+        target = MagicMock(id="Primary")
+        evc1 = MagicMock(id="1")
+        evc1.current_path = evc1.backup_path = old_current
+        evc1.get_reactivation_path.return_value = target
+        evc1.failover_path = Path([])
+        evc1._prepare_uni_flows.return_value = {"1": ["Ingress1"]}
+        self.napp.execute_install_standby = MagicMock(
+            return_value=([evc1], [])
+        )
+
+        assert not self.napp.resume_on_static([evc1])
+        assert evc1.current_path == old_current
+        evc1.activate.assert_not_called()
+        emit_main_mock.assert_not_called()
+        self.napp.mongo_controller.update_evcs.assert_called_once()
 
     @patch("napps.kytos.mef_eline.main.emit_event")
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
@@ -2858,16 +3414,25 @@ class TestMain:
         evc1.is_active.return_value = True
         evc1.failover_path = Path([])
         evc1.current_path = ["LINK"]
+        evc1.has_dual_static_paths.return_value = False
 
         evc2 = MagicMock()
         evc2.is_eligible_for_failover_path.return_value = False
         evc2.is_active.return_value = True
         evc2.failover_path = Path([])
         evc2.current_path = ["LINK"]
+        evc2.has_dual_static_paths.return_value = False
+
+        # dual static EVC keeps the standby installed instead (EP041)
+        evc3 = MagicMock()
+        evc3.is_active.return_value = True
+        evc3.current_path = ["LINK"]
+        evc3.has_dual_static_paths.return_value = True
 
         self.napp.circuits = {
             "evc_1": evc1,
             "evc_2": evc2,
+            "evc_3": evc3,
         }
 
         event = KytosEvent(
@@ -2879,6 +3444,15 @@ class TestMain:
 
         self.napp.handle_evc_deployed(event)
         evc1.setup_failover_path.assert_called()
+
+        event3 = KytosEvent(
+            name="kytos/mef_eline.deployed",
+            content={"evc_id": "evc_3"}
+        )
+        self.napp.install_static_standby = MagicMock()
+        self.napp.handle_evc_deployed(event3)
+        self.napp.install_static_standby.assert_called_once_with(evc3)
+        evc3.setup_failover_path.assert_not_called()
 
         event = KytosEvent(
             name="kytos/mef_eline.need_failover",
