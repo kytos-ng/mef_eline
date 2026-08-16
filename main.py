@@ -1147,28 +1147,6 @@ class Main(KytosNApp):
         emit_event(self.controller, event_name,
                    content=map_evc_event_content(evc))
 
-    @listen_to("kytos/mef_eline.evc_affected_by_link_down")
-    def on_evc_affected_by_link_down(self, event):
-        """Change circuit when link is down or under_mantenance."""
-        self.handle_evc_affected_by_link_down(event)
-
-    def handle_evc_affected_by_link_down(self, event):
-        """Change circuit when link is down or under_mantenance."""
-        evc = self.circuits.get(event.content["evc_id"])
-        link = event.content['link']
-        if not evc:
-            return
-        with evc.lock:
-            if not evc.is_affected_by_link(link):
-                return
-            result = evc.handle_link_down()
-        event_name = "error_redeploy_link_down"
-        if result:
-            log.info(f"{evc} redeployed due to link down {link.id}")
-            event_name = "redeployed_link_down"
-        emit_event(self.controller, event_name,
-                   content=map_evc_event_content(evc))
-
     @listen_to(
         "kytos/mef_eline.(redeployed_link_(up|down)|deployed|need_failover)"
     )
