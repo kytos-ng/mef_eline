@@ -1878,32 +1878,6 @@ class LinkProtection(EVCDeploy):
                 return True
         return False
 
-    def handle_link_down(self):
-        """Handle circuit when link down.
-
-        Returns:
-            bool: True if the re-deploy was successly otherwise False.
-
-        """
-        success = False
-        if self.is_using_primary_path():
-            success = self.deploy_to_backup_path()
-        elif self.is_using_backup_path():
-            success = self.deploy_to_primary_path()
-
-        if not success and self.dynamic_backup_path:
-            success = self.deploy_to_path()
-
-        if success:
-            log.debug(f"{self} deployed after link down.")
-        else:
-            self.remove_current_flows(sync=False)
-            self.deactivate()
-            self.sync()
-            log.debug(f"Failed to re-deploy {self} after link down.")
-
-        return success
-
     def are_unis_active(self) -> bool:
         """Determine whether this EVC should be active"""
         interface_a = self.uni_a.interface

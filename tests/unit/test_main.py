@@ -2384,68 +2384,6 @@ class TestMain:
             call(evc.failover_path),
         ])
 
-    @patch("napps.kytos.mef_eline.main.emit_event")
-    def test_handle_evc_affected_by_link_down(self, emit_event_mock):
-        """Test handle_evc_affected_by_link_down method."""
-        uni = create_autospec(UNI)
-        evc1 = MagicMock(
-            id="1",
-            metadata="data_mocked",
-            _active="true",
-            _enabled="false",
-            uni_a=uni,
-            uni_z=uni,
-        )
-        evc1.name = "name_mocked"
-        evc1.handle_link_down.return_value = True
-        evc2 = MagicMock(
-            id="2",
-            metadata="mocked_data",
-            _active="false",
-            _enabled="true",
-            uni_a=uni,
-            uni_z=uni,
-        )
-        evc2.name = "mocked_name"
-        evc2.handle_link_down.return_value = False
-        self.napp.circuits = {"1": evc1, "2": evc2}
-
-        event = KytosEvent(name="e1", content={
-            "evc_id": "3",
-            "link": MagicMock(),
-        })
-        self.napp.handle_evc_affected_by_link_down(event)
-        emit_event_mock.assert_not_called()
-        event.content["evc_id"] = "1"
-        self.napp.handle_evc_affected_by_link_down(event)
-        emit_event_mock.assert_called_with(
-            self.napp.controller, "redeployed_link_down", content={
-                "id": "1",
-                "evc_id": "1",
-                "name": "name_mocked",
-                "metadata": "data_mocked",
-                "active": "true",
-                "enabled": "false",
-                "uni_a": uni.as_dict(),
-                "uni_z": uni.as_dict(),
-            }
-        )
-
-        event.content["evc_id"] = "2"
-        self.napp.handle_evc_affected_by_link_down(event)
-        emit_event_mock.assert_called_with(
-            self.napp.controller, "error_redeploy_link_down", content={
-                "evc_id": "2",
-                "id": "2",
-                "name": "mocked_name",
-                "metadata": "mocked_data",
-                "active": "false",
-                "enabled": "true",
-                "uni_a": uni.as_dict(),
-                "uni_z": uni.as_dict(),
-            }
-        )
-
     async def test_add_metadata(self):
         """Test method to add metadata"""
         self.napp.controller.loop = asyncio.get_running_loop()
