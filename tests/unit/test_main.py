@@ -1463,6 +1463,7 @@ class TestMain:
         response = await self.api_client.get(url)
         assert response.status_code == 404
 
+    @patch('httpx.request')
     @patch('httpx.post')
     @patch("napps.kytos.mef_eline.main.Main._use_uni_tags")
     @patch('napps.kytos.mef_eline.scheduler.Scheduler.add')
@@ -1486,7 +1487,8 @@ class TestMain:
         _mongo_controller_update_mock,
         _sched_add_mock,
         mock_use_uni_tags,
-        httpx_mock
+        httpx_mock,
+        httpx_request_mock,
     ):
         """Test update a circuit circuit."""
         self.napp.controller.loop = asyncio.get_running_loop()
@@ -1501,7 +1503,9 @@ class TestMain:
 
         response = MagicMock()
         response.status_code = 201
+        response.is_server_error = False
         httpx_mock.return_value = response
+        httpx_request_mock.return_value = response
 
         payloads = [
             {
