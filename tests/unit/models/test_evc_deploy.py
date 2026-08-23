@@ -1,5 +1,5 @@
 """Method to thest EVCDeploy class."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import sys
 from unittest.mock import MagicMock, Mock, call, patch
 import operator
@@ -439,6 +439,7 @@ class TestEVC():
         }
         return EVC(**attributes)
 
+    @patch("httpx.request")
     @patch("httpx.post")
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
     @patch("napps.kytos.mef_eline.models.evc.log")
@@ -459,12 +460,14 @@ class TestEVC():
             log_mock,
             _,
             httpx_mock,
+            httpx_request_mock,
         ) = args
 
         response = MagicMock()
         response.status_code = 201
         response.is_server_error = False
         httpx_mock.return_value = response
+        httpx_request_mock.return_value = response
 
         should_deploy_mock.return_value = True
         evc = self.create_evc_inter_switch()
@@ -2315,7 +2318,7 @@ class TestEVC():
         assert evc.intra_evc_needs_redeployment() is True
         evc.last_deployed_at = datetime.now(tzone)
         assert evc.intra_evc_needs_redeployment() is False
-        evc.last_removed_at = datetime.now(tzone)
+        evc.last_removed_at = evc.last_deployed_at + timedelta(seconds=1)
         assert evc.intra_evc_needs_redeployment() is True
 
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
