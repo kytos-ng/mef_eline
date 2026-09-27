@@ -31,7 +31,8 @@ from napps.kytos.mef_eline.utils import (_does_uni_affect_evc,
                                          compare_uni_out_trace, emit_event,
                                          make_uni_list, map_dl_vlan,
                                          map_evc_event_content,
-                                         merge_flow_dicts)
+                                         merge_flow_dicts,
+                                         send_flow_mods_http)
 
 from .path import DynamicPathManager, Path
 
@@ -631,18 +632,12 @@ class EVCDeploy(EVCBase):
         if any((self.is_intra_switch(), not self.current_path)):
             return False
         if self.has_dual_static_paths():
-            # Dual static EVCs swap between their two configured paths and do
-            # not use failover_path - except as a last-resort dynamic escape
-            # when both configured paths are down and a dynamic backup exists
-            # (EP041).
             return bool(
-                self.dynamic_backup_path and not self.get_reactivation_path()
+                self.dynamic_backup_path
+                and not self.get_reactivation_path()
+                and (self.is_using_primary_path()
+                     or self.is_using_backup_path())
             )
-        # A single static + dynamic EVC pre-installs a dynamic failover only to
-        # protect its primary. While forwarding on the dynamic (primary down)
-        # it does NOT arm a second dynamic: the dynamic is a bridge back to
-        # primary, and a failure there is handled by the last-resort cold
-        # dynamic escape, keeping states simple and swaps leak-free (EP041).
         if (self.has_single_static_dynamic_path()
                 and not self.is_using_primary_path()):
             return False
@@ -698,13 +693,32 @@ class EVCDeploy(EVCBase):
         ))
 
     def get_static_standby_path(self):
-        """The configured path kept installed as standby: backup when on
-        primary, else primary."""
-        if self.is_using_primary_path():
-            return self.backup_path
-        if self.primary_path:
-            return self.primary_path
-        return Path([])
+        """The configured path not carrying traffic, kept installed as the
+        standby.
+
+        An UP one is preferred, which only matters while forwarding on an
+        escape, where both configured paths qualify. It is returned whatever
+        its status: callers check that themselves, and handle_link_down needs
+        the down one to notice a standby went away (EP041).
+        """
+        candidates = [path for path in (self.primary_path, self.backup_path)
+                      if path and path != self.current_path]
+        for path in candidates:
+            if path.status == EntityStatus.UP:
+                return path
+        return candidates[0] if candidates else Path([])
+
+    def needs_static_standby(self) -> bool:
+        """True when a dual static EVC's standby is UP but not installed,
+        so the consistency routine asks for it (EP041)."""
+        if not self.has_dual_static_paths():
+            return False
+        standby = self.get_static_standby_path()
+        return bool(
+            standby
+            and standby.status == EntityStatus.UP
+            and not standby.is_deployed()
+        )
 
     def get_reactivation_path(self):
         """Return the configured path to resume forwarding on after all
@@ -823,7 +837,7 @@ class EVCDeploy(EVCBase):
         deploy a dynamic path.
         """
         # TODO: Remove flows from current (cookies)
-        if self.is_using_backup_path():
+        if self.is_using_backup_path() and self.is_active():
             # TODO: Log to say that cannot move backup to backup
             return True
 
@@ -846,7 +860,7 @@ class EVCDeploy(EVCBase):
         deploy this primary_path.
         """
         # TODO: Remove flows from current (cookies)
-        if self.is_using_primary_path():
+        if self.is_using_primary_path() and self.is_active():
             # TODO: Log to say that cannot move primary to primary
             return True
 
@@ -1174,6 +1188,7 @@ class EVCDeploy(EVCBase):
         7. Update links caches(primary, current, backup)
 
         """
+        self.remove_static_standby_flows()
         self.remove_current_flows(sync=False)
         self.remove_failover_flows(sync=False)
         use_path = path or Path([])
@@ -1354,7 +1369,29 @@ class EVCDeploy(EVCBase):
             return {}
         return self._prepare_uni_flows(standby, skip_out=True)
 
-    def deploy_static_standby(self) -> bool:
+    def install_uni_ingress(self) -> None:
+        """Install only the UNI ingress flows of the current path.
+
+        The ingress match is EVC scoped (UNI port and customer VLAN), so this
+        overwrites in place and is safe to repeat. A parked EVC has had its
+        ingress removed while the rest of its path stayed installed, so this
+        is what resumes its forwarding. Advertised with ``failover_deployed``
+        so telemetry_int mirrors them (EP041).
+        """
+        ingress = self._prepare_uni_flows(self.current_path, skip_out=True)
+        if not ingress:
+            return
+        send_flow_mods_http(ingress, "install")
+        emit_event(self._controller, "static.ingress_installed", content={
+            self.id: map_evc_event_content(
+                self,
+                flows=deepcopy(ingress),
+                removed_flows={},
+                current_path=self.current_path.as_dict(),
+            )
+        })
+
+    def deploy_static_standby(self, path=None) -> bool:
         """Install the standby static path egress + NNI flows (EP041).
 
         A dual static EVC keeps both configured paths installed at all
@@ -1365,8 +1402,12 @@ class EVCDeploy(EVCBase):
         ``s_vlan`` means the egress/NNI are already in the datapath. The newly
         installed flows are advertised with ``failover_deployed`` so
         telemetry_int mirrors them.
+
+        ``path`` installs a caller chosen target instead of the default
+        standby, for when the caller already knows which configured path it
+        needs installed (EP041).
         """
-        standby = self.get_static_standby_path()
+        standby = self.get_static_standby_path() if path is None else path
         if not standby or standby.status != EntityStatus.UP:
             return False
         if standby.is_deployed():
@@ -1387,14 +1428,16 @@ class EVCDeploy(EVCBase):
             return False
         self.sync()
         if out_new_flows:
-            emit_event(self._controller, "failover_deployed", content={
-                self.id: map_evc_event_content(
-                    self,
-                    flows=deepcopy(out_new_flows),
-                    removed_flows={},
-                    current_path=self.current_path.as_dict(),
-                )
-            })
+            emit_event(
+                self._controller, "static.standby_installed", content={
+                    self.id: map_evc_event_content(
+                        self,
+                        flows=deepcopy(out_new_flows),
+                        removed_flows={},
+                        current_path=self.current_path.as_dict(),
+                    )
+                }
+            )
         log.info(f"Standby static path for {self} was deployed.")
         return True
 
@@ -2068,19 +2111,13 @@ class LinkProtection(EVCDeploy):
         """
         condition_pairs = [
             (
-                lambda me: me.is_using_primary_path(),
+                lambda me: me.is_using_primary_path() and me.is_active(),
                 lambda _: (True, 'nothing')
             ),
             (
                 lambda me: me.is_intra_switch(),
                 lambda _: (True, 'nothing')
             ),
-            # Network convergence must never break-before-make a static EVC
-            # that already has a path provisioned: deploy_to_primary_path
-            # would remove the live current/failover flows first. Only install
-            # the primary when nothing is provisioned yet (empty current_path);
-            # a live EVC reverts to primary via the napp ingress swap once the
-            # primary is fully UP (EP041).
             (
                 lambda me: (me.primary_path.is_affected_by_link(link)
                             and not me.current_path),
@@ -2109,9 +2146,7 @@ class LinkProtection(EVCDeploy):
                 lambda _: (True, 'nothing')
             ),
             # In this case, probably the circuit is not being used and
-            # we can move to backup. Same invariant as the primary row above:
-            # only install when nothing is provisioned, never break-before-make
-            # a live static path on convergence (EP041).
+            # we can move to backup.
             (
                 lambda me: (me.backup_path.is_affected_by_link(link)
                             and not me.current_path),
@@ -2186,6 +2221,9 @@ class LinkProtection(EVCDeploy):
             for interface in (self.uni_a.interface, self.uni_z.interface)
         }
         try:
+            # only a static path can be left installed without its ingress
+            if self.is_using_primary_path() or self.is_using_backup_path():
+                self.install_uni_ingress()
             self.try_to_activate()
             log.info(
                 f"Activating {self}. Interfaces: "
@@ -2198,6 +2236,9 @@ class LinkProtection(EVCDeploy):
             # On this ctx, no ActivationError isn't expected since the
             # activation pre-requisites states were checked, so handled as err
             log.error(f"ActivationError: {str(exc)} when handling {interface}")
+        except FlowModException as exc:
+            # stay inactive so the consistency routine still sees it
+            log.error(f"Fail to install {self} ingress for {interface}: {exc}")
 
     def handle_interface_link_down(self, interface):
         """

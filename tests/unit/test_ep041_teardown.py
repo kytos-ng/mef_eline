@@ -250,6 +250,36 @@ class TestEP041Teardown:
         self.napp.execute_dyn_escape.assert_called_once_with([evc])
         self.napp.execute_undeploy.assert_not_called()
 
+    def test_dual_dynamic_on_escape_swaps_to_recovered_backup(self):
+        """On an escape with a down primary but a recovered backup, the EVC
+        swaps onto that kept-installed backup instead of hunting another
+        dynamic or parking (EP041)."""
+        link = MagicMock()
+        standby_up = MagicMock(status=EntityStatus.UP)
+        standby_up.is_affected_by_link.return_value = False
+        evc = MagicMock(id="1")
+        evc.has_dual_static_paths.return_value = True
+        evc.has_single_static_path.return_value = False
+        evc.dynamic_backup_path = True          # dual + dynamic
+        evc.is_affected_by_link.return_value = True   # the escape went down
+        evc.is_active.return_value = True
+        evc.get_static_standby_path.return_value = standby_up
+        self.napp.get_evcs_by_svc_level = MagicMock(return_value=[evc])
+        self.napp.execute_swap_to_standby = MagicMock(
+            return_value=([evc], [])
+        )
+        self.napp.execute_dyn_escape = MagicMock(return_value=([], []))
+        self.napp.execute_remove_ingress = MagicMock(return_value=([], []))
+        self.napp.execute_undeploy = MagicMock(return_value=([], []))
+        self.napp.mongo_controller = MagicMock()
+
+        self.napp.handle_link_down(KytosEvent(content={"link": link}))
+
+        self.napp.execute_swap_to_standby.assert_called_once_with([evc])
+        self.napp.execute_dyn_escape.assert_not_called()
+        self.napp.execute_remove_ingress.assert_not_called()
+        self.napp.execute_undeploy.assert_not_called()
+
     def test_dual_dynamic_link_down_tries_dyn_escape(self):
         """dual + dynamic on a double failure routes to the dynamic escape
         (execute_dyn_escape), keeping both statics installed, instead
@@ -447,7 +477,9 @@ class TestEP041Teardown:
 
         self.napp.execute_swap_to_standby([evc])
 
-        evc.deploy_static_standby.assert_called_once_with()
+        evc.deploy_static_standby.assert_called_once_with(
+            evc.get_static_standby_path.return_value
+        )
 
     @patch("napps.kytos.mef_eline.main.emit_event")
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")

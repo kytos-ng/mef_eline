@@ -10,6 +10,7 @@ Added
 =====
 - Added new EVC field called ``last_deployed_at`` to help identify if EVC was ever deployed and install flows.
 - Added new EVC field called ``last_removed_at`` to help identify if EVC did ever remove flows.
+- Implemented EP041 fast convergence for static EVCs
 
 Fixed
 =====

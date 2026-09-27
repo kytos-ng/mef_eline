@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from kytos.core.common import EntityStatus
 from kytos.lib.helpers import get_controller_mock
+from napps.kytos.mef_eline.exceptions import FlowModException
 from napps.kytos.mef_eline.models import EVC, Path  # NOQA pycodestyle
 from napps.kytos.mef_eline.tests.helpers import (
     get_link_mocked,
@@ -333,19 +334,29 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
     def test_get_static_standby_path(self):
         """Test get_static_standby_path (EP041)."""
         evc = self.evc
-        primary, backup = Path([MagicMock()]), Path([MagicMock()])
+        primary = MagicMock(status=EntityStatus.UP)
+        backup = MagicMock(status=EntityStatus.UP)
         evc.primary_path, evc.backup_path = primary, backup
 
-        # dual static on primary -> backup is the standby
-        evc.is_using_primary_path = MagicMock(return_value=True)
+        # dual static on primary -> backup is the standby, and the reverse
+        evc.current_path = primary
         assert evc.get_static_standby_path() is backup
-
-        # dual static on backup, or single static + dynamic on a dynamic
-        # path -> primary
-        evc.is_using_primary_path = MagicMock(return_value=False)
+        evc.current_path = backup
         assert evc.get_static_standby_path() is primary
 
-        # no primary configured -> no standby
+        # on an escape both configured paths qualify: primary while it is UP
+        evc.current_path = MagicMock(status=EntityStatus.UP)
+        assert evc.get_static_standby_path() is primary
+
+        # a down primary leaves the UP backup as the standby to swap onto
+        primary.status = EntityStatus.DOWN
+        assert evc.get_static_standby_path() is backup
+
+        # a down standby is still returned, so handle_link_down sees it
+        evc.current_path = backup
+        assert evc.get_static_standby_path() is primary
+
+        # nothing configured other than the path in use -> no standby
         evc.primary_path = Path([])
         assert not evc.get_static_standby_path()
 
@@ -461,7 +472,7 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         self,
         deploy_to_mocked,
     ):
-        """Test if handle link up do nothing when is using primary path."""
+        """A live EVC on primary is untouched; a parked one is redeployed."""
         deploy_to_mocked.return_value = True
         primary_path = [
             get_link_mocked(
@@ -504,10 +515,18 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
 
         evc = EVC(**attributes)
         evc.current_path = evc.primary_path
+        evc.is_active = MagicMock(return_value=True)
         deploy_to_mocked.reset_mock()
         current_handle_link_up = evc.handle_link_up(backup_path[0])
         assert deploy_to_mocked.call_count == 0
         assert current_handle_link_up
+
+        # parked on primary: current_path is still set but nothing is
+        # forwarding, so the ladder no longer skips it (EP041)
+        evc.is_active = MagicMock(return_value=False)
+        evc.deploy_to_path = MagicMock(return_value=True)
+        assert evc.handle_link_up(backup_path[0])
+        assert evc.deploy_to_path.call_count == 1
 
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.deploy")
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.deploy_to_path")
@@ -737,10 +756,12 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         assert self.evc.deploy_to_path.call_count == 1
 
         self.evc.is_using_primary_path = return_true_mock
+        self.evc.is_active = return_true_mock
         assert self.evc.handle_link_up(MagicMock())
         assert self.evc.deploy_to_path.call_count == 1
 
         self.evc.is_using_primary_path = return_false_mock
+        self.evc.is_active = return_false_mock
         self.evc.is_intra_switch = return_true_mock
         assert self.evc.handle_link_up(MagicMock())
         assert self.evc.deploy_to_path.call_count == 1
@@ -997,6 +1018,43 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         }
         expected = (False, interfaces)
         assert actual == expected
+
+    @patch("napps.kytos.mef_eline.models.evc._does_uni_affect_evc")
+    @patch("napps.kytos.mef_eline.models.evc.emit_event")
+    async def test_handle_interface_link_up_installs_ingress(
+        self, _emit_mock, affect_mock
+    ):
+        """A UNI coming back reinstalls the ingress before activating, so a
+        parked EVC is not marked active without it (EP041)."""
+        affect_mock.return_value = True
+        self.evc.try_to_handle_uni_as_link_up = MagicMock(return_value=False)
+        self.evc.install_uni_ingress = MagicMock()
+        self.evc.try_to_activate = MagicMock()
+        self.evc.sync = MagicMock()
+
+        # not on a configured static: nothing can be missing, just activate
+        self.evc.is_using_primary_path = MagicMock(return_value=False)
+        self.evc.is_using_backup_path = MagicMock(return_value=False)
+        self.evc.handle_interface_link_up(MagicMock())
+        self.evc.install_uni_ingress.assert_not_called()
+        self.evc.try_to_activate.assert_called_once()
+
+        self.evc.is_using_primary_path = MagicMock(return_value=True)
+        self.evc.try_to_activate = MagicMock()
+        self.evc.handle_interface_link_up(MagicMock())
+
+        self.evc.install_uni_ingress.assert_called_once()
+        self.evc.try_to_activate.assert_called_once()
+
+        # a failed install leaves it inactive for the consistency routine
+        self.evc.install_uni_ingress = MagicMock(
+            side_effect=FlowModException("err")
+        )
+        self.evc.try_to_activate = MagicMock()
+
+        self.evc.handle_interface_link_up(MagicMock())
+
+        self.evc.try_to_activate.assert_not_called()
 
     async def test_handle_interface_link(self, monkeypatch):
         """

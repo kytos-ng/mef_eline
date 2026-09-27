@@ -185,6 +185,38 @@ class TestMain:
             content=evc3
         )
 
+    @patch("napps.kytos.mef_eline.main.map_evc_event_content")
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.check_list_traces")
+    def test_execute_consistency_installs_missing_standby(
+        self, mock_check_list_traces, mock_emit_event, mock_map_evc
+    ):
+        """An active dual static EVC whose standby was never installed is
+        asked for one, even though it is not failover eligible (EP041)."""
+        mock_map_evc.side_effect = lambda x: x
+        mock_check_list_traces.return_value = {}
+
+        evc = MagicMock(id=1, service_level=0, creation_time=1)
+        evc.is_enabled.return_value = True
+        evc.is_active.return_value = True
+        evc.lock.locked.return_value = False
+        evc.is_eligible_for_failover_path.return_value = False
+        evc.failover_path = Path([])
+        evc.needs_static_standby.return_value = True
+        self.napp.circuits = {"1": evc}
+
+        self.napp.execute_consistency()
+
+        mock_emit_event.assert_called_once_with(
+            self.napp.controller, "need_failover", content=evc
+        )
+
+        # standby already installed -> nothing asked for
+        evc.needs_static_standby.return_value = False
+        mock_emit_event.reset_mock()
+        self.napp.execute_consistency()
+        mock_emit_event.assert_not_called()
+
     @patch('napps.kytos.mef_eline.main.settings')
     @patch('napps.kytos.mef_eline.main.Main._load_evc')
     @patch("napps.kytos.mef_eline.controllers.ELineController.upsert_evc")
@@ -1772,8 +1804,8 @@ class TestMain:
             self.napp._link_from_dict(link_dict, "current_path")
 
     def test_link_from_dict_vlan_metadata(self):
-        """Test that link_from_dict only accepts vlans for current_path
-         and failover_path."""
+        """s_vlan is restored for every path attribute so is_deployed()
+        survives a restart (EP041)."""
         intf = MagicMock(id="01:1")
         self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
         link_dict = {
@@ -1782,14 +1814,10 @@ class TestMain:
             'endpoint_b': {'id': '00:00:00:00:00:00:00:05:2'},
             'metadata': {'s_vlan': {'tag_type': 'vlan', 'value': 1}}
         }
-        link = self.napp._link_from_dict(link_dict, "current_path")
-        assert link.metadata.get('s_vlan', None)
-
-        link = self.napp._link_from_dict(link_dict, "failover_path")
-        assert link.metadata.get('s_vlan', None)
-
-        link = self.napp._link_from_dict(link_dict, "primary_path")
-        assert link.metadata.get('s_vlan', None) is None
+        for attribute in ("current_path", "failover_path",
+                          "primary_path", "backup_path"):
+            link = self.napp._link_from_dict(link_dict, attribute)
+            assert link.metadata.get('s_vlan', None), attribute
 
     def test_uni_from_dict_non_existent_intf(self):
         """Test _link_from_dict non existent intf."""
@@ -2140,7 +2168,9 @@ class TestMain:
         event = KytosEvent(name="test", content={"link": link})
         self.napp.handle_link_up(event)
 
-        evc.deploy_static_standby.assert_called_once_with()
+        evc.deploy_static_standby.assert_called_once_with(
+            evc.get_reactivation_path.return_value
+        )
         self.napp.execute_reactivate_static.assert_called_once_with([evc])
         self.napp.execute_undeploy.assert_not_called()
         evc.handle_link_up.assert_not_called()
@@ -2164,7 +2194,9 @@ class TestMain:
         event = KytosEvent(name="test", content={"link": link})
         self.napp.handle_link_up(event)
 
-        evc.deploy_static_standby.assert_called_once_with()
+        evc.deploy_static_standby.assert_called_once_with(
+            evc.get_reactivation_path.return_value
+        )
         self.napp.execute_reactivate_static.assert_not_called()
         evc.remove_static_standby_flows.assert_called_once_with()
         self.napp.execute_undeploy.assert_called_once_with([evc])
@@ -2638,7 +2670,7 @@ class TestMain:
         evc1.activate.assert_not_called()
         emit_main_mock.assert_called_with(
             self.napp.controller,
-            "failover_link_down",
+            "static.ingress_swapped",
             content={"1": "StandbyEvent1"}
         )
 
@@ -2704,10 +2736,10 @@ class TestMain:
         self.napp.execute_clear_failover.assert_not_called()
 
         send_flow_mods_mock.assert_called_with({"1": ["Flow1"]}, "install")
-        # swap reuses failover_deployed so telemetry_int mirrors INT flows
+        # a revert is a link up driven ingress swap
         emit_main_mock.assert_called_with(
             self.napp.controller,
-            "failover_deployed",
+            "static.ingress_swapped",
             content={"1": "FailoverEvent1"}
         )
 
@@ -2738,12 +2770,14 @@ class TestMain:
         assert evc1.current_path == backup
         emit_main_mock.assert_not_called()
 
+    @patch("napps.kytos.mef_eline.main.emit_event")
     @patch("napps.kytos.mef_eline.main.prepare_delete_flow")
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
     def test_execute_remove_ingress(
         self,
         send_flow_mods_mock: MagicMock,
         prepare_delete_mock: MagicMock,
+        emit_main_mock: MagicMock,
     ):
         """Ingress-only removal keeps egress/NNI and deactivates (EP041)."""
         prepare_delete_mock.side_effect = \
@@ -2769,6 +2803,11 @@ class TestMain:
         evc1.deactivate.assert_called_once_with()
         evc1.remove_static_standby_flows.assert_not_called()
         evc2.deactivate.assert_not_called()
+        # the removal is announced so telemetry_int drops its INT ingress
+        assert emit_main_mock.call_args[0][1] == "static.ingress_removed"
+        content = emit_main_mock.call_args[1]["content"]
+        assert list(content) == ["1"]
+        assert content["1"]["removed_flows"] == {"1": ["DelIngress1"]}
 
     @patch("napps.kytos.mef_eline.main.prepare_delete_flow")
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
@@ -2823,7 +2862,7 @@ class TestMain:
         evc1.activate.assert_called_once_with()
         emit_main_mock.assert_called_with(
             self.napp.controller,
-            "failover_deployed",
+            "static.ingress_installed",
             content={"1": "Event1"}
         )
 

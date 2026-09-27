@@ -72,6 +72,9 @@ Subscribed
 Published
 ---------
 
+The ``failover_*`` and ``static.*`` events carry the FlowMods that changed, in
+``flows`` and ``removed_flows``, for consumers that mirror them.
+
 kytos/mef_eline.redeployed_link_down
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -292,6 +295,96 @@ Event published when an EVC failover related old path gets removed (cleaned up).
      "current_path": evc.current_path.as_dict(),
    }
   }
+
+kytos/mef_eline.static.standby_installed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Event published when the egress and NNI flows of a static standby path get installed, so a link event only has to move the UNI ingress. ``flows`` are the new deployed flows.
+
+.. code-block:: python3
+
+  {
+   evc.id: {
+     "id", evc.id,
+     "evc_id": evc.id,
+     "name": evc.name,
+     "metadata": evc.metadata,
+     "active": evc._active,
+     "enabled": evc._enabled,
+     "uni_a": evc.uni_a.as_dict(),
+     "uni_z": evc.uni_z.as_dict(),
+     "flows": [],
+     "removed_flows": [],
+     "current_path": evc.current_path.as_dict(),
+   }
+  }
+
+kytos/mef_eline.static.ingress_installed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Event published when the UNI ingress flows get installed and the EVC resumes forwarding on a configured path whose egress and NNI were kept installed. ``flows`` are the new deployed flows.
+
+.. code-block:: python3
+
+  {
+   evc.id: {
+     "id", evc.id,
+     "evc_id": evc.id,
+     "name": evc.name,
+     "metadata": evc.metadata,
+     "active": evc._active,
+     "enabled": evc._enabled,
+     "uni_a": evc.uni_a.as_dict(),
+     "uni_z": evc.uni_z.as_dict(),
+     "flows": [],
+     "removed_flows": [],
+     "current_path": evc.current_path.as_dict(),
+   }
+  }
+
+kytos/mef_eline.static.ingress_removed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Event published when only the UNI ingress flows get removed, so the EVC stops forwarding while its configured paths stay installed. ``removed_flows`` are the removed flows.
+
+.. code-block:: python3
+
+  {
+   evc.id: {
+     "id", evc.id,
+     "evc_id": evc.id,
+     "name": evc.name,
+     "metadata": evc.metadata,
+     "active": evc._active,
+     "enabled": evc._enabled,
+     "uni_a": evc.uni_a.as_dict(),
+     "uni_z": evc.uni_z.as_dict(),
+     "removed_flows": [],
+     "current_path": evc.current_path.as_dict(),
+   }
+  }
+
+kytos/mef_eline.static.ingress_swapped
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Event published when the UNI ingress moves onto another configured path, both of which stay installed. ``flows`` are the new deployed flows.
+
+.. code-block:: python3
+
+  {
+   evc.id: {
+     "id", evc.id,
+     "evc_id": evc.id,
+     "name": evc.name,
+     "metadata": evc.metadata,
+     "active": evc._active,
+     "enabled": evc._enabled,
+     "uni_a": evc.uni_a.as_dict(),
+     "uni_z": evc.uni_z.as_dict(),
+     "flows": [],
+   }
+  }
+
 
 
 .. TAGs

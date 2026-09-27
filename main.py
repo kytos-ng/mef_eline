@@ -155,7 +155,8 @@ class Main(KytosNApp):
                 and circuit.are_unis_active()
                 # if a inter-switch EVC does not have current_path, it does not
                 # make sense to run sdntrace on it
-                and (circuit.is_intra_switch() or circuit.current_path)
+                and (circuit.is_intra_switch()
+                     or circuit.current_path.is_deployed())
                 ):
             return True
         return False
@@ -166,10 +167,10 @@ class Main(KytosNApp):
         for circuit in self.get_evcs_by_svc_level(enable_filter=False):
             if self.should_be_checked(circuit):
                 circuits_to_check.append(circuit)
-            if (
-                circuit.is_active()
-                and not circuit.failover_path
-                and circuit.is_eligible_for_failover_path()
+            if circuit.is_active() and (
+                (not circuit.failover_path
+                 and circuit.is_eligible_for_failover_path())
+                or circuit.needs_static_standby()
             ):
                 emit_event(
                     self.controller,
@@ -615,6 +616,7 @@ class Main(KytosNApp):
         deployed = False
         with evc.lock:
             if evc.is_enabled():
+                evc.remove_static_standby_flows()
                 path_dict = evc.remove_current_flows(
                     sync=False,
                     return_path=try_avoid_same_s_vlan == "true"
@@ -813,8 +815,7 @@ class Main(KytosNApp):
         with ExitStack() as exit_stack:
             exit_stack.enter_context(self.multi_evc_lock)
             revert_to_primary, handle_link_up_ladder = [], []
-            reactivate_static, install_standby = [], []
-            dyn_recovery = []
+            reactivate_static, install_standby, dyn_recovery = [], [], []
             evcs_to_update: dict[str, EVC] = {}
 
             for evc in self.get_evcs_by_svc_level():
@@ -834,10 +835,9 @@ class Main(KytosNApp):
                         handle_link_up_ladder.append(evc)
                     exit_stack.push(sub_stack.pop_all())
 
-            # Install a never-installed target (pre-EP041) first
             failed = []
             for evc in install_standby:
-                if evc.deploy_static_standby():
+                if evc.deploy_static_standby(evc.get_reactivation_path()):
                     reactivate_static.append(evc)
                 else:
                     failed.append(evc)
@@ -903,16 +903,13 @@ class Main(KytosNApp):
         """Revert dual static / single static + dynamic EVCs onto primary_path
         with a UNI-ingress swap. Dual static keeps its old backup as standby;
         a single static + dynamic EVC leaves its old dynamic path in
-        failover_path for the caller to refresh. Reuses failover_deployed for
-        telemetry_int events."""
+        failover_path for the caller to refresh."""
         stale_dyn: dict[str, Path] = {}
         for evc in evcs:
             if evc.has_single_static_dynamic_path():
                 stale_dyn[evc.id] = evc.current_path
 
-        reverted, failed = self.execute_swap_to_standby(
-            evcs, event="failover_deployed"
-        )
+        reverted, failed = self.execute_swap_to_standby(evcs)
         for evc in reverted:
             if evc.id in stale_dyn:
                 evc.failover_path = stale_dyn[evc.id]
@@ -965,7 +962,7 @@ class Main(KytosNApp):
                 evc.current_path = targets[evc.id]
                 evc.activate()
             emit_event(
-                self.controller, "failover_deployed",
+                self.controller, "static.ingress_installed",
                 content=deepcopy(event_contents)
             )
             return done, not_done
@@ -1148,7 +1145,6 @@ class Main(KytosNApp):
     def execute_swap_to_standby(
         self,
         evcs: list[EVC],
-        event: str = "failover_link_down",
     ) -> tuple[list[EVC], list[EVC]]:
         """Swap dual static EVCs onto their standby static path (EP041).
 
@@ -1165,7 +1161,7 @@ class Main(KytosNApp):
 
         for evc in evcs:
             standby = evc.get_static_standby_path()
-            if not evc.deploy_static_standby():
+            if not evc.deploy_static_standby(standby):
                 not_swapped_evcs.append(evc)
                 continue
 
@@ -1193,15 +1189,13 @@ class Main(KytosNApp):
                 old_current = evc.current_path
                 evc.current_path = targets[evc.id]
                 # If it was forwarding on a throwaway dynamic escape (a dual
-                # static + dynamic EVC that recovered onto a dynamic path in a
-                # double failure), the configured backup is the standby now, so
-                # tear the escape down or its flows and VLANs would leak.
+                # static + dynamic EVC that recovered onto a dynamic path)
                 if (old_current and evc.backup_path
                         and old_current != evc.primary_path
                         and old_current != evc.backup_path):
                     evc.remove_path_flows(old_current)
             emit_event(
-                self.controller, event,
+                self.controller, "static.ingress_swapped",
                 content=deepcopy(event_contents)
             )
             return swapped_evcs, not_swapped_evcs
@@ -1296,7 +1290,7 @@ class Main(KytosNApp):
         link_up resumes forwarding with an ingress install instead of a full
         redeploy. The EVC is deactivated but current_path is left set.
         """
-        delete_flows = {}
+        delete_flows, event_contents = {}, {}
         removed_evcs = list[EVC]()
         not_removed_evcs = list[EVC]()
 
@@ -1304,6 +1298,11 @@ class Main(KytosNApp):
             delete_flow = self.prepare_remove_ingress_flow(evc)
             if delete_flow:
                 delete_flows = merge_flow_dicts(delete_flows, delete_flow)
+                event_contents[evc.id] = map_evc_event_content(
+                    evc,
+                    current_path=evc.current_path.as_dict(),
+                    removed_flows=deepcopy(delete_flow),
+                )
                 removed_evcs.append(evc)
             else:
                 not_removed_evcs.append(evc)
@@ -1312,6 +1311,10 @@ class Main(KytosNApp):
             send_flow_mods_http(delete_flows, 'delete')
             for evc in removed_evcs:
                 evc.deactivate()
+            emit_event(
+                self.controller, "static.ingress_removed",
+                content=deepcopy(event_contents)
+            )
             return removed_evcs, not_removed_evcs
         except FlowModException as exc:
             log.error(f"Failed to remove ingress flows for {evcs}: {exc}")
@@ -1379,11 +1382,18 @@ class Main(KytosNApp):
             evc.failover_path = Path([])
             evc.current_path = primary
             try:
-                send_flow_mods_http(
-                    prepare_delete_flow(
-                        evc._prepare_uni_flows(primary, skip_out=True)
-                    ),
-                    "delete",
+                del_flows = prepare_delete_flow(
+                    evc._prepare_uni_flows(primary, skip_out=True)
+                )
+                send_flow_mods_http(del_flows, "delete")
+                emit_event(
+                    self.controller, "static.ingress_removed", content={
+                        evc.id: map_evc_event_content(
+                            evc,
+                            current_path=evc.current_path.as_dict(),
+                            removed_flows=deepcopy(del_flows),
+                        )
+                    }
                 )
             # pylint: disable=broad-except
             except Exception:
@@ -1526,12 +1536,8 @@ class Main(KytosNApp):
 
                     exit_stack.push(sub_stack.pop_all())
 
-            # Sweep the kept standby before undeploy so it isn't orphaned
-            # (a single static + dynamic EVC keeps primary here) (EP041).
             for evc in undeploy:
                 evc.remove_static_standby_flows()
-
-            # Swap dual static EVCs onto their standby
 
             if swap_to_standby:
                 success, failure = self.execute_swap_to_standby(
@@ -1539,12 +1545,9 @@ class Main(KytosNApp):
                 )
 
                 evcs_to_update.update((evc.id, evc) for evc in success)
-
-                # A failed swap leaves the standby still installed; remove it
-                # before undeploy so its flows/VLANs are not orphaned
+                # A failed swap leaves the standby still installed
                 for evc in failure:
                     evc.remove_static_standby_flows()
-
                 undeploy.extend(failure)
 
             # Swap from current path to failover path
@@ -1555,13 +1558,7 @@ class Main(KytosNApp):
                 )
 
                 for evc in success:
-                    # After the swap, failover_path holds the old current path.
-                    # For a single static + dynamic EVC that was on primary,
-                    # that parked path IS the static primary: detach it (kept
-                    # installed, tracked by primary_path). If it was instead a
-                    # throwaway dynamic (the EVC was already on its dynamic
-                    # failover and a second one had been computed), it must be
-                    # cleared or its flows/VLANs leak.
+                    # After the swap, failover_path holds the old current path
                     if (evc.has_single_static_dynamic_path()
                             and evc.failover_path == evc.primary_path):
                         evc.failover_path = Path([])
@@ -1569,16 +1566,13 @@ class Main(KytosNApp):
                         clear_failover.append(evc)
 
                 evcs_to_update.update((evc.id, evc) for evc in success)
-
                 undeploy.extend(failure)
 
             # Clear out failover path
 
             if clear_failover:
                 success, failure = self.execute_clear_failover(clear_failover)
-
                 evcs_to_update.update((evc.id, evc) for evc in success)
-
                 undeploy.extend(failure)
 
             # Drop only the ingress of dual static EVCs with no usable path
@@ -1588,33 +1582,24 @@ class Main(KytosNApp):
 
                 evcs_to_update.update((evc.id, evc) for evc in success)
 
-                # A failed ingress removal falls back to a full teardown;
-                # remove the kept standby flows first so they are not
-                # orphaned once execute_undeploy clears current_path
+                # A failed ingress removal falls back to a full teardown
                 for evc in failure:
                     evc.remove_static_standby_flows()
 
                 undeploy.extend(failure)
 
-            # All statics down + dynamic backup: escape onto a fresh dynamic
-            # keeping the statics, else drop ingress and deactivate (EP041)
-
             if dyn_escape:
                 success, failure = self.execute_dyn_escape(
                     dyn_escape
                 )
-
                 evcs_to_update.update((evc.id, evc) for evc in success)
-
                 undeploy.extend(failure)
 
             # Undeploy the evc, schedule a redeploy
 
             if undeploy:
                 success, failure = self.execute_undeploy(undeploy)
-
                 evcs_to_update.update((evc.id, evc) for evc in success)
-
                 if failure:
                     log.error(f"Failed to handle_link_down for {failure}")
 
@@ -1688,7 +1673,12 @@ class Main(KytosNApp):
                    timeout=1)
 
     def _load_evc(self, circuit_dict):
-        """Load one EVC from mongodb to memory."""
+        """Load one EVC from mongodb to memory.
+
+        A live deploy leaves current_path aliasing the static Path object it
+        was deployed as, so freeing one frees the other's s_vlan. Loading
+        rebuilds them as separate objects, so re-alias them (EP041).
+        """
         try:
             evc = self._evc_from_dict(circuit_dict)
         except (ValueError, KytosTagError) as exception:
@@ -1698,6 +1688,14 @@ class Main(KytosNApp):
             return None
         if evc.archived:
             return None
+        for role in ("current_path", "failover_path"):
+            path = getattr(evc, role)
+            if not path:
+                continue
+            for static in (evc.primary_path, evc.backup_path):
+                if static and path == static:
+                    setattr(evc, role, static)
+                    break
 
         self.circuits.setdefault(evc.id, evc)
         self.sched.add(evc)
@@ -1820,7 +1818,8 @@ class Main(KytosNApp):
             raise ValueError(error_msg)
 
         link = Link(endpoint_a, endpoint_b)
-        allowed_paths = {"current_path", "failover_path"}
+        allowed_paths = {"current_path", "failover_path",
+                         "primary_path", "backup_path"}
         if "metadata" in link_dict and attribute in allowed_paths:
             link.extend_metadata(link_dict.get("metadata"))
 

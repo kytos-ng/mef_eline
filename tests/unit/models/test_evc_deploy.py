@@ -2074,7 +2074,9 @@ class TestEVC():
     ):
         """Dual static EVCs skip failover_path, except as a last-resort
         dynamic escape when both configured paths are down (EP041)."""
-        self.evc_deploy.current_path = Path([get_link_mocked()])
+        primary = Path([get_link_mocked()])
+        self.evc_deploy.primary_path = primary
+        self.evc_deploy.current_path = primary
         self.evc_deploy.dynamic_backup_path = True
         dual_mock.return_value = True
 
@@ -2085,6 +2087,11 @@ class TestEVC():
         # both configured paths down + dynamic backup -> dynamic escape allowed
         react_mock.return_value = Path([])
         assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+        # already forwarding on the escape -> no second dynamic is armed
+        self.evc_deploy.current_path = Path([get_link_mocked()])
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+        self.evc_deploy.current_path = primary
 
         # both down but no dynamic backup -> still no failover
         self.evc_deploy.dynamic_backup_path = False
@@ -2144,6 +2151,34 @@ class TestEVC():
         )
 
     @patch("napps.kytos.mef_eline.models.evc.emit_event")
+    @patch("napps.kytos.mef_eline.models.evc.send_flow_mods_http")
+    def test_install_uni_ingress(self, send_mock, emit_mock):
+        """Only the UNI ingress of the current path is (re)installed, and it
+        is advertised so telemetry_int mirrors it."""
+        evc = self.evc_deploy
+        evc._prepare_uni_flows = MagicMock(return_value={"s1": ["ingress"]})
+        evc.current_path = Path([MagicMock()])
+
+        evc.install_uni_ingress()
+
+        evc._prepare_uni_flows.assert_called_once_with(
+            evc.current_path, skip_out=True
+        )
+        send_mock.assert_called_once_with({"s1": ["ingress"]}, "install")
+        assert emit_mock.call_args[0][1] == "static.ingress_installed"
+        content = emit_mock.call_args[1]["content"][evc.id]
+        assert content["flows"] == {"s1": ["ingress"]}
+        assert content["removed_flows"] == {}
+
+        # nothing to install -> no FlowMods and no event
+        send_mock.reset_mock()
+        emit_mock.reset_mock()
+        evc._prepare_uni_flows = MagicMock(return_value={})
+        evc.install_uni_ingress()
+        send_mock.assert_not_called()
+        emit_mock.assert_not_called()
+
+    @patch("napps.kytos.mef_eline.models.evc.emit_event")
     def test_deploy_static_standby(self, emit_mock):
         """Test deploy_static_standby installs the standby path (EP041)."""
         evc = self.evc_deploy
@@ -2176,7 +2211,7 @@ class TestEVC():
         assert evc.deploy_static_standby() is True
         standby2.choose_vlans.assert_called_once()
         evc._install_flows.assert_called_once_with(standby2, skip_in=True)
-        assert emit_mock.call_args[0][1] == "failover_deployed"
+        assert emit_mock.call_args[0][1] == "static.standby_installed"
 
         # cold install failure -> the VLANs chosen this call are rolled back
         evc._install_flows = MagicMock(side_effect=EVCPathNotInstalled("x"))
@@ -2186,6 +2221,23 @@ class TestEVC():
         evc.get_static_standby_path = MagicMock(return_value=cold)
         assert evc.deploy_static_standby() is False
         evc.remove_path_flows.assert_called_once_with(cold)
+
+    @patch("napps.kytos.mef_eline.models.evc.emit_event")
+    def test_deploy_static_standby_explicit_path(self, _emit_mock):
+        """An explicit target is installed instead of the default standby,
+        which can be a different (down) path (EP041)."""
+        evc = self.evc_deploy
+        evc.sync = MagicMock()
+        evc._install_flows = MagicMock(return_value={"s1": ["flow"]})
+        down = MagicMock(status=EntityStatus.DOWN)
+        evc.get_static_standby_path = MagicMock(return_value=down)
+
+        target = MagicMock(status=EntityStatus.UP)
+        target.is_deployed.return_value = False
+
+        assert evc.deploy_static_standby(target) is True
+        evc.get_static_standby_path.assert_not_called()
+        evc._install_flows.assert_called_once_with(target, skip_in=True)
 
     def test_remove_static_standby_flows(self):
         """Every kept static that is not current is swept (EP041)."""
