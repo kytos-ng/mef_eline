@@ -533,7 +533,7 @@ class TestDynamicPathManager():
         assert isinstance(res_paths, list)
         assert mock_log.error.call_count == 1
 
-    # pylint: disable=too-many-statements, too-many-locals
+    # pylint: disable=too-many-statements
     @patch.object(
         DynamicPathManager,
         "get_shared_components",
