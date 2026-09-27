@@ -60,7 +60,6 @@ Subscribed
 - ``kytos/flow_manager.flow.error``
 - ``kytos/flow_manager.flow.removed``
 - ``kytos/of_multi_table.enable_table``
-- ``kytos/mef_eline.evc_affected_by_link_down``
 - ``kytos/mef_eline.redeployed_link_up``
 - ``kytos/mef_eline.redeployed_link_down``
 - ``kytos/mef_eline.deployed``

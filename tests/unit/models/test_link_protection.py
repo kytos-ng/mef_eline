@@ -1,10 +1,10 @@
+# pylint: disable=too-many-lines
 """Module to test the LinkProtection class."""
 import sys
 from unittest.mock import MagicMock, patch
 
 from kytos.core.common import EntityStatus
 from kytos.lib.helpers import get_controller_mock
-from napps.kytos.mef_eline.exceptions import FlowModException
 from napps.kytos.mef_eline.models import EVC, Path  # NOQA pycodestyle
 from napps.kytos.mef_eline.tests.helpers import (
     get_link_mocked,
@@ -149,18 +149,30 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         evc.has_single_static_dynamic_path = MagicMock(return_value=True)
         assert evc.is_eligible_for_static_revert() is True
 
+        # dual static + dynamic on an escape with only the backup recovered:
+        # non-revertive, it stays on the escape until primary recovers
+        make_eligible()
+        evc.primary_path.status = EntityStatus.DOWN
+        evc.backup_path = MagicMock(status=EntityStatus.UP)
+        evc.is_using_backup_path = MagicMock(return_value=False)
+        assert evc.is_eligible_for_static_revert() is False
+
+        # single static + dynamic with primary down -> nothing to revert to
+        evc.has_dual_static_paths = MagicMock(return_value=False)
+        evc.has_single_static_dynamic_path = MagicMock(return_value=True)
+        assert evc.is_eligible_for_static_revert() is False
+
         # neither regime keeps primary installed -> slow revert
         make_eligible()
         evc.has_dual_static_paths = MagicMock(return_value=False)
         evc.has_single_static_dynamic_path = MagicMock(return_value=False)
         assert evc.is_eligible_for_static_revert() is False
 
+        # no primary or intra switch: neither regime applies, as the real
+        # has_dual_static_paths tells
         make_eligible()
         evc.primary_path = Path([])
-        assert evc.is_eligible_for_static_revert() is False
-
-        make_eligible()
-        evc.is_intra_switch = MagicMock(return_value=True)
+        evc.has_dual_static_paths = MagicMock(return_value=False)
         assert evc.is_eligible_for_static_revert() is False
 
         make_eligible()
@@ -246,14 +258,14 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         disjoint_mock.return_value = 1.0
         assert evc.is_failover_reusable_after_revert() is False
 
-        # no failover parked -> nothing to keep
+        # no old dynamic in failover_path -> nothing to keep
         evc.failover_path = Path([])
         assert evc.is_failover_reusable_after_revert() is False
 
     def test_has_dual_static_paths(self):
         """Test has_dual_static_paths classifies by configuration (EP041).
 
-        Disjointness is guaranteed upstream by _validate_paths_distinct, so
+        Disjointness is guaranteed upstream by _validate_static_paths, so
         this only checks both static paths are set on a non-intra EVC.
         """
         evc = self.evc
@@ -304,32 +316,23 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         evc.is_intra_switch = MagicMock(return_value=True)
         assert evc.has_single_static_dynamic_path() is False
 
-    def test_has_single_static_path(self):
-        """Test has_single_static_path (lone primary) (EP041)."""
+    def test_keeps_static_paths(self):
+        """Any inter-switch EVC with a primary_path keeps its configured
+        paths installed: single static, single static + dynamic, dual
+        static, with or without dynamic (EP041)."""
         evc = self.evc
         evc.is_intra_switch = MagicMock(return_value=False)
         evc.primary_path = Path([MagicMock()])
-        evc.backup_path = Path([])
-        evc.dynamic_backup_path = False
-
-        assert evc.has_single_static_path() is True
-
-        # a static backup makes it dual static, not single
-        evc.backup_path = Path([MagicMock()])
-        assert evc.has_single_static_path() is False
-        evc.backup_path = Path([])
-
-        # a dynamic backup makes it single static + dynamic, not single
-        evc.dynamic_backup_path = True
-        assert evc.has_single_static_path() is False
-        evc.dynamic_backup_path = False
+        for backup in (Path([]), Path([MagicMock()])):
+            for dynamic in (False, True):
+                evc.backup_path, evc.dynamic_backup_path = backup, dynamic
+                assert evc.keeps_static_paths() is True
 
         evc.primary_path = Path([])
-        assert evc.has_single_static_path() is False
+        assert evc.keeps_static_paths() is False
         evc.primary_path = Path([MagicMock()])
-
         evc.is_intra_switch = MagicMock(return_value=True)
-        assert evc.has_single_static_path() is False
+        assert evc.keeps_static_paths() is False
 
     def test_get_static_standby_path(self):
         """Test get_static_standby_path (EP041)."""
@@ -360,6 +363,89 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         evc.primary_path = Path([])
         assert not evc.get_static_standby_path()
 
+    def test_is_inactive_on_static(self):
+        """Inactive on a configured path still installed: only the ingress
+        was removed (EP041)."""
+        evc = self.evc
+        evc.is_active = MagicMock(return_value=False)
+        evc.current_path = MagicMock()
+        evc.current_path.is_deployed.return_value = True
+        evc.is_using_primary_path = MagicMock(return_value=True)
+        evc.is_using_backup_path = MagicMock(return_value=False)
+        assert evc.is_inactive_on_static() is True
+
+        evc.is_using_primary_path.return_value = False
+        evc.is_using_backup_path.return_value = True
+        assert evc.is_inactive_on_static() is True
+
+        # a dynamic current_path
+        evc.is_using_backup_path.return_value = False
+        assert evc.is_inactive_on_static() is False
+
+        # nothing installed on the static
+        evc.is_using_primary_path.return_value = True
+        evc.current_path.is_deployed.return_value = False
+        assert evc.is_inactive_on_static() is False
+
+        # forwarding
+        evc.current_path.is_deployed.return_value = True
+        evc.is_active.return_value = True
+        assert evc.is_inactive_on_static() is False
+
+    def test_get_kept_standby_paths(self):
+        """Installed configured paths other than the current and failover
+        path objects (EP041)."""
+        evc = self.evc
+        primary, backup = MagicMock(), MagicMock()
+        evc.primary_path, evc.backup_path = primary, backup
+        evc.current_path, evc.failover_path = primary, Path([])
+        assert evc.get_kept_standby_paths() == [backup]
+
+        # on a dynamic escape both are kept
+        evc.current_path = MagicMock()
+        assert evc.get_kept_standby_paths() == [primary, backup]
+
+        backup.is_deployed.return_value = False
+        assert evc.get_kept_standby_paths() == [primary]
+
+        # by object: the current_path is never its own standby, even when a
+        # distinct copy with the same links is the configured path
+        link = MagicMock()
+        link.get_metadata.return_value = {"value": 10}
+        evc.primary_path, evc.backup_path = Path([link]), Path([])
+        evc.current_path = Path([link])
+        assert evc.current_path == evc.primary_path
+        assert evc.get_kept_standby_paths() == [evc.primary_path]
+        evc.current_path = evc.primary_path
+        assert not evc.get_kept_standby_paths()
+
+    @patch("napps.kytos.mef_eline.models.evc.emit_event")
+    def test_request_dyn_escape(self, emit_mock):
+        """need_dyn_escape schedules the escape of this EVC (EP041)."""
+        evc = self.evc
+        evc.request_dyn_escape()
+        assert emit_mock.call_args[0][1] == "need_dyn_escape"
+        assert emit_mock.call_args[1]["content"] == {"evc_id": evc.id}
+
+    def test_get_installed_static_path(self):
+        """Keeps an installed configured current_path, else picks an
+        installed one (primary first), else empty (EP041)."""
+        evc = self.evc
+        primary, backup, dynamic = MagicMock(), MagicMock(), MagicMock()
+        evc.primary_path, evc.backup_path = primary, backup
+        evc.current_path = backup
+        assert evc.get_installed_static_path() is backup
+
+        evc.current_path = dynamic
+        assert evc.get_installed_static_path() is primary
+
+        # primary never installed (deployed while it was down)
+        primary.is_deployed.return_value = False
+        assert evc.get_installed_static_path() is backup
+
+        backup.is_deployed.return_value = False
+        assert not evc.get_installed_static_path()
+
     def test_get_reactivation_path(self):
         """Test get_reactivation_path prefers an UP primary (EP041)."""
         evc = self.evc
@@ -377,17 +463,15 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         # neither UP -> nothing to resume on
         assert not evc.get_reactivation_path()
 
-    def test_is_eligible_for_static_reactivation(self):
-        """Test is_eligible_for_static_reactivation guards (EP041)."""
+    def test_is_eligible_for_static_resume(self):
+        """Test is_eligible_for_static_resume guards (EP041)."""
         evc = self.evc
         link = MagicMock()
 
         def make_eligible():
             evc.is_active = MagicMock(return_value=False)
             evc.current_path = Path([MagicMock()])
-            evc.has_dual_static_paths = MagicMock(return_value=True)
-            evc.has_single_static_path = MagicMock(return_value=False)
-            evc.has_single_static_dynamic_path = MagicMock(return_value=False)
+            evc.keeps_static_paths = MagicMock(return_value=True)
             evc.are_unis_active = MagicMock(return_value=True)
             evc.is_primary_path_affected_by_link = MagicMock(
                 return_value=True
@@ -400,79 +484,51 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
             )
 
         make_eligible()
-        assert evc.is_eligible_for_static_reactivation(link) is True
-
-        make_eligible()
-        # a lone static primary also reactivates via ingress reinstall
-        evc.has_dual_static_paths = MagicMock(return_value=False)
-        evc.has_single_static_path = MagicMock(return_value=True)
-        assert evc.is_eligible_for_static_reactivation(link) is True
-
-        make_eligible()
-        # a single static + dynamic EVC (primary + dynamic backup) also
-        # reactivates onto primary
-        evc.has_dual_static_paths = MagicMock(return_value=False)
-        evc.has_single_static_dynamic_path = MagicMock(return_value=True)
-        assert evc.is_eligible_for_static_reactivation(link) is True
+        assert evc.is_eligible_for_static_resume(link) is True
 
         make_eligible()
         evc.is_active = MagicMock(return_value=True)
-        assert evc.is_eligible_for_static_reactivation(link) is False
+        assert evc.is_eligible_for_static_resume(link) is False
 
         make_eligible()
         # a cleared current_path means it was fully torn down -> redeploy
         evc.current_path = Path([])
-        assert evc.is_eligible_for_static_reactivation(link) is False
+        assert evc.is_eligible_for_static_resume(link) is False
 
         make_eligible()
         # a down UNI must not be silently reactivated
         evc.are_unis_active = MagicMock(return_value=False)
-        assert evc.is_eligible_for_static_reactivation(link) is False
+        assert evc.is_eligible_for_static_resume(link) is False
 
         make_eligible()
-        evc.has_dual_static_paths = MagicMock(return_value=False)
-        assert evc.is_eligible_for_static_reactivation(link) is False
+        # configured paths aren't kept, e.g. a pure dynamic EVC
+        evc.keeps_static_paths = MagicMock(return_value=False)
+        assert evc.is_eligible_for_static_resume(link) is False
 
         make_eligible()
         evc.is_primary_path_affected_by_link = MagicMock(return_value=False)
         evc.is_backup_path_affected_by_link = MagicMock(return_value=False)
-        assert evc.is_eligible_for_static_reactivation(link) is False
+        assert evc.is_eligible_for_static_resume(link) is False
 
         make_eligible()
         evc.get_reactivation_path = MagicMock(return_value=Path([]))
-        assert evc.is_eligible_for_static_reactivation(link) is False
+        assert evc.is_eligible_for_static_resume(link) is False
 
-    def test_is_eligible_for_standby_install(self):
-        """A never-deployed target needs its standby installed first, not an
-        ingress-only reactivation (EP041)."""
-        evc = self.evc
-        link = MagicMock()
-        evc.is_active = MagicMock(return_value=False)
-        evc.current_path = Path([MagicMock()])
-        evc.has_dual_static_paths = MagicMock(return_value=True)
-        evc.are_unis_active = MagicMock(return_value=True)
-        evc.is_primary_path_affected_by_link = MagicMock(return_value=True)
-
-        deployed = Path([MagicMock()])  # mock metadata -> deployed
-        evc.get_reactivation_path = MagicMock(return_value=deployed)
-        assert evc.is_eligible_for_static_reactivation(link) is True
-        assert evc.is_eligible_for_standby_install(link) is False
-
-        never = MagicMock()
-        never.get_metadata.return_value = None  # no s_vlan
-        evc.get_reactivation_path = MagicMock(return_value=Path([never]))
-        assert evc.is_eligible_for_static_reactivation(link) is False
-        assert evc.is_eligible_for_standby_install(link) is True
-
+        # without a link, e.g. a UNI coming up: any configured path UP
+        make_eligible()
+        evc.is_primary_path_affected_by_link = MagicMock(return_value=False)
+        evc.is_backup_path_affected_by_link = MagicMock(return_value=False)
+        assert evc.is_eligible_for_static_resume() is True
         evc.get_reactivation_path = MagicMock(return_value=Path([]))
-        assert evc.is_eligible_for_standby_install(link) is False
+        assert evc.is_eligible_for_static_resume() is False
 
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.deploy")
     async def test_handle_link_up_case_1(
         self,
         deploy_to_mocked,
     ):
-        """A live EVC on primary is untouched; a parked one is redeployed."""
+        """An EVC on primary is left untouched by the ladder, live or with
+        its ingress removed (EP041)."""
         deploy_to_mocked.return_value = True
         primary_path = [
             get_link_mocked(
@@ -521,12 +577,16 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         assert deploy_to_mocked.call_count == 0
         assert current_handle_link_up
 
-        # parked on primary: current_path is still set but nothing is
-        # forwarding, so the ladder no longer skips it (EP041)
+        # inactive on primary (ingress removed or UNI down): never redeployed
+        # here, tearing down its kept statics; it resumes with an ingress
+        # install instead (EP041)
         evc.is_active = MagicMock(return_value=False)
         evc.deploy_to_path = MagicMock(return_value=True)
+        evc.deploy_to_primary_path = MagicMock(return_value=True)
         assert evc.handle_link_up(backup_path[0])
-        assert evc.deploy_to_path.call_count == 1
+        assert evc.handle_link_up(interface=evc.uni_a.interface)
+        evc.deploy_to_path.assert_not_called()
+        evc.deploy_to_primary_path.assert_not_called()
 
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.deploy")
     @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.deploy_to_path")
@@ -540,7 +600,7 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
 
         With primary fully UP the EVC keeps forwarding on its provisioned
         backup: the model no longer break-before-makes to primary. The revert
-        is an ingress swap driven by the napp (execute_revert_to_primary), not
+        is an ingress swap driven by the napp (execute_swap_to_standby), not
         a redeploy here (EP041).
         """
         deploy_mocked.return_value = True
@@ -1018,43 +1078,6 @@ class TestLinkProtection():  # pylint: disable=too-many-public-methods
         }
         expected = (False, interfaces)
         assert actual == expected
-
-    @patch("napps.kytos.mef_eline.models.evc._does_uni_affect_evc")
-    @patch("napps.kytos.mef_eline.models.evc.emit_event")
-    async def test_handle_interface_link_up_installs_ingress(
-        self, _emit_mock, affect_mock
-    ):
-        """A UNI coming back reinstalls the ingress before activating, so a
-        parked EVC is not marked active without it (EP041)."""
-        affect_mock.return_value = True
-        self.evc.try_to_handle_uni_as_link_up = MagicMock(return_value=False)
-        self.evc.install_uni_ingress = MagicMock()
-        self.evc.try_to_activate = MagicMock()
-        self.evc.sync = MagicMock()
-
-        # not on a configured static: nothing can be missing, just activate
-        self.evc.is_using_primary_path = MagicMock(return_value=False)
-        self.evc.is_using_backup_path = MagicMock(return_value=False)
-        self.evc.handle_interface_link_up(MagicMock())
-        self.evc.install_uni_ingress.assert_not_called()
-        self.evc.try_to_activate.assert_called_once()
-
-        self.evc.is_using_primary_path = MagicMock(return_value=True)
-        self.evc.try_to_activate = MagicMock()
-        self.evc.handle_interface_link_up(MagicMock())
-
-        self.evc.install_uni_ingress.assert_called_once()
-        self.evc.try_to_activate.assert_called_once()
-
-        # a failed install leaves it inactive for the consistency routine
-        self.evc.install_uni_ingress = MagicMock(
-            side_effect=FlowModException("err")
-        )
-        self.evc.try_to_activate = MagicMock()
-
-        self.evc.handle_interface_link_up(MagicMock())
-
-        self.evc.try_to_activate.assert_not_called()
 
     async def test_handle_interface_link(self, monkeypatch):
         """

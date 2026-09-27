@@ -12,6 +12,11 @@ Added
 - Added new EVC field called ``last_removed_at`` to help identify if EVC did ever remove flows.
 - Implemented EP041 fast convergence for static EVCs
 
+Changed
+=======
+- ``primary_path`` and ``backup_path`` must now be distinct, EVC creation and updates are rejected otherwise, including an EVC that already has both paths equal.
+- ``backup_path`` now requires a ``primary_path``, EVC creation and updates are rejected otherwise, including an EVC that already has only a ``backup_path``.
+
 Fixed
 =====
 - Intra EVC now redeploys when it gets activated because UNI status changed to ``UP``.
