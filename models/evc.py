@@ -291,11 +291,6 @@ class EVCBase(GenericEntity):
         # Changing/Updating with the new values
         uni_a, uni_z = self._get_unis_use_tags(uni_a, uni_z)
 
-        # The kept standbys are about to be replaced, they are swept only
-        # once the update is stored, as storing it can still reject it
-        sweep = []
-        if "primary_path" in kwargs or "backup_path" in kwargs:
-            sweep = self.get_kept_standby_paths()
         for attribute, value in kwargs.items():
             if attribute == "enabled":
                 if value:
@@ -309,10 +304,6 @@ class EVCBase(GenericEntity):
                     redeploy = True
         self.save_leftover_switch(leftover_switch)
         self.sync(set(kwargs.keys()))
-        if sweep:
-            # defined by the EVCDeploy subclass, like the rest of the flows
-            # pylint: disable=no-member
-            self.remove_static_standby_flows(sweep)
         return enable, redeploy
 
     def save_leftover_switch(self, leftover_switch):
@@ -888,6 +879,20 @@ class EVCDeploy(EVCBase):
             and path is not self.current_path
             and path is not self.failover_path
         ]
+
+    def update(self, **kwargs):
+        """Sweep the kept standbys whose configured path was overwritten.
+
+        Captured before the new paths are set, swept only once the update is
+        stored, as storing it can still reject it (EP041).
+        """
+        sweep = []
+        if "primary_path" in kwargs or "backup_path" in kwargs:
+            sweep = self.get_kept_standby_paths()
+        enable, redeploy = super().update(**kwargs)
+        if sweep:
+            self.remove_static_standby_flows(sweep)
+        return enable, redeploy
 
     def remove_static_standby_flows(self, paths: list[Path] = None):
         """Sweep every kept static path not carrying traffic, or the given

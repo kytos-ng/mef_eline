@@ -272,7 +272,7 @@ class Main(KytosNApp):
                 detached.append((evc, old_current))
         resumed = [evc for evc, _ in done.values()]
         if resumed:
-            log.info(f"Resumed {resumed} on a configured path")
+            log.info(f"Resumed on a configured path: {resumed}")
             emit_event(
                 self.controller, "static.ingress_installed", content={
                     evc.id: map_evc_event_content(
@@ -289,7 +289,7 @@ class Main(KytosNApp):
         for evc in resumed:
             self.request_failover_path(evc)
         if failed:
-            log.error(f"Failed to resume {failed} on a configured path")
+            log.error(f"Failed to resume on a configured path: {failed}")
         if installed:
             self.mongo_controller.update_evcs(
                 [evc.as_dict() for evc in installed]
@@ -979,8 +979,8 @@ class Main(KytosNApp):
                 if failed:
                     # stored anyway to avoid leaking s-vlans
                     evcs_to_update.update((evc.id, evc) for evc in failed)
-                    log.error(f"Failed to revert {failed} to primary_path, "
-                              "retried on the next link_up")
+                    log.error("Failed to revert to primary_path, retried on "
+                              f"the next link_up: {failed}")
                 for evc in reverted:
                     self.request_failover_path(evc)
 
@@ -1238,7 +1238,7 @@ class Main(KytosNApp):
         emit_event(
             self.controller, "static.standby_installed", content=contents
         )
-        log.info("Installed the standby configured path of "
+        log.info("Installed the standby configured path: "
                  f"{[evc for evc, _, _ in chosen]}")
         return [*ready, *(evc for evc, _, _ in chosen)], failed
 
@@ -1345,7 +1345,7 @@ class Main(KytosNApp):
             target = targets[evc.id]
             by_role[evc.get_path_role(target)].append(evc)
         for role, moved in by_role.items():
-            log.info(f"Swapped {moved} onto their {role}")
+            log.info(f"Swapped onto their {role}: {moved}")
 
         if detached:
             self.execute_clear_paths(detached)
@@ -1409,7 +1409,7 @@ class Main(KytosNApp):
                 "failover_old_path",
                 content=event_contents
             )
-            log.info(f"Cleared the failover path of {cleared_evcs}")
+            log.info(f"Cleared the failover path: {cleared_evcs}")
             return cleared_evcs, not_cleared_evcs
         except FlowModException as exc:
             log.error(f"Failed to delete failover flows for {evcs}: {exc}")
@@ -1455,7 +1455,7 @@ class Main(KytosNApp):
             emit_event(
                 self.controller, "failover_old_path", content=event_contents
             )
-            log.info("Cleared the detached paths of "
+            log.info("Cleared the detached paths: "
                      f"{[evc for evc, _ in cleared]}")
 
     def prepare_remove_ingress_flow(self, evc: EVC):
@@ -1500,8 +1500,8 @@ class Main(KytosNApp):
             return [], [*removed_evcs, *not_removed_evcs]
         for evc in removed_evcs:
             evc.deactivate()
-        log.info(f"Stopped forwarding on {removed_evcs}, no usable path, "
-                 "their configured paths are kept installed")
+        log.info("Stopped forwarding, no usable path, their configured "
+                 f"paths are kept installed: {removed_evcs}")
 
         emit_event(
             self.controller, "static.ingress_removed", content={
