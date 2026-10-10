@@ -808,6 +808,52 @@ class TestEP041Teardown:
         )
         assert emit_mock.call_args[0][1] == "static.standby_installed"
 
+    @patch("napps.kytos.mef_eline.main.emit_event")
+    @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
+    def test_execute_install_standby_per_evc_failures(
+        self, send_mock, emit_mock
+    ):
+        """An EVC failing to choose VLANs or to build its flows does not
+        abort the batch, and the tags it took are freed (EP041)."""
+        # pylint: disable=import-outside-toplevel
+        from kytos.core.exceptions import KytosNoTagAvailableError
+
+        def cold_path():
+            path = MagicMock(status=EntityStatus.UP)
+            path.is_deployed.return_value = False
+            return path
+
+        ok_path, no_tag, bad_flows = cold_path(), cold_path(), cold_path()
+        no_tag.choose_vlans.side_effect = KytosNoTagAvailableError(MagicMock())
+        evc_ok, evc_no_tag, evc_bad = (
+            MagicMock(id=evc_id) for evc_id in ("ok", "no_tag", "bad")
+        )
+        evc_ok._prepare_nni_flows.return_value = {"s1": ["nni"]}
+        evc_ok._prepare_uni_flows.return_value = {}
+        evc_bad._prepare_nni_flows.side_effect = ValueError("boom")
+
+        ready, failed = self.napp.execute_install_standby([
+            (evc_no_tag, no_tag), (evc_bad, bad_flows), (evc_ok, ok_path),
+        ])
+
+        assert ready == [evc_ok]
+        assert failed == [evc_no_tag, evc_bad]
+        # nothing was allocated for the first, the second frees what it took
+        no_tag.make_vlans_available.assert_not_called()
+        bad_flows.make_vlans_available.assert_called_once()
+        send_mock.assert_called_once_with({"s1": ["nni"]}, "install")
+        assert emit_mock.call_args[0][1] == "static.standby_installed"
+
+        # nothing installable -> no FlowMods and no event at all
+        send_mock.reset_mock()
+        emit_mock.reset_mock()
+        ready, failed = self.napp.execute_install_standby(
+            [(evc_no_tag, no_tag)]
+        )
+        assert not ready and failed == [evc_no_tag]
+        send_mock.assert_not_called()
+        emit_mock.assert_not_called()
+
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
     @patch("napps.kytos.mef_eline.main.prepare_delete_flow")
     def test_execute_install_standby_rolls_back(

@@ -8,6 +8,7 @@ import time
 import traceback
 from collections import defaultdict
 from contextlib import ExitStack
+from enum import StrEnum
 from copy import deepcopy
 from threading import Lock
 from typing import Optional
@@ -39,6 +40,21 @@ from napps.kytos.mef_eline.utils import (_does_uni_affect_evc, aemit_event,
                                          map_evc_event_content,
                                          merge_flow_dicts, prepare_delete_flow,
                                          send_flow_mods_http)
+
+
+class LinkDownAction(StrEnum):
+    """What an EVC keeping its configured paths does on a link_down (EP041).
+
+    Never undeploy: that would tear down the paths kept installed for its
+    fast convergence.
+    """
+
+    NONE = ""
+    SWAP_TO_STANDBY = "swap_to_standby"
+    SWAP_TO_FAILOVER = "swap_to_failover"
+    DYN_ESCAPE = "dyn_escape"
+    REMOVE_INGRESS = "remove_ingress"
+    CLEAR_FAILOVER = "clear_failover"
 
 
 # pylint: disable=too-many-public-methods
@@ -1669,9 +1685,9 @@ class Main(KytosNApp):
             return [], [*undeploy_evcs, *not_undeploy_evcs]
 
     @staticmethod
-    def classify_static_link_down(evc: EVC, link) -> str:
+    def classify_static_link_down(evc: EVC, link) -> LinkDownAction:
         """Convergence bucket of an EVC keeping its configured paths on a
-        link_down, "" for nothing to do (EP041).
+        link_down, NONE for nothing to do (EP041).
 
         An inactive EVC is classified too: it may still hold its ingress,
         e.g. after a UNI down, and removing an absent one is harmless.
@@ -1679,22 +1695,23 @@ class Main(KytosNApp):
         if not evc.is_affected_by_link(link):
             if (evc.failover_path
                     and evc.is_failover_path_affected_by_link(link)):
-                return "clear_failover"
-            return ""
+                return LinkDownAction.CLEAR_FAILOVER
+            return LinkDownAction.NONE
 
         standby = evc.get_static_standby_path()
 
         if (standby and standby.status == EntityStatus.UP
                 and not standby.is_affected_by_link(link)):
-            return "swap_to_standby"
+            return LinkDownAction.SWAP_TO_STANDBY
 
         if (evc.has_single_static_dynamic_path()
                 and evc.failover_path
                 and evc.failover_path.status == EntityStatus.UP
                 and not evc.is_failover_path_affected_by_link(link)):
-            return "swap_to_failover"
+            return LinkDownAction.SWAP_TO_FAILOVER
 
-        return "dyn_escape" if evc.dynamic_backup_path else "remove_ingress"
+        return (LinkDownAction.DYN_ESCAPE if evc.dynamic_backup_path
+                else LinkDownAction.REMOVE_INGRESS)
 
     def handle_link_down(self, event):
         """Change circuit when link is down or under_mantenance.
@@ -1725,11 +1742,11 @@ class Main(KytosNApp):
             clear_failover = list[EVC]()
             evcs_to_update = dict[str, EVC]()
             buckets = {
-                "swap_to_standby": swap_to_standby,
-                "swap_to_failover": swap_to_failover,
-                "dyn_escape": dyn_escape,
-                "remove_ingress": remove_ingress,
-                "clear_failover": clear_failover,
+                LinkDownAction.SWAP_TO_STANDBY: swap_to_standby,
+                LinkDownAction.SWAP_TO_FAILOVER: swap_to_failover,
+                LinkDownAction.DYN_ESCAPE: dyn_escape,
+                LinkDownAction.REMOVE_INGRESS: remove_ingress,
+                LinkDownAction.CLEAR_FAILOVER: clear_failover,
             }
 
             for evc in self.get_evcs_by_svc_level():
@@ -1737,7 +1754,7 @@ class Main(KytosNApp):
                     sub_stack.enter_context(evc.lock)
                     if evc.keeps_static_paths():
                         action = self.classify_static_link_down(evc, link)
-                        if action:
+                        if action != LinkDownAction.NONE:
                             buckets[action].append(evc)
                             exit_stack.push(sub_stack.pop_all())
                         elif evc.is_static_path_affected_by_link(link):
