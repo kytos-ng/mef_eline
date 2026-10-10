@@ -914,6 +914,9 @@ class Main(KytosNApp):
           configured path when nothing is provisioned; an active dual static
           EVC gets a missing standby installed
 
+        Classified in that order, but run down EVCs first: resume, dynamic
+        escapes, then the reverts, which are still forwarding.
+
         Other EVCs go through the model's handle_link_up too: an intra-switch
         EVC or a dynamic one forwarding on an UP path is left as is, an
         inactive dynamic one is deployed on a new path. A missing
@@ -1219,6 +1222,8 @@ class Main(KytosNApp):
         emit_event(
             self.controller, "static.standby_installed", content=contents
         )
+        log.info("Installed the standby configured path of "
+                 f"{[evc for evc, _, _ in chosen]}")
         return [*ready, *(evc for evc, _, _ in chosen)], failed
 
     def _roll_back_standby_install(
@@ -1319,6 +1324,12 @@ class Main(KytosNApp):
                 for evc in swapped_evcs
             }
         )
+        by_role = defaultdict(list)
+        for evc in swapped_evcs:
+            target = targets[evc.id]
+            by_role[evc.get_path_role(target)].append(evc)
+        for role, moved in by_role.items():
+            log.info(f"Swapped {moved} onto their {role}")
 
         if detached:
             self.execute_clear_paths(detached)
@@ -1382,6 +1393,7 @@ class Main(KytosNApp):
                 "failover_old_path",
                 content=event_contents
             )
+            log.info(f"Cleared the failover path of {cleared_evcs}")
             return cleared_evcs, not_cleared_evcs
         except FlowModException as exc:
             log.error(f"Failed to delete failover flows for {evcs}: {exc}")
@@ -1427,6 +1439,8 @@ class Main(KytosNApp):
             emit_event(
                 self.controller, "failover_old_path", content=event_contents
             )
+            log.info("Cleared the detached paths of "
+                     f"{[evc for evc, _ in cleared]}")
 
     def prepare_remove_ingress_flow(self, evc: EVC):
         """Prepare deletion of a static EVC's active UNI ingress."""
@@ -1470,6 +1484,8 @@ class Main(KytosNApp):
             return [], [*removed_evcs, *not_removed_evcs]
         for evc in removed_evcs:
             evc.deactivate()
+        log.info(f"Stopped forwarding on {removed_evcs}, no usable path, "
+                 "their configured paths are kept installed")
 
         emit_event(
             self.controller, "static.ingress_removed", content={

@@ -11,6 +11,7 @@ Added
 - Added new EVC field called ``last_deployed_at`` to help identify if EVC was ever deployed and install flows.
 - Added new EVC field called ``last_removed_at`` to help identify if EVC did ever remove flows.
 - Implemented EP041 fast convergence for static EVCs
+- Added new published events for static EVC convergence, which carry the changed flows so consumers such as ``telemetry_int`` can mirror them: ``kytos/mef_eline.static.standby_installed``, ``kytos/mef_eline.static.ingress_installed``, ``kytos/mef_eline.static.ingress_removed`` and ``kytos/mef_eline.static.ingress_swapped``
 
 Changed
 =======

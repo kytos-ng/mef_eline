@@ -685,6 +685,13 @@ class EVCDeploy(EVCBase):
             not self.has_dual_static_paths(),
         ))
 
+    def get_path_role(self, path) -> str:
+        """The attribute name a path is configured as, for logging."""
+        for role in ("primary_path", "backup_path"):
+            if path is getattr(self, role):
+                return role
+        return "configured path"
+
     def get_static_standby_path(self):
         """The configured path not carrying traffic, an UP one preferred,
         whatever its status (EP041)."""
