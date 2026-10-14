@@ -86,6 +86,7 @@ Event reporting a redeployed circuit after a link down event.
     "metadata": evc.metadata,
     "active": evc._active,
     "enabled": evc._enabled,
+    "service_level": evc.service_level,
     "uni_a": evc.uni_a.as_dict(),
     "uni_z": evc.uni_z.as_dict()
   }
@@ -104,6 +105,7 @@ Event reporting an error with redeploying a circuit with a link down event.
     "metadata": evc.metadata,
     "active": evc._active,
     "enabled": evc._enabled,
+    "service_level": evc.service_level,
     "uni_a": evc.uni_a.as_dict(),
     "uni_z": evc.uni_z.as_dict()
   }
@@ -122,6 +124,7 @@ Event reporting that a link down event has occurred.
     "metadata": evc.metadata,
     "active": evc._active,
     "enabled": evc._enabled,
+    "service_level": evc.service_level,
     "uni_a": evc.uni_a.as_dict(),
     "uni_z": evc.uni_z.as_dict(),
     "link": link
@@ -141,6 +144,7 @@ Event reporting that a link up event has occurred.
     "metadata": evc.metadata,
     "active": evc._active,
     "enabled": evc._enabled,
+    "service_level": evc.service_level,
     "uni_a": evc.uni_a.as_dict(),
     "uni_z": evc.uni_z.as_dict()
   }
@@ -159,6 +163,7 @@ Event reporting that a circuit has been updated.
     "metadata": evc.metadata,
     "active": evc._active,
     "enabled": evc._enabled,
+    "service_level": evc.service_level,
     "uni_a": evc.uni_a.as_dict(),
     "uni_z": evc.uni_z.as_dict()
   }
@@ -177,6 +182,7 @@ Event reporting that a circuit was deployed or removed.
     "metadata": evc.metadata,
     "active": evc._active,
     "enabled": evc._enabled,
+    "service_level": evc.service_level,
     "uni_a": evc.uni_a.as_dict(),
     "uni_z": evc.uni_z.as_dict()
   }
@@ -222,6 +228,7 @@ Event published when an EVC active state changes due to a UNI going up or down
    "metadata": evc.metadata,
    "active": evc._active,
    "enabled": evc._enabled,
+   "service_level": evc.service_level,
    "uni_a": evc.uni_a.as_dict(),
    "uni_z": evc.uni_z.as_dict()}
   }
@@ -241,6 +248,7 @@ Event published when an EVC failover_path gets deployed. ``flows`` are the new d
      "metadata": evc.metadata,
      "active": evc._active,
      "enabled": evc._enabled,
+     "service_level": evc.service_level,
      "uni_a": evc.uni_a.as_dict(),
      "uni_z": evc.uni_z.as_dict(),
      "flows": [],
@@ -265,6 +273,7 @@ Event published when an EVC failover_path switches over. ``flows`` are the new d
      "metadata": evc.metadata,
      "active": evc._active,
      "enabled": evc._enabled,
+     "service_level": evc.service_level,
      "uni_a": evc.uni_a.as_dict(),
      "uni_z": evc.uni_z.as_dict(),
      "flows": [],
@@ -286,6 +295,7 @@ Event published when an EVC failover related old path gets removed (cleaned up).
      "metadata": evc.metadata,
      "active": evc._active,
      "enabled": evc._enabled,
+     "service_level": evc.service_level,
      "uni_a": evc.uni_a.as_dict(),
      "uni_z": evc.uni_z.as_dict(),
      "removed_flows": [],
