@@ -21,6 +21,7 @@ def map_evc_event_content(evc, **kwargs) -> dict:
                      "metadata": evc.metadata,
                      "active": evc._active,
                      "enabled": evc._enabled,
+                     "service_level": evc.service_level,
                      "uni_a": evc.uni_a.as_dict(),
                      "uni_z": evc.uni_z.as_dict()}
 

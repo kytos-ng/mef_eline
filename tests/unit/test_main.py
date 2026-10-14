@@ -2426,6 +2426,7 @@ class TestMain:
                 "metadata": "data_mocked",
                 "active": "true",
                 "enabled": "false",
+                "service_level": evc1.service_level,
                 "uni_a": uni.as_dict(),
                 "uni_z": uni.as_dict(),
             }
@@ -2441,6 +2442,7 @@ class TestMain:
                 "metadata": "mocked_data",
                 "active": "false",
                 "enabled": "true",
+                "service_level": evc2.service_level,
                 "uni_a": uni.as_dict(),
                 "uni_z": uni.as_dict(),
             }

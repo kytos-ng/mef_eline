@@ -10,6 +10,7 @@ Added
 =====
 - Added new EVC field called ``last_deployed_at`` to help identify if EVC was ever deployed and install flows.
 - Added new EVC field called ``last_removed_at`` to help identify if EVC did ever remove flows.
+- Published events now also carry the EVC ``service_level``, so consumers can process or prioritize them by service level.
 
 Fixed
 =====
