@@ -17,6 +17,7 @@ Changed
 =======
 - ``primary_path`` and ``backup_path`` must now be distinct, EVC creation and updates are rejected otherwise, including an EVC that already has both paths equal.
 - ``backup_path`` now requires a ``primary_path``, EVC creation and updates are rejected otherwise, including an EVC that already has only a ``backup_path``.
+- Published events now also carry the EVC ``service_level``, so consumers can process or prioritize them by service level.
 
 Fixed
 =====
