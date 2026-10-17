@@ -307,7 +307,6 @@ class TestEVC():
         }
         assert expected_flow_mod == flow_mod
 
-    # pylint: disable=too-many-branches
     @pytest.mark.parametrize(
         "in_vlan_a,in_vlan_z",
         [
@@ -450,7 +449,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.EVC.should_deploy")
     def test_deploy_successfully(self, *args):
         """Test if all methods to deploy are called."""
-        # pylint: disable=too-many-locals
         (
             should_deploy_mock,
             activate_mock,
@@ -586,7 +584,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.EVC.sync")
     def test_deploy_fail(self, *args):
         """Test if all methods is ignored when the should_deploy is false."""
-        # pylint: disable=too-many-locals
         (
             sync_mock,
             should_deploy_mock,
@@ -613,7 +610,9 @@ class TestEVC():
         assert install_unni_flows_mock.call_count == 0
         assert choose_vlans_mock.call_count == 0
         assert log_mock.info.call_count == 0
-        assert sync_mock.call_count == 0
+        # stored with its paths torn down, kept standbys included, so they
+        # don't reload as installed (EP041)
+        assert sync_mock.call_count == 1
         assert deployed is False
 
         # NoTagAvailable on static path
@@ -639,7 +638,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.EVC.sync")
     def test_deploy_error(self, *args):
         """Test if all methods is ignored when the should_deploy is false."""
-        # pylint: disable=too-many-locals
         (
             sync_mock,
             remove_current_flows,
@@ -699,6 +697,39 @@ class TestEVC():
         assert sync_mock.call_count == 0
         assert remove_current_flows.call_count == 2
         assert deployed is False
+
+    @patch("napps.kytos.mef_eline.models.evc.emit_event")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.get_failover_path_candidates")
+    @patch("napps.kytos.mef_eline.models.evc.EVC._install_flows")
+    @patch("napps.kytos.mef_eline.models.evc.EVC.remove_path_flows")
+    @patch("napps.kytos.mef_eline.models.EVC.sync")
+    def test_setup_failover_path_reference_path(self, *args):
+        """A reference_path skips the eligibility check, which excludes dual
+        static EVCs, and is what candidates are disjoint from: how their
+        dynamic escape sets up its path (EP041)."""
+        (
+            _sync_mock,
+            _remove_path_flows_mock,
+            install_flows_mock,
+            candidates_mock,
+            _emit_event_mock,
+        ) = args
+        evc = self.create_evc_inter_switch()
+        evc.is_eligible_for_failover_path = MagicMock(return_value=False)
+        reference = MagicMock()
+        fresh = MagicMock()
+        candidates_mock.return_value = [fresh]
+        install_flows_mock.return_value = {"1": ["flow"]}
+
+        assert evc.setup_failover_path(reference_path=reference) is True
+        candidates_mock.assert_called_once_with(reference)
+        evc.is_eligible_for_failover_path.assert_not_called()
+        assert evc.failover_path is fresh
+
+        # without it, a non eligible EVC gets no failover
+        candidates_mock.reset_mock()
+        assert evc.setup_failover_path() is False
+        candidates_mock.assert_not_called()
 
     @patch("napps.kytos.mef_eline.models.evc.emit_event")
     @patch("napps.kytos.mef_eline.models.evc.EVC.get_failover_path_candidates")
@@ -806,7 +837,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.EVC.discover_new_paths")
     def test_deploy_without_path_case1(self, *args):
         """Test if not path is found a dynamic path is used."""
-        # pylint: disable=too-many-locals
         (
             discover_new_paths_mocked,
             should_deploy_mock,
@@ -920,7 +950,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.log.error")
     def test_remove_current_flows(self, *args):
         """Test remove current flows from inter EVC."""
-        # pylint: disable=too-many-locals
         (log_error_mock, send_flow_mods_mocked, _) = args
         uni_a = get_uni_mocked(
             interface_port=2,
@@ -1059,7 +1088,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.log.error")
     def test_remove_failover_flows_exclude_uni_switches(self, *args):
         """Test remove failover flows excluding UNI switches."""
-        # pylint: disable=too-many-locals
         (log_error_mock, send_flow_mods_mocked, mock_upsert) = args
         uni_a = get_uni_mocked(
             interface_port=2,
@@ -1128,7 +1156,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
     def test_remove_failover_flows_include_all(self, *args):
         """Test remove failover flows including UNI switches."""
-        # pylint: disable=too-many-locals
         (send_flow_mods_mocked, mock_upsert) = args
         uni_a = get_uni_mocked(
             interface_port=2,
@@ -1220,7 +1247,6 @@ class TestEVC():
         }
         return EVC(**attributes)
 
-    # pylint: disable=too-many-branches
     @pytest.mark.parametrize(
         "uni_a,uni_z",
         [
@@ -2045,7 +2071,12 @@ class TestEVC():
     def test_get_failover_path_vandidates(self, get_disjoint_paths_mock):
         """Test get_failover_path_candidates method"""
         self.evc_deploy.get_failover_path_candidates()
-        get_disjoint_paths_mock.assert_called_once()
+        get_disjoint_paths_mock.assert_called_once_with(
+            self.evc_deploy, self.evc_deploy.current_path
+        )
+        reference = Path([get_link_mocked()])
+        self.evc_deploy.get_failover_path_candidates(reference)
+        get_disjoint_paths_mock.assert_called_with(self.evc_deploy, reference)
 
     def test_is_failover_path_affected_by_link(self):
         """Test is_failover_path_affected_by_link method"""
@@ -2060,10 +2091,163 @@ class TestEVC():
     def test_is_eligible_for_failover_path(self):
         """Test is_eligible_for_failover_path method"""
         assert self.evc_deploy.is_eligible_for_failover_path() is False
+        self.evc_deploy.current_path = Path([get_link_mocked()])
         self.evc_deploy.dynamic_backup_path = True
         self.evc_deploy.primary_path = Path([])
         self.evc_deploy.backup_path = Path([])
         assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+    def test_is_eligible_for_failover_path_with_backup(self):
+        """No EVC with a backup_path uses failover_path, as on master: dual
+        static EVCs swap between their configured paths and escape with a
+        reference_path, and a backup only + dynamic EVC must never have its
+        configured backup cleared as a throwaway failover (EP041)."""
+        primary = Path([get_link_mocked()])
+        backup = Path([get_link_mocked(endpoint_a_port=5, endpoint_b_port=6)])
+        self.evc_deploy.dynamic_backup_path = True
+
+        # dual static + dynamic, on primary or on an escape
+        self.evc_deploy.primary_path = primary
+        self.evc_deploy.backup_path = backup
+        self.evc_deploy.current_path = primary
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+        self.evc_deploy.current_path = Path([get_link_mocked()])
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+
+        # backup only + dynamic
+        self.evc_deploy.primary_path = Path([])
+        self.evc_deploy.current_path = backup
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+
+        # no backup: plain dynamic eligibility
+        self.evc_deploy.backup_path = Path([])
+        self.evc_deploy.current_path = Path([get_link_mocked()])
+        assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.is_using_primary_path")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy"
+           ".has_single_static_dynamic_path")
+    @patch("napps.kytos.mef_eline.models.evc.EVCDeploy.has_dual_static_paths")
+    def test_is_eligible_for_failover_path_single_static_dyn(
+        self, dual_mock, single_static_dyn_mock, using_primary_mock
+    ):
+        """single static + dynamic pre-installs a dynamic failover only while
+        forwarding on primary; on the dynamic it is not eligible - the dynamic
+        is a bridge back to primary, protected only by the last-resort cold
+        escape (EP041)."""
+        self.evc_deploy.current_path = Path([get_link_mocked()])
+        self.evc_deploy.dynamic_backup_path = True
+        dual_mock.return_value = False
+        single_static_dyn_mock.return_value = True
+
+        # on primary -> eligible (arm a dynamic failover to protect primary)
+        using_primary_mock.return_value = True
+        assert self.evc_deploy.is_eligible_for_failover_path() is True
+
+        # on the dynamic (primary down) -> NOT eligible (no second dynamic)
+        using_primary_mock.return_value = False
+        assert self.evc_deploy.is_eligible_for_failover_path() is False
+
+    @patch("napps.kytos.mef_eline.models.path.DynamicPathManager"
+           ".get_disjointness")
+    def test_validate_static_paths(self, get_disjointness_mock):
+        """A backup_path requires a primary_path, and both must be disjoint,
+        on create and on an update setting either (EP041)."""
+        primary = Path([get_link_mocked()])
+        backup = Path([get_link_mocked(endpoint_a_port=7, endpoint_b_port=8)])
+        evc = self.evc_deploy
+        evc.primary_path, evc.backup_path = Path([]), Path([])
+        get_disjointness_mock.return_value = 1.0
+
+        with pytest.raises(ValueError, match="requires a primary_path"):
+            evc._validate_static_paths(backup_path=backup)
+        evc._validate_static_paths(primary_path=primary, backup_path=backup)
+        evc._validate_static_paths(primary_path=primary)
+        evc._validate_static_paths()
+
+        # not disjoint (identical or fully overlapping)
+        get_disjointness_mock.return_value = 0
+        with pytest.raises(ValueError, match="disjoint"):
+            evc._validate_static_paths(
+                primary_path=primary, backup_path=primary
+            )
+        get_disjointness_mock.return_value = 1.0
+
+        # an update emptying primary_path of an EVC with a backup_path
+        evc.primary_path, evc.backup_path = primary, backup
+        with pytest.raises(ValueError, match="requires a primary_path"):
+            evc._validate_static_paths(primary_path=Path([]))
+        # or emptying both
+        evc._validate_static_paths(
+            primary_path=Path([]), backup_path=Path([])
+        )
+
+    @patch("napps.kytos.mef_eline.models.path.Path.is_valid")
+    def test_update_rejects_backup_without_primary(self, _is_valid_mock):
+        """update() rejects removing the primary_path of an EVC keeping its
+        backup_path, before changing anything (EP041)."""
+        evc = self.evc_deploy
+        evc.primary_path = Path([get_link_mocked()])
+        evc.backup_path = Path([
+            get_link_mocked(endpoint_a_port=7, endpoint_b_port=8)
+        ])
+        evc.dynamic_backup_path = True
+        evc.sync = MagicMock()
+        primary = evc.primary_path
+
+        with pytest.raises(ValueError, match="requires a primary_path"):
+            evc.update(primary_path=Path([]))
+        assert evc.primary_path is primary
+        evc.sync.assert_not_called()
+
+    def test_remove_static_standby_flows(self):
+        """Every kept static that is not current is swept (EP041)."""
+        evc = self.evc_deploy
+        evc.remove_path_flows = MagicMock()
+        primary = Path([get_link_mocked()])
+        backup = Path([get_link_mocked()])
+        escape = Path([get_link_mocked()])
+
+        # no configured statics -> no-op
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_not_called()
+
+        # dual static on primary -> sweeps only the backup standby
+        evc.primary_path, evc.backup_path = primary, backup
+        evc.current_path = primary
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_called_once_with(backup)
+
+        # dual static on backup -> sweeps only the primary standby
+        evc.remove_path_flows.reset_mock()
+        evc.current_path = backup
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_called_once_with(primary)
+
+        # single static + dynamic on its dynamic -> sweeps only primary
+        evc.remove_path_flows.reset_mock()
+        evc.backup_path = Path([])
+        evc.current_path = escape
+        evc.remove_static_standby_flows()
+        evc.remove_path_flows.assert_called_once_with(primary)
+
+    def test_remove_static_standby_flows_skips_never_deployed(self):
+        """A configured path never deployed (no s_vlan) has no flows to
+        sweep and is skipped, e.g. the new path of an admin path update,
+        already set when the redeploy's sweep runs (EP041)."""
+        evc = self.evc_deploy
+        evc.remove_path_flows = MagicMock()
+        old_primary = Path([get_link_mocked()])
+        new_primary = Path([get_link_mocked()])
+        new_primary[0].get_metadata = Mock(return_value=None)  # no s_vlan
+        assert not new_primary.is_deployed()
+        evc.primary_path = new_primary      # already overwritten by update
+        evc.current_path = old_primary      # still forwarding on the old
+        evc.backup_path = Path([])
+
+        evc.remove_static_standby_flows()
+
+        evc.remove_path_flows.assert_not_called()
 
     def test_get_value_from_uni_tag(self):
         """Test _get_value_from_uni_tag"""
@@ -2325,7 +2509,6 @@ class TestEVC():
     @patch("napps.kytos.mef_eline.models.evc.EVC._send_flow_mods")
     def test_remove_current_flows_intra(self, *args):
         """Remove flows from intra EVC"""
-        # pylint: disable=too-many-locals
         (send_flow_mods_mocked, _,) = args
         uni_a = get_uni_mocked()
         uni_z = get_uni_mocked()
@@ -2367,7 +2550,6 @@ class TestEVC():
     def test_remove_current_flows_leftover_switch(self, *args):
         """Remove flows from inter EVC without current path
         because it was recently changed from intra EVC."""
-        # pylint: disable=too-many-locals
         (send_flow_mods_mocked, _,) = args
         uni_a = get_uni_mocked()
         uni_z = get_uni_mocked()

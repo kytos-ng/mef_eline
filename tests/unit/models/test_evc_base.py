@@ -153,8 +153,10 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         evc.update(**update_dict)
         assert evc.is_enabled() is False
 
+    @patch("napps.kytos.mef_eline.models.path.Path.is_deployed",
+           return_value=False)
     @patch("napps.kytos.mef_eline.models.EVC.sync")
-    def test_update_empty_primary_path(self, _sync_mock):
+    def test_update_empty_primary_path(self, _sync_mock, _is_deployed):
         """Test if an empty primary path can be set."""
         initial_primary_path = Path([MagicMock(id=1), MagicMock(id=2)])
         attributes = {
@@ -195,8 +197,10 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
             in str(handle_error)
         )
 
+    @patch("napps.kytos.mef_eline.models.path.Path.is_deployed",
+           return_value=False)
     @patch("napps.kytos.mef_eline.models.EVC.sync")
-    def test_update_empty_backup_path(self, _sync_mock):
+    def test_update_empty_backup_path(self, _sync_mock, _is_deployed):
         """Test if an empty backup path can be set."""
         initial_backup_path = Path([MagicMock(id=1), MagicMock(id=2)])
         attributes = {
@@ -214,8 +218,12 @@ class TestEVC():  # pylint: disable=too-many-public-methods, no-member
         evc.update(**update_dict)
         assert len(evc.backup_path) == 0
 
+    @patch("napps.kytos.mef_eline.models.path.Path.is_deployed",
+           return_value=False)
     @patch("napps.kytos.mef_eline.models.EVC.sync")
-    def test_update_empty_backup_path_non_dynamic(self, _sync_mock):
+    def test_update_empty_backup_path_non_dynamic(
+        self, _sync_mock, _is_deployed
+    ):
         """Test if an empty backup path can be set even if it's non dynamic."""
         uni_a = get_uni_mocked(is_valid=True, switch_id="00:01")
         uni_z = get_uni_mocked(is_valid=True, switch_id="00:02")
