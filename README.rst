@@ -331,7 +331,7 @@ Event published when the egress and NNI flows of a static standby path get insta
 kytos/mef_eline.static.ingress_installed
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Event published when the UNI ingress flows get installed and the EVC resumes forwarding on a configured path whose egress and NNI were kept installed. ``flows`` are the new deployed flows.
+Event published when the UNI ingress flows get installed and an EVC that was down resumes forwarding, either on a configured path whose egress and NNI were kept installed, or on a dynamic path escaping its down configured paths. ``flows`` are the new deployed flows.
 
 .. code-block:: python3
 
@@ -376,7 +376,7 @@ Event published when only the UNI ingress flows get removed, so the EVC stops fo
 kytos/mef_eline.static.ingress_swapped
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Event published when the UNI ingress moves onto another configured path, both of which stay installed. ``flows`` are the new deployed flows.
+Event published when the UNI ingress moves onto another configured path, both of which stay installed, without changing whether the EVC is active. ``flows`` are the new deployed flows.
 
 .. code-block:: python3
 

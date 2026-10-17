@@ -1295,9 +1295,9 @@ class TestEP041Teardown:
     @patch("napps.kytos.mef_eline.main.emit_event")
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
     def test_swap_to_failover_activate(self, _send, emit_mock):
-        """Only on request an EVC is activated once swapped, the event built
-        afterwards reporting it active; master's default is unchanged
-        (EP041)."""
+        """Only on request an EVC is activated once swapped, reported with
+        static.ingress_installed built afterwards; master's default is
+        unchanged (EP041)."""
         evc = MagicMock(id="1")
         evc.failover_path = MagicMock()
         states = []
@@ -1310,36 +1310,52 @@ class TestEP041Teardown:
             ) or "E"
         )
 
+        self.napp.prepare_resume_event = MagicMock(
+            side_effect=lambda evc, _flows: evc.try_to_activate.called
+        )
+
         self.napp.execute_swap_to_failover([evc])
         evc.try_to_activate.assert_not_called()
         assert states == [False]
+        assert emit_mock.call_args[0][1] == "failover_link_down"
 
-        states.clear()
         self.napp.execute_swap_to_failover([evc], activate=True)
         evc.try_to_activate.assert_called_once_with()
-        # built again after activating
-        assert states == [False, True]
-        assert emit_mock.call_args[0][1] == "failover_link_down"
+        assert emit_mock.call_args[0][1] == "static.ingress_installed"
+        assert emit_mock.call_args[1]["content"] == {"1": True}
 
     @patch("napps.kytos.mef_eline.main.emit_event")
     @patch("napps.kytos.mef_eline.main.send_flow_mods_http")
     def test_swap_to_standby_event_after_activation(self, _send, emit_mock):
-        """static.ingress_swapped is built once the EVC is repointed and
-        activated, so consumers see it forwarding (EP041)."""
+        """A swap activating an EVC reports it with static.ingress_installed,
+        built once it's repointed and activated; the others keep
+        static.ingress_swapped (EP041)."""
         evc = MagicMock(id="1")
         evc.is_active.return_value = False
         evc.are_unis_active.return_value = True
-        evc.failover_path = Path([])
-        evc._prepare_uni_flows.return_value = {"1": ["In"]}
-        self.napp.execute_install_standby = MagicMock(return_value=([evc], []))
-        self.napp.prepare_swap_to_failover_event = MagicMock(
+        active = MagicMock(id="2")
+        active.is_active.return_value = True
+        for item in (evc, active):
+            item.failover_path = Path([])
+            item._prepare_uni_flows.return_value = {"1": ["In"]}
+        self.napp.execute_install_standby = MagicMock(
+            return_value=([evc, active], [])
+        )
+        self.napp.prepare_resume_event = MagicMock(
             side_effect=lambda evc, _flows: evc.try_to_activate.called
         )
+        self.napp.prepare_swap_to_failover_event = MagicMock(return_value="E")
 
-        self.napp.execute_swap_to_standby([evc])
+        self.napp.execute_swap_to_standby([evc, active])
 
-        assert emit_mock.call_args[0][1] == "static.ingress_swapped"
-        assert emit_mock.call_args[1]["content"] == {"1": True}
+        emitted = {
+            call[0][1]: call[1]["content"]
+            for call in emit_mock.call_args_list
+        }
+        assert emitted == {
+            "static.ingress_installed": {"1": True},
+            "static.ingress_swapped": {"2": "E"},
+        }
 
     def test_consistency_path_down_after_trace(self):
         """A trace that passed doesn't activate an EVC whose path went down

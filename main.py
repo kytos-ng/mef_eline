@@ -275,12 +275,7 @@ class Main(KytosNApp):
             log.info(f"Resumed on a configured path: {resumed}")
             emit_event(
                 self.controller, "static.ingress_installed", content={
-                    evc.id: map_evc_event_content(
-                        evc,
-                        flows=deepcopy(install_flow),
-                        removed_flows={},
-                        current_path=evc.current_path.as_dict(),
-                    )
+                    evc.id: self.prepare_resume_event(evc, install_flow)
                     for evc, install_flow in done.values()
                 }
             )
@@ -1130,6 +1125,17 @@ class Main(KytosNApp):
             flows=deepcopy(install_flow)
         )
 
+    @staticmethod
+    def prepare_resume_event(evc: EVC, install_flow):
+        """Prepare static.ingress_installed contents, an EVC that was down
+        forwarding again with its ingress installed (EP041)."""
+        return map_evc_event_content(
+            evc,
+            flows=deepcopy(install_flow),
+            removed_flows={},
+            current_path=evc.current_path.as_dict(),
+        )
+
     def execute_swap_to_failover(
         self,
         evcs: list[EVC],
@@ -1138,8 +1144,8 @@ class Main(KytosNApp):
         """Process changes needed to commit a swap to failover.
 
         With activate, an EVC that was down, such as a static EVC escaping
-        onto a dynamic path, is activated once swapped, before the event is
-        built so it reports its new state (EP041).
+        onto a dynamic path, is activated once swapped and reported with
+        static.ingress_installed instead (EP041).
         """
         event_contents = {}
         install_flows = {}
@@ -1172,12 +1178,13 @@ class Main(KytosNApp):
                         evc.try_to_activate()
                     except ActivationError as exc:
                         log.error(f"Fail to activate {evc}: {exc}")
-                    event_contents[evc.id] = \
-                        self.prepare_swap_to_failover_event(
-                            evc, flows_by_evc[evc.id]
-                        )
+                    event_contents[evc.id] = self.prepare_resume_event(
+                        evc, flows_by_evc[evc.id]
+                    )
             emit_event(
-                self.controller, "failover_link_down",
+                self.controller,
+                "static.ingress_installed" if activate
+                else "failover_link_down",
                 content=deepcopy(event_contents)
             )
             return swapped_evcs, not_swapped_evcs
@@ -1306,12 +1313,13 @@ class Main(KytosNApp):
             log.error(f"Fail to install standby flows for {evcs}: {exc}")
             return [], [*swapped_evcs, *not_swapped_evcs]
 
-        detached = []
+        detached, resumed = [], set()
         for evc in swapped_evcs:
             old_current, evc.current_path = evc.current_path, targets[evc.id]
             evc.execution_rounds = 0
             # it now forwards, don't leave it reported as inactive
             if not evc.is_active() and evc.are_unis_active():
+                resumed.add(evc.id)
                 try:
                     evc.try_to_activate()
                 except ActivationError as exc:
@@ -1332,14 +1340,18 @@ class Main(KytosNApp):
             if old_current.is_deployed():
                 detached.append((evc, old_current))
 
-        emit_event(
-            self.controller, "static.ingress_swapped", content={
-                evc.id: self.prepare_swap_to_failover_event(
-                    evc, flows_by_evc[evc.id]
-                )
-                for evc in swapped_evcs
-            }
-        )
+        contents = defaultdict(dict)
+        for evc in swapped_evcs:
+            if evc.id in resumed:
+                contents["static.ingress_installed"][evc.id] = \
+                    self.prepare_resume_event(evc, flows_by_evc[evc.id])
+            else:
+                contents["static.ingress_swapped"][evc.id] = \
+                    self.prepare_swap_to_failover_event(
+                        evc, flows_by_evc[evc.id]
+                    )
+        for name, content in contents.items():
+            emit_event(self.controller, name, content=content)
         by_role = defaultdict(list)
         for evc in swapped_evcs:
             target = targets[evc.id]
