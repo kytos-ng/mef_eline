@@ -17,7 +17,7 @@ Fixed
 - Fixed leftover flows when changing from intra-EVC to inter-EVC by detecting the change and removing UNI flows from intra switch.
 - Fixed leftover flow when both EVC UNI were patched and the circuit changed from intra to inter switch.
 - Redeploying intra EVC when when it has not flows and UNI gets activated.
-- Fixed race condition on EVC metadata endpoints, bulk and single EVC metadata updates and schedule create, update and delete now hold the EVC locks, so a concurrent ``evc.sync()`` no longer reverts a bulk metadata write.
+- Fixed race condition on EVC metadata endpoints, bulk and single EVC metadata updates, schedule create, update and delete, and scheduled EVC deploy and remove jobs now hold the EVC locks, so a concurrent ``evc.sync()`` no longer reverts a bulk metadata write.
 
 [2025.2.0] - 2026-02-02
 ***********************

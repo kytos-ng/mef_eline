@@ -1,12 +1,14 @@
 """Module to test the schedule.py file."""
 import datetime
-from unittest.mock import patch
+from threading import Lock
+from unittest.mock import MagicMock, patch
 
 from apscheduler.triggers.cron import CronTrigger
 from pytz import utc
 
 from napps.kytos.mef_eline.models import EVC
-from napps.kytos.mef_eline.scheduler import CircuitSchedule, Scheduler
+from napps.kytos.mef_eline.scheduler import (CircuitSchedule, Scheduler,
+                                             _run_with_lock)
 from napps.kytos.mef_eline.tests.helpers import get_controller_mock
 
 
@@ -100,9 +102,12 @@ class TestScheduler():
             "id": circuit_scheduler.id,
             "run_date": circuit_scheduler.date,
         }
-        scheduler_add_job_mock.assert_called_once_with(
-            evc.remove, "date", **expected_parameters
-        )
+        scheduler_add_job_mock.assert_called_once()
+        args, kwargs = scheduler_add_job_mock.call_args
+        assert args[0].func == _run_with_lock
+        assert args[0].args == (evc, evc.remove)
+        assert args[1:] == ("date",)
+        assert kwargs == expected_parameters
 
     @patch("apscheduler.schedulers.background.BackgroundScheduler.add_job")
     @patch("napps.kytos.mef_eline.models.EVC._validate")
@@ -134,9 +139,12 @@ class TestScheduler():
                 2019, 8, 9, 19, 25, 6, 0, tzinfo=datetime.timezone.utc
             ),
         }
-        scheduler_add_job_mock.assert_called_once_with(
-            evc.deploy, "interval", **expected_parameters
-        )
+        scheduler_add_job_mock.assert_called_once()
+        args, kwargs = scheduler_add_job_mock.call_args
+        assert args[0].func == _run_with_lock
+        assert args[0].args == (evc, evc.deploy)
+        assert args[1:] == ("interval",)
+        assert kwargs == expected_parameters
 
     @patch("apscheduler.triggers.cron.CronTrigger.from_crontab")
     @patch("apscheduler.schedulers.background.BackgroundScheduler.add_job")
@@ -175,6 +183,18 @@ class TestScheduler():
                 2019, 8, 9, 19, 25, 6, 0, tzinfo=datetime.timezone.utc
             ),
         }
-        scheduler_add_job_mock.assert_called_once_with(
-            evc.deploy, trigger, **expected_parameters
-        )
+        scheduler_add_job_mock.assert_called_once()
+        args, kwargs = scheduler_add_job_mock.call_args
+        assert args[0].func == _run_with_lock
+        assert args[0].args == (evc, evc.deploy)
+        assert args[1:] == (trigger,)
+        assert kwargs == expected_parameters
+
+    def test_run_with_lock(self):
+        """Test _run_with_lock holds the circuit lock while running action."""
+        circuit = MagicMock()
+        circuit.lock = Lock()
+        action = MagicMock(side_effect=circuit.lock.locked)
+        assert _run_with_lock(circuit, action)
+        action.assert_called_once()
+        assert not circuit.lock.locked()
