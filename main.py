@@ -675,18 +675,19 @@ class Main(KytosNApp):
         # new schedule from dict
         new_schedule = CircuitSchedule.from_dict(schedule_data)
 
-        # If there is no schedule, create the list
-        if not evc.circuit_scheduler:
-            evc.circuit_scheduler = []
+        with evc.lock:
+            # If there is no schedule, create the list
+            if not evc.circuit_scheduler:
+                evc.circuit_scheduler = []
 
-        # Add the new schedule
-        evc.circuit_scheduler.append(new_schedule)
+            # Add the new schedule
+            evc.circuit_scheduler.append(new_schedule)
 
-        # Add schedule job
-        self.sched.add_circuit_job(evc, new_schedule)
+            # Add schedule job
+            self.sched.add_circuit_job(evc, new_schedule)
 
-        # save circuit to mongodb
-        evc.sync()
+            # save circuit to mongodb
+            evc.sync()
 
         result = new_schedule.as_dict()
         status = 201
@@ -724,17 +725,18 @@ class Main(KytosNApp):
 
         new_schedule = CircuitSchedule.from_dict(data)
         new_schedule.id = found_schedule.id
-        # Remove the old schedule
-        evc.circuit_scheduler.remove(found_schedule)
-        # Append the modified schedule
-        evc.circuit_scheduler.append(new_schedule)
+        with evc.lock:
+            # Remove the old schedule
+            evc.circuit_scheduler.remove(found_schedule)
+            # Append the modified schedule
+            evc.circuit_scheduler.append(new_schedule)
 
-        # Cancel all schedule jobs
-        self.sched.cancel_job(found_schedule.id)
-        # Add the new circuit schedule
-        self.sched.add_circuit_job(evc, new_schedule)
-        # Save EVC to mongodb
-        evc.sync()
+            # Cancel all schedule jobs
+            self.sched.cancel_job(found_schedule.id)
+            # Add the new circuit schedule
+            self.sched.add_circuit_job(evc, new_schedule)
+            # Save EVC to mongodb
+            evc.sync()
 
         result = new_schedule.as_dict()
         status = 200
@@ -760,13 +762,14 @@ class Main(KytosNApp):
             log.debug("delete_schedule result %s %s", result, 404)
             raise HTTPException(404, detail=result)
 
-        # Remove the old schedule
-        evc.circuit_scheduler.remove(found_schedule)
+        with evc.lock:
+            # Remove the old schedule
+            evc.circuit_scheduler.remove(found_schedule)
 
-        # Cancel all schedule jobs
-        self.sched.cancel_job(found_schedule.id)
-        # Save EVC to mongodb
-        evc.sync()
+            # Cancel all schedule jobs
+            self.sched.cancel_job(found_schedule.id)
+            # Save EVC to mongodb
+            evc.sync()
 
         result = "Schedule removed"
         status = 200
