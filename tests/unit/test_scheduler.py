@@ -104,7 +104,7 @@ class TestScheduler():
         }
         scheduler_add_job_mock.assert_called_once()
         args, kwargs = scheduler_add_job_mock.call_args
-        assert args[0].func == _run_with_lock
+        assert args[0].func is _run_with_lock
         assert args[0].args == (evc, evc.remove)
         assert args[1:] == ("date",)
         assert kwargs == expected_parameters
@@ -141,7 +141,7 @@ class TestScheduler():
         }
         scheduler_add_job_mock.assert_called_once()
         args, kwargs = scheduler_add_job_mock.call_args
-        assert args[0].func == _run_with_lock
+        assert args[0].func is _run_with_lock
         assert args[0].args == (evc, evc.deploy)
         assert args[1:] == ("interval",)
         assert kwargs == expected_parameters
@@ -185,7 +185,7 @@ class TestScheduler():
         }
         scheduler_add_job_mock.assert_called_once()
         args, kwargs = scheduler_add_job_mock.call_args
-        assert args[0].func == _run_with_lock
+        assert args[0].func is _run_with_lock
         assert args[0].args == (evc, evc.deploy)
         assert args[1:] == (trigger,)
         assert kwargs == expected_parameters
