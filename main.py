@@ -502,6 +502,24 @@ class Main(KytosNApp):
                 detail=f"circuit_id {circuit_id} not found."
             ) from error
 
+    def _lock_evcs(
+        self, exit_stack: ExitStack, circuit_ids: list[str]
+    ) -> tuple[list[EVC], list[str]]:
+        """Acquire the locks of the given EVCs on exit_stack.
+
+        Return the found EVCs and the circuit_ids that weren't found.
+        """
+        exit_stack.enter_context(self.multi_evc_lock)
+        found, not_found = [], []
+        for _id in dict.fromkeys(circuit_ids):
+            try:
+                evc = self.circuits[_id]
+                exit_stack.enter_context(evc.lock)
+                found.append(evc)
+            except KeyError:
+                not_found.append(_id)
+        return found, not_found
+
     @rest("/v2/evc/metadata", methods=["POST"])
     @validate_openapi(spec)
     def bulk_add_metadata(self, request: Request) -> JSONResponse:
@@ -509,15 +527,13 @@ class Main(KytosNApp):
         data = get_json_or_400(request, self.controller.loop)
         circuit_ids = data.pop("circuit_ids")
 
-        self.mongo_controller.update_evcs_metadata(circuit_ids, data, "add")
-
-        fail_evcs = []
-        for _id in circuit_ids:
-            try:
-                evc = self.circuits[_id]
+        with ExitStack() as exit_stack:
+            evcs, fail_evcs = self._lock_evcs(exit_stack, circuit_ids)
+            self.mongo_controller.update_evcs_metadata(
+                circuit_ids, data, "add"
+            )
+            for evc in evcs:
                 evc.extend_metadata(data)
-            except KeyError:
-                fail_evcs.append(_id)
 
         if fail_evcs:
             raise HTTPException(404, detail=fail_evcs)
@@ -539,8 +555,9 @@ class Main(KytosNApp):
                 detail=f"circuit_id {circuit_id} not found."
             ) from error
 
-        evc.extend_metadata(metadata)
-        evc.sync()
+        with evc.lock:
+            evc.extend_metadata(metadata)
+            evc.sync()
         return JSONResponse("Operation successful", status_code=201)
 
     @rest("/v2/evc/metadata/{key}", methods=["DELETE"])
@@ -550,17 +567,14 @@ class Main(KytosNApp):
         data = get_json_or_400(request, self.controller.loop)
         key = request.path_params["key"]
         circuit_ids = data.pop("circuit_ids")
-        self.mongo_controller.update_evcs_metadata(
-            circuit_ids, {key: ""}, "del"
-        )
 
-        fail_evcs = []
-        for _id in circuit_ids:
-            try:
-                evc = self.circuits[_id]
+        with ExitStack() as exit_stack:
+            evcs, fail_evcs = self._lock_evcs(exit_stack, circuit_ids)
+            self.mongo_controller.update_evcs_metadata(
+                circuit_ids, {key: ""}, "del"
+            )
+            for evc in evcs:
                 evc.remove_metadata(key)
-            except KeyError:
-                fail_evcs.append(_id)
 
         if fail_evcs:
             raise HTTPException(404, detail=fail_evcs)
@@ -579,8 +593,9 @@ class Main(KytosNApp):
                 detail=f"circuit_id {circuit_id} not found."
             ) from error
 
-        evc.remove_metadata(key)
-        evc.sync()
+        with evc.lock:
+            evc.remove_metadata(key)
+            evc.sync()
         return JSONResponse("Operation successful")
 
     @rest("/v2/evc/{circuit_id}/redeploy", methods=["PATCH"])
@@ -660,18 +675,19 @@ class Main(KytosNApp):
         # new schedule from dict
         new_schedule = CircuitSchedule.from_dict(schedule_data)
 
-        # If there is no schedule, create the list
-        if not evc.circuit_scheduler:
-            evc.circuit_scheduler = []
+        with evc.lock:
+            # If there is no schedule, create the list
+            if not evc.circuit_scheduler:
+                evc.circuit_scheduler = []
 
-        # Add the new schedule
-        evc.circuit_scheduler.append(new_schedule)
+            # Add the new schedule
+            evc.circuit_scheduler.append(new_schedule)
 
-        # Add schedule job
-        self.sched.add_circuit_job(evc, new_schedule)
+            # Add schedule job
+            self.sched.add_circuit_job(evc, new_schedule)
 
-        # save circuit to mongodb
-        evc.sync()
+            # save circuit to mongodb
+            evc.sync()
 
         result = new_schedule.as_dict()
         status = 201
@@ -709,17 +725,18 @@ class Main(KytosNApp):
 
         new_schedule = CircuitSchedule.from_dict(data)
         new_schedule.id = found_schedule.id
-        # Remove the old schedule
-        evc.circuit_scheduler.remove(found_schedule)
-        # Append the modified schedule
-        evc.circuit_scheduler.append(new_schedule)
+        with evc.lock:
+            # Remove the old schedule
+            evc.circuit_scheduler.remove(found_schedule)
+            # Append the modified schedule
+            evc.circuit_scheduler.append(new_schedule)
 
-        # Cancel all schedule jobs
-        self.sched.cancel_job(found_schedule.id)
-        # Add the new circuit schedule
-        self.sched.add_circuit_job(evc, new_schedule)
-        # Save EVC to mongodb
-        evc.sync()
+            # Cancel all schedule jobs
+            self.sched.cancel_job(found_schedule.id)
+            # Add the new circuit schedule
+            self.sched.add_circuit_job(evc, new_schedule)
+            # Save EVC to mongodb
+            evc.sync()
 
         result = new_schedule.as_dict()
         status = 200
@@ -745,13 +762,14 @@ class Main(KytosNApp):
             log.debug("delete_schedule result %s %s", result, 404)
             raise HTTPException(404, detail=result)
 
-        # Remove the old schedule
-        evc.circuit_scheduler.remove(found_schedule)
+        with evc.lock:
+            # Remove the old schedule
+            evc.circuit_scheduler.remove(found_schedule)
 
-        # Cancel all schedule jobs
-        self.sched.cancel_job(found_schedule.id)
-        # Save EVC to mongodb
-        evc.sync()
+            # Cancel all schedule jobs
+            self.sched.cancel_job(found_schedule.id)
+            # Save EVC to mongodb
+            evc.sync()
 
         result = "Schedule removed"
         status = 200

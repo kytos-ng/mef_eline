@@ -1,4 +1,5 @@
 """Module responsible for handling schedulers."""
+from functools import partial
 from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
@@ -7,6 +8,12 @@ from apscheduler.triggers.cron import CronTrigger
 from pytz import utc
 
 from kytos.core import log
+
+
+def _run_with_lock(circuit, action):
+    """Run a circuit action while holding the circuit lock."""
+    with circuit.lock:
+        return action()
 
 
 class CircuitSchedule:
@@ -92,11 +99,12 @@ class Scheduler:
         :return:
         """
         if circuit_scheduler.action == "create":
-            job_call = circuit.deploy
+            action = circuit.deploy
         elif circuit_scheduler.action == "remove":
-            job_call = circuit.remove
+            action = circuit.remove
         else:
             raise ValueError("Scheduler action must be 'create' or 'remove'")
+        job_call = partial(_run_with_lock, circuit, action)
 
         data = {"id": circuit_scheduler.id}
         if circuit_scheduler.date:

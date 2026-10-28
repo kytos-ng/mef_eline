@@ -1,5 +1,6 @@
 """Module to test the main napp file."""
 import asyncio
+from threading import Lock
 from unittest.mock import (AsyncMock, MagicMock, Mock, call,
                            create_autospec, patch)
 
@@ -2452,6 +2453,7 @@ class TestMain:
         """Test method to add metadata"""
         self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evc_mock.metadata = {}
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2528,6 +2530,7 @@ class TestMain:
     async def test_delete_metadata(self):
         """Test method to delete metadata"""
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evc_mock.metadata = {'metadata1': 1, 'metadata2': 2}
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
@@ -2695,6 +2698,7 @@ class TestMain:
         """Test add_bulk_metadata method"""
         self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
         payload = {
@@ -2715,6 +2719,8 @@ class TestMain:
         calls = self.napp.mongo_controller.update_evcs_metadata.call_count
         assert calls == 1
         evc_mock.extend_metadata.assert_called_with(payload)
+        evc_mock.lock.__enter__.assert_called_once()
+        evc_mock.lock.__exit__.assert_called_once()
 
     async def test_add_bulk_metadata_empty_list(self):
         """Test add_bulk_metadata method empty list"""
@@ -2738,6 +2744,7 @@ class TestMain:
         """Test add_bulk_metadata with unknown evc id"""
         self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
         payload = {
@@ -2768,6 +2775,7 @@ class TestMain:
         """Test delete_metadata method"""
         self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evc_mock.id = 1234
         self.napp.circuits = {"1234": evc_mock}
         payload = {
@@ -2786,11 +2794,30 @@ class TestMain:
         calls = self.napp.mongo_controller.update_evcs_metadata.call_count
         assert calls == 1
         assert evc_mock.remove_metadata.call_count == 1
+        evc_mock.lock.__enter__.assert_called_once()
+        evc_mock.lock.__exit__.assert_called_once()
+
+    async def test_bulk_metadata_duplicated_ids(self):
+        """Test bulk metadata with duplicated circuit_ids"""
+        self.napp.controller.loop = asyncio.get_running_loop()
+        evc_mock = create_autospec(EVC)
+        evc_mock.lock = Lock()
+        self.napp.circuits = {"1234": evc_mock}
+        payload = {"circuit_ids": ["1234", "1234"], "metadata1": 1}
+        response = await self.api_client.post(
+            f"{self.base_endpoint}/v2/evc/metadata",
+            json=payload
+        )
+        assert response.status_code == 201
+        assert evc_mock.extend_metadata.call_count == 1
+        assert not evc_mock.lock.locked()
+        assert not self.napp.multi_evc_lock.locked()
 
     async def test_delete_bulk_metadata_error(self):
         """Test bulk_delete_metadata with ciruit erroring"""
         self.napp.controller.loop = asyncio.get_running_loop()
         evc_mock = create_autospec(EVC)
+        evc_mock.lock = MagicMock()
         evcs = [evc_mock, evc_mock]
         self.napp.circuits = dict(zip(["1", "2"], evcs))
         payload = {"circuit_ids": ["1", "2", "3"]}
