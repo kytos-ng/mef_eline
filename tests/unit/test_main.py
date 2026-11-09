@@ -1792,6 +1792,96 @@ class TestMain:
         link = self.napp._link_from_dict(link_dict, "primary_path")
         assert link.metadata.get('s_vlan', None) is None
 
+    def test_link_from_dict_reference_by_id(self):
+        """A string path element that matches a link id is resolved to its
+        endpoints (ID-exact takes precedence over link_name)."""
+        link = MagicMock(id="link_id_1")
+        link.endpoint_a.id = "00:00:00:00:00:32:00:04:2"
+        link.endpoint_b.id = "00:00:00:00:00:32:00:03:2"
+        self.napp.controller.get_link = MagicMock(return_value=link)
+        intf = MagicMock(id="01:1")
+        self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
+
+        result = self.napp._link_from_dict("link_id_1", "primary_path")
+
+        assert result is not None
+        self.napp.controller.get_link.assert_called_once_with("link_id_1")
+
+    def test_link_from_dict_reference_by_name(self):
+        """A string that is not a link id resolves via metadata.link_name."""
+        self.napp.controller.get_link = MagicMock(return_value=None)
+        link = MagicMock(id="abc")
+        link.endpoint_a.id = "00:00:00:00:00:32:00:04:2"
+        link.endpoint_b.id = "00:00:00:00:00:32:00:03:2"
+        link.get_metadata = MagicMock(return_value="SAO-SCL-100G-01")
+        self.napp.controller.links = {"abc": link}
+        intf = MagicMock(id="01:1")
+        self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
+
+        result = self.napp._link_from_dict("SAO-SCL-100G-01", "primary_path")
+
+        assert result is not None
+
+    def test_link_from_dict_reference_not_found(self):
+        """Unknown reference (no id, no link_name) raises ValueError -> 400."""
+        self.napp.controller.get_link = MagicMock(return_value=None)
+        self.napp.controller.links = {}
+        with pytest.raises(ValueError):
+            self.napp._link_from_dict("ghost", "primary_path")
+
+    def test_link_from_dict_reference_name_ambiguous(self):
+        """Duplicate link_name is ambiguous and raises ValueError -> 400.
+
+        The error message lists the colliding link ids (D6)."""
+        self.napp.controller.get_link = MagicMock(return_value=None)
+        link_1 = MagicMock(id="id1")
+        link_1.get_metadata = MagicMock(return_value="DUP")
+        link_2 = MagicMock(id="id2")
+        link_2.get_metadata = MagicMock(return_value="DUP")
+        self.napp.controller.links = {"id1": link_1, "id2": link_2}
+        with pytest.raises(ValueError) as exc:
+            self.napp._link_from_dict("DUP", "primary_path")
+        assert "id1" in str(exc.value) and "id2" in str(exc.value)
+
+    def test_link_from_dict_reference_whitespace(self):
+        """A whitespace-only reference passes schema minLength but matches no
+        link, so it is rejected with ValueError -> 400 (D5)."""
+        self.napp.controller.get_link = MagicMock(return_value=None)
+        self.napp.controller.links = {}
+        with pytest.raises(ValueError):
+            self.napp._link_from_dict("   ", "primary_path")
+
+    def test_link_from_dict_mixed_forms(self):
+        """A single path list may mix the dict form, a link id and a
+        link_name; each element is resolved independently."""
+        by_id = MagicMock(id="id_hex")
+        by_id.endpoint_a.id = "00:00:00:00:00:32:00:04:2"
+        by_id.endpoint_b.id = "00:00:00:00:00:32:00:03:2"
+        by_name = MagicMock(id="id_named")
+        by_name.endpoint_a.id = "00:00:00:00:00:32:00:03:1"
+        by_name.endpoint_b.id = "00:00:00:00:00:40:00:04:1"
+        by_name.get_metadata = MagicMock(return_value="SAO-SCL-100G-01")
+
+        def fake_get_link(ref):
+            return by_id if ref == "id_hex" else None
+
+        self.napp.controller.get_link = MagicMock(side_effect=fake_get_link)
+        self.napp.controller.links = {"id_named": by_name}
+        intf = MagicMock(id="01:1")
+        self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
+
+        value = [
+            {"endpoint_a": {"id": "00:00:00:00:00:32:00:04:2"},
+             "endpoint_b": {"id": "00:00:00:00:00:32:00:03:2"}},   # dict
+            "id_hex",                                               # link id
+            "SAO-SCL-100G-01",                                      # link_name
+        ]
+        result = [
+            self.napp._link_from_dict(item, "primary_path") for item in value
+        ]
+        assert len(result) == 3
+        assert all(link is not None for link in result)
+
     def test_uni_from_dict_non_existent_intf(self):
         """Test _link_from_dict non existent intf."""
         self.napp.controller.get_interface_by_id = MagicMock(return_value=None)

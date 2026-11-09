@@ -419,11 +419,11 @@ components:
         primary_path:
           type: array
           items:
-            $ref: '#/components/schemas/Link'
+            $ref: '#/components/schemas/PathLink'
         backup_path:
           type: array
           items:
-            $ref: '#/components/schemas/Link'
+            $ref: '#/components/schemas/PathLink'
         primary_constraints:
           $ref: '#/components/schemas/PathConstraints'
         secondary_constraints:
@@ -518,6 +518,20 @@ components:
           properties:
             id:
               type: string
+
+    PathLink: # Can be referenced via '#/components/schemas/PathLink'
+      description: >
+        One hop of a primary/backup path. Either an explicit link with
+        endpoint_a/endpoint_b, OR a string referencing a topology link by its
+        id or by its metadata.link_name. A string is resolved to a link id
+        first, then to a unique metadata.link_name; an unknown or ambiguous
+        link_name is rejected with HTTP 400. The three forms may be mixed
+        freely within the same path list.
+      oneOf:
+        - $ref: '#/components/schemas/Link'
+        - type: string
+          minLength: 1
+          description: A topology link id or link_name.
 
     Path: # Can be referenced via '#/components/schemas/Path'
       type: object
@@ -780,11 +794,11 @@ components:
         primary_path:
           type: array
           items:
-            $ref: '#/components/schemas/Link'
+            $ref: '#/components/schemas/PathLink'
         backup_path:
           type: array
           items:
-            $ref: '#/components/schemas/Link'
+            $ref: '#/components/schemas/PathLink'
         primary_links:
           type: array
           items:
