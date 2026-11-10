@@ -1793,34 +1793,77 @@ class TestMain:
         assert link.metadata.get('s_vlan', None) is None
 
     def test_link_from_dict_reference_by_id(self):
-        """A string path element that matches a link id is resolved to its
-        endpoints (ID-exact takes precedence over link_name)."""
-        link = MagicMock(id="link_id_1")
-        link.endpoint_a.id = "00:00:00:00:00:32:00:04:2"
-        link.endpoint_b.id = "00:00:00:00:00:32:00:03:2"
-        self.napp.controller.get_link = MagicMock(return_value=link)
-        intf = MagicMock(id="01:1")
-        self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
+        """A string matching a link id is resolved by id; the id match takes
+        precedence over a link whose link_name equals the same string."""
+        ep_a, ep_b = "00:00:00:00:00:32:00:04:2", "00:00:00:00:00:32:00:03:2"
+        by_id = MagicMock(id="collision")
+        by_id.endpoint_a.id, by_id.endpoint_b.id = ep_a, ep_b
+        # A different link whose link_name collides with the id string; it
+        # must be ignored because the id match wins.
+        by_name = MagicMock(id="other")
+        by_name.endpoint_a.id = "00:00:00:00:00:99:00:99:9"
+        by_name.endpoint_b.id = "00:00:00:00:00:88:00:88:8"
+        by_name.get_metadata = MagicMock(return_value="collision")
+        self.napp.controller.get_link = MagicMock(
+            side_effect=lambda ref: by_id if ref == "collision" else None
+        )
+        self.napp.controller.links = {"other": by_name}
+        intfs = {i: MagicMock(id=i) for i in (ep_a, ep_b)}
+        self.napp.controller.get_interface_by_id = MagicMock(
+            side_effect=lambda i: intfs.get(i)
+        )
 
-        result = self.napp._link_from_dict("link_id_1", "primary_path")
+        result = self.napp._link_from_dict("collision", "primary_path")
 
-        assert result is not None
-        self.napp.controller.get_link.assert_called_once_with("link_id_1")
+        self.napp.controller.get_link.assert_called_once_with("collision")
+        # the colliding link_name was never consulted (id short-circuits)
+        by_name.get_metadata.assert_not_called()
+        assert {result.endpoint_a.id, result.endpoint_b.id} == {ep_a, ep_b}
 
     def test_link_from_dict_reference_by_name(self):
-        """A string that is not a link id resolves via metadata.link_name."""
+        """A string that is not a link id resolves via metadata.link_name to
+        that link's actual endpoints; other links are not matched."""
+        ep_a, ep_b = "00:00:00:00:00:32:00:03:1", "00:00:00:00:00:40:00:04:1"
         self.napp.controller.get_link = MagicMock(return_value=None)
         link = MagicMock(id="abc")
-        link.endpoint_a.id = "00:00:00:00:00:32:00:04:2"
-        link.endpoint_b.id = "00:00:00:00:00:32:00:03:2"
+        link.endpoint_a.id, link.endpoint_b.id = ep_a, ep_b
         link.get_metadata = MagicMock(return_value="SAO-SCL-100G-01")
-        self.napp.controller.links = {"abc": link}
-        intf = MagicMock(id="01:1")
-        self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
+        decoy = MagicMock(id="decoy")
+        decoy.get_metadata = MagicMock(return_value="OTHER-NAME")
+        self.napp.controller.links = {"abc": link, "decoy": decoy}
+        intfs = {i: MagicMock(id=i) for i in (ep_a, ep_b)}
+        self.napp.controller.get_interface_by_id = MagicMock(
+            side_effect=lambda i: intfs.get(i)
+        )
 
         result = self.napp._link_from_dict("SAO-SCL-100G-01", "primary_path")
 
-        assert result is not None
+        assert {result.endpoint_a.id, result.endpoint_b.id} == {ep_a, ep_b}
+        self.napp.controller.get_interface_by_id.assert_any_call(ep_a)
+        self.napp.controller.get_interface_by_id.assert_any_call(ep_b)
+
+    def test_link_from_dict_reference_is_stateless(self):
+        """Resolving by link_name returns a fresh Link carrying only the
+        endpoints, not the topology link's link_name, so a later rename of
+        that link cannot change an already-stored path."""
+        ep_a, ep_b = "00:00:00:00:00:32:00:03:1", "00:00:00:00:00:40:00:04:1"
+        self.napp.controller.get_link = MagicMock(return_value=None)
+        topo_link = MagicMock(id="abc")
+        topo_link.endpoint_a.id, topo_link.endpoint_b.id = ep_a, ep_b
+        topo_link.get_metadata = MagicMock(return_value="OLD-NAME")
+        self.napp.controller.links = {"abc": topo_link}
+        intfs = {i: MagicMock(id=i) for i in (ep_a, ep_b)}
+        self.napp.controller.get_interface_by_id = MagicMock(
+            side_effect=lambda i: intfs.get(i)
+        )
+
+        result = self.napp._link_from_dict("OLD-NAME", "primary_path")
+
+        # A fresh Link, detached from the live topology link...
+        assert result is not topo_link
+        assert {result.endpoint_a.id, result.endpoint_b.id} == {ep_a, ep_b}
+        # ...carrying no link_name metadata, so a rename is a no-op for it.
+        assert result.get_metadata("link_name") is None
 
     def test_link_from_dict_reference_not_found(self):
         """Unknown reference (no id, no link_name) raises ValueError -> 400."""
@@ -1853,34 +1896,140 @@ class TestMain:
 
     def test_link_from_dict_mixed_forms(self):
         """A single path list may mix the dict form, a link id and a
-        link_name; each element is resolved independently."""
+        link_name; each element resolves independently to its own
+        endpoints."""
+        dict_a = "00:00:00:00:00:32:00:04:2"
+        dict_b = "00:00:00:00:00:32:00:03:2"
+        id_a, id_b = "00:00:00:00:00:32:00:04:31", "00:00:00:00:00:32:00:03:31"
+        name_a = "00:00:00:00:00:32:00:03:1"
+        name_b = "00:00:00:00:00:40:00:04:1"
         by_id = MagicMock(id="id_hex")
-        by_id.endpoint_a.id = "00:00:00:00:00:32:00:04:2"
-        by_id.endpoint_b.id = "00:00:00:00:00:32:00:03:2"
+        by_id.endpoint_a.id, by_id.endpoint_b.id = id_a, id_b
         by_name = MagicMock(id="id_named")
-        by_name.endpoint_a.id = "00:00:00:00:00:32:00:03:1"
-        by_name.endpoint_b.id = "00:00:00:00:00:40:00:04:1"
+        by_name.endpoint_a.id, by_name.endpoint_b.id = name_a, name_b
         by_name.get_metadata = MagicMock(return_value="SAO-SCL-100G-01")
 
-        def fake_get_link(ref):
-            return by_id if ref == "id_hex" else None
-
-        self.napp.controller.get_link = MagicMock(side_effect=fake_get_link)
+        self.napp.controller.get_link = MagicMock(
+            side_effect=lambda ref: by_id if ref == "id_hex" else None
+        )
         self.napp.controller.links = {"id_named": by_name}
-        intf = MagicMock(id="01:1")
-        self.napp.controller.get_interface_by_id = MagicMock(return_value=intf)
+        all_ids = (dict_a, dict_b, id_a, id_b, name_a, name_b)
+        intfs = {i: MagicMock(id=i) for i in all_ids}
+        self.napp.controller.get_interface_by_id = MagicMock(
+            side_effect=lambda i: intfs.get(i)
+        )
 
         value = [
-            {"endpoint_a": {"id": "00:00:00:00:00:32:00:04:2"},
-             "endpoint_b": {"id": "00:00:00:00:00:32:00:03:2"}},   # dict
-            "id_hex",                                               # link id
-            "SAO-SCL-100G-01",                                      # link_name
+            {"endpoint_a": {"id": dict_a},
+             "endpoint_b": {"id": dict_b}},   # dict form
+            "id_hex",                         # link id
+            "SAO-SCL-100G-01",                # link_name
         ]
         result = [
             self.napp._link_from_dict(item, "primary_path") for item in value
         ]
         assert len(result) == 3
-        assert all(link is not None for link in result)
+        assert {result[0].endpoint_a.id, result[0].endpoint_b.id} \
+            == {dict_a, dict_b}
+        assert {result[1].endpoint_a.id, result[1].endpoint_b.id} \
+            == {id_a, id_b}
+        assert {result[2].endpoint_a.id, result[2].endpoint_b.id} \
+            == {name_a, name_b}
+
+    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
+    @patch("napps.kytos.mef_eline.models.evc.EVCBase._validate")
+    def test_evc_from_dict_string_and_mixed_paths(
+        self, _validate_mock, uni_from_dict_mock
+    ):
+        """primary_path and backup_path accept strings (id/name) and mixed
+        forms through the real _evc_dict_with_instances loop."""
+        _validate_mock.return_value = True
+        uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
+
+        p_dict = ("00:00:00:00:00:32:00:04:2", "00:00:00:00:00:32:00:03:2")
+        p_id = ("00:00:00:00:00:32:00:04:31", "00:00:00:00:00:32:00:03:31")
+        b_name = ("00:00:00:00:00:32:00:03:1", "00:00:00:00:00:40:00:04:1")
+        by_id = MagicMock(id="primary_hex")
+        by_id.endpoint_a.id, by_id.endpoint_b.id = p_id
+        by_name = MagicMock(id="backup_named")
+        by_name.endpoint_a.id, by_name.endpoint_b.id = b_name
+        by_name.get_metadata = MagicMock(return_value="BACKUP-LINK")
+
+        self.napp.controller.get_link = MagicMock(
+            side_effect=lambda ref: by_id if ref == "primary_hex" else None
+        )
+        self.napp.controller.links = {"backup_named": by_name}
+        all_ids = p_dict + p_id + b_name
+        intfs = {i: MagicMock(id=i) for i in all_ids}
+        self.napp.controller.get_interface_by_id = MagicMock(
+            side_effect=lambda i: intfs.get(i)
+        )
+
+        payload = {
+            "name": "mixed evc",
+            "uni_a": {"interface_id": "00:00:00:00:00:00:00:01:1"},
+            "uni_z": {"interface_id": "00:00:00:00:00:00:00:02:2"},
+            "primary_path": [
+                {"endpoint_a": {"id": p_dict[0]},
+                 "endpoint_b": {"id": p_dict[1]}},   # dict form
+                "primary_hex",                        # link id
+            ],
+            "backup_path": ["BACKUP-LINK"],           # link_name
+        }
+        evc = self.napp._evc_from_dict(payload)
+
+        assert len(evc.primary_path) == 2
+        assert len(evc.backup_path) == 1
+        assert {evc.primary_path[0].endpoint_a.id,
+                evc.primary_path[0].endpoint_b.id} == set(p_dict)
+        assert {evc.primary_path[1].endpoint_a.id,
+                evc.primary_path[1].endpoint_b.id} == set(p_id)
+        assert {evc.backup_path[0].endpoint_a.id,
+                evc.backup_path[0].endpoint_b.id} == set(b_name)
+
+    @patch("napps.kytos.mef_eline.main.Main._uni_from_dict")
+    async def test_create_circuit_unknown_link_name(self, uni_from_dict_mock):
+        """POST with an unknown link reference is rejected with 400."""
+        self.napp.controller.loop = asyncio.get_running_loop()
+        uni_from_dict_mock.side_effect = ["uni_a", "uni_z"]
+        self.napp.controller.get_link = MagicMock(return_value=None)
+        self.napp.controller.links = {}
+        payload = {
+            "name": "evc1",
+            "uni_a": {"interface_id": "00:00:00:00:00:00:00:01:1",
+                      "tag": {"tag_type": "vlan", "value": 80}},
+            "uni_z": {"interface_id": "00:00:00:00:00:00:00:02:2",
+                      "tag": {"tag_type": "vlan", "value": 1}},
+            "dynamic_backup_path": False,
+            "primary_path": ["no-such-link"],
+        }
+        response = await self.api_client.post(
+            f"{self.base_endpoint}/v2/evc/", json=payload
+        )
+        assert response.status_code == 400
+        assert "no-such-link" in response.json()["description"]
+
+    async def test_update_circuit_duplicate_link_name_unchanged(self):
+        """PATCH with an ambiguous link_name is rejected with 400 and the
+        EVC is left unchanged (update() is never called)."""
+        self.napp.controller.loop = asyncio.get_running_loop()
+        self.napp.controller.get_link = MagicMock(return_value=None)
+        link_1 = MagicMock(id="id1")
+        link_1.get_metadata = MagicMock(return_value="DUP")
+        link_2 = MagicMock(id="id2")
+        link_2.get_metadata = MagicMock(return_value="DUP")
+        self.napp.controller.links = {"id1": link_1, "id2": link_2}
+        circuit_id = "aabbccddeeff00"
+        evc = MagicMock()
+        self.napp.circuits = {circuit_id: evc}
+
+        response = await self.api_client.patch(
+            f"{self.base_endpoint}/v2/evc/{circuit_id}",
+            json={"primary_path": ["DUP"]},
+        )
+        assert response.status_code == 400
+        assert "DUP" in response.json()["description"]
+        evc.update.assert_not_called()
 
     def test_uni_from_dict_non_existent_intf(self):
         """Test _link_from_dict non existent intf."""
