@@ -462,7 +462,7 @@ class TestEP041Teardown:
         evc.is_eligible_for_dyn_failover_recovery.return_value = True
         self.napp.handle_evc_need_dyn_escape(event)
         self.napp.escape_to_dynamic.assert_called_once_with(evc)
-        evc.lock.__enter__.assert_called_once()
+        assert [c[0] for c in evc.lock.mock_calls].count("__enter__") == 1
 
         # a failed escape leaves it down on its kept configured paths
         self.napp.escape_to_dynamic.return_value = False

@@ -1937,6 +1937,14 @@ class Main(KytosNApp):
             return None
         if evc.archived:
             return None
+        try:
+            evc._validate_static_paths()
+        except ValueError as exception:
+            log.warning(
+                f"{evc} loaded with invalid static paths: {exception} "
+                "Its updates will be rejected until it's patched with a "
+                "valid backup_path or an empty one."
+            )
 
         self.circuits.setdefault(evc.id, evc)
         self.sched.add(evc)

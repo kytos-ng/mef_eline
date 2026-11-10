@@ -3090,6 +3090,32 @@ class TestMain:
         self.napp.sched.add.assert_called_with(evc)
         assert self.napp.circuits[1] == evc
 
+    @patch('napps.kytos.mef_eline.main.log')
+    @patch('napps.kytos.mef_eline.main.Main._evc_from_dict')
+    def test_load_evc_invalid_static_paths(self, evc_from_dict_mock, log_mock):
+        """Test _load_evc warns but still loads an EVC whose primary_path
+        and backup_path aren't disjoint, e.g. created before EP041."""
+        # pylint: disable=protected-access
+        evc = MagicMock()
+        evc.archived = False
+        evc.id = 2
+        evc._validate_static_paths.side_effect = ValueError(
+            "primary_path and backup_path must be different/disjoint."
+        )
+        evc_from_dict_mock.return_value = evc
+        self.napp.sched = MagicMock()
+
+        assert self.napp._load_evc(MagicMock()) == evc
+        assert log_mock.warning.call_count == 1
+        assert "disjoint" in log_mock.warning.call_args[0][0]
+        self.napp.sched.add.assert_called_with(evc)
+        assert self.napp.circuits[2] == evc
+
+        log_mock.reset_mock()
+        evc._validate_static_paths.side_effect = None
+        self.napp._load_evc(MagicMock())
+        log_mock.warning.assert_not_called()
+
     def test_handle_flow_mod_error(self):
         """Test handle_flow_mod_error method"""
         flow = MagicMock()
