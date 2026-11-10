@@ -232,7 +232,6 @@ class EVCBase(GenericEntity):
             uni_a = self.uni_a
         return uni_a, uni_z
 
-    # pylint: disable=too-many-branches
     def update(self, **kwargs):
         """Update evc attributes.
 
@@ -284,8 +283,14 @@ class EVCBase(GenericEntity):
                         f"{path_name} is not a valid path: {exception}"
                     )
 
+        self._validate_static_paths(
+            primary_path=kwargs.get("primary_path"),
+            backup_path=kwargs.get("backup_path"),
+        )
+
         # Changing/Updating with the new values
         uni_a, uni_z = self._get_unis_use_tags(uni_a, uni_z)
+
         for attribute, value in kwargs.items():
             if attribute == "enabled":
                 if value:
@@ -388,6 +393,29 @@ class EVCBase(GenericEntity):
         ):
             msg = "The EVC must have a primary path or allow dynamic paths."
             raise ValueError(msg)
+
+    def _validate_static_paths(
+        self, primary_path=None, backup_path=None
+    ) -> None:
+        """Reject a backup_path without a primary_path, as it's the standby of
+        a primary, and a primary_path and backup_path that aren't disjoint,
+        so EVCs are classified by config alone (EP041)."""
+        primary_path = (
+            primary_path if primary_path is not None else self.primary_path
+        )
+        backup_path = (
+            backup_path if backup_path is not None else self.backup_path
+        )
+        if not backup_path:
+            return
+        if not primary_path:
+            raise ValueError("backup_path requires a primary_path.")
+        if DynamicPathManager.get_disjointness(
+            self, primary_path, backup_path
+        ) <= 0:
+            raise ValueError(
+                "primary_path and backup_path must be different/disjoint."
+            )
 
     def __eq__(self, other):
         """Override the default implementation."""
@@ -550,16 +578,12 @@ class EVCDeploy(EVCBase):
         return DynamicPathManager.get_best_paths(self, self.max_paths,
                                                  **self.primary_constraints)
 
-    def get_failover_path_candidates(self):
-        """Get failover paths to satisfy this EVC."""
-        # in the future we can return primary/backup paths as well
-        # we just have to properly handle link_up and failover paths
-        # if (
-        #     self.is_using_primary_path() and
-        #     self.backup_path.status is EntityStatus.UP
-        # ):
-        #     yield self.backup_path
-        return DynamicPathManager.get_disjoint_paths(self, self.current_path)
+    def get_failover_path_candidates(self, reference_path=None):
+        """Get failover paths to satisfy this EVC, disjoint from
+        reference_path, current_path by default (EP041)."""
+        return DynamicPathManager.get_disjoint_paths(
+            self, reference_path or self.current_path
+        )
 
     def change_path(self):
         """Change EVC path."""
@@ -588,14 +612,25 @@ class EVCDeploy(EVCBase):
         """Return True if this EVC has the given link on its failover path."""
         return link in self.failover_path
 
+    def is_static_path_affected_by_link(self, link=None) -> bool:
+        """Verify if primary_path or backup_path is affected by link."""
+        return (self.is_primary_path_affected_by_link(link)
+                or self.is_backup_path_affected_by_link(link))
+
     def is_eligible_for_failover_path(self):
-        """Verify if this EVC is eligible for failover path (EP029)"""
-        # In the future this function can be augmented to consider
-        # primary/backup, primary/dynamic, and other path combinations
-        return (
-            self.dynamic_backup_path and
-            not self.primary_path and not self.backup_path
-        )
+        """Verify if this EVC is eligible for failover path (EP029).
+
+        EVCs with a backup_path never use it (EP041)."""
+        if any((
+            self.is_intra_switch(),
+            not self.current_path,
+            self.backup_path,
+        )):
+            return False
+        if (self.has_single_static_dynamic_path()
+                and not self.is_using_primary_path()):
+            return False
+        return bool(self.dynamic_backup_path)
 
     def is_using_primary_path(self):
         """Verify if the current deployed path is self.primary_path."""
@@ -616,6 +651,148 @@ class EVCDeploy(EVCBase):
             return True
         return False
 
+    def has_dual_static_paths(self):
+        """True when both static paths are set (kept installed, ingress
+        swapped between them); disjointness enforced at config."""
+        return all((
+            not self.is_intra_switch(),
+            self.primary_path,
+            self.backup_path,
+        ))
+
+    def keeps_static_paths(self) -> bool:
+        """True for EVCs whose configured paths are kept installed and
+        converge with UNI ingress swaps: single static, single static +
+        dynamic and dual static, with or without dynamic (EP041)."""
+        return bool(not self.is_intra_switch() and self.primary_path)
+
+    def has_single_static_dynamic_path(self):
+        """True for a static primary + dynamic backup: primary is kept as
+        standby, never moved into failover_path."""
+        return all((
+            not self.is_intra_switch(),
+            self.primary_path,
+            self.dynamic_backup_path,
+            not self.has_dual_static_paths(),
+        ))
+
+    def get_path_role(self, path) -> str:
+        """The attribute name a path is configured as, for logging."""
+        for role in ("primary_path", "backup_path"):
+            if path is getattr(self, role):
+                return role
+        return "configured path"
+
+    def get_static_standby_path(self):
+        """The configured path not carrying traffic, an UP one preferred,
+        whatever its status (EP041)."""
+        candidates = [path for path in (self.primary_path, self.backup_path)
+                      if path and path != self.current_path]
+        for path in candidates:
+            if path.status == EntityStatus.UP:
+                return path
+        return candidates[0] if candidates else Path([])
+
+    def needs_static_standby(self) -> bool:
+        """True when a dual static EVC's standby is UP but not installed,
+        so the consistency routine asks for it (EP041)."""
+        if not self.has_dual_static_paths():
+            return False
+        standby = self.get_static_standby_path()
+        return bool(
+            standby
+            and standby.status == EntityStatus.UP
+            and not standby.is_deployed()
+        )
+
+    def is_inactive_on_static(self) -> bool:
+        """True when this EVC is inactive on a configured path that is still
+        installed (EP041): its ingress was removed on convergence, or a UNI
+        went down. A redeploy would tear down the kept paths, so it resumes
+        by (re)installing the ingress, idempotent either way."""
+        return bool(
+            not self.is_active()
+            and self.current_path.is_deployed()
+            and (self.is_using_primary_path() or self.is_using_backup_path())
+        )
+
+    def get_installed_static_path(self) -> Path:
+        """The configured path to keep as current_path once the UNI ingress
+        is removed: the current one if it is an installed configured path,
+        else an installed one, primary preferred. Empty when none is
+        installed, so the EVC is not mistaken for a deployed one (EP041)."""
+        statics = [path for path in (self.primary_path, self.backup_path)
+                   if path]
+        for path in (self.current_path, *statics):
+            if path.is_deployed() and any(path is s for s in statics):
+                return path
+        return Path([])
+
+    def get_reactivation_path(self):
+        """The configured path to resume forwarding on, primary preferred
+        (EP041)."""
+        if self.primary_path and \
+                self.primary_path.status == EntityStatus.UP:
+            return self.primary_path
+        if self.backup_path and \
+                self.backup_path.status == EntityStatus.UP:
+            return self.backup_path
+        return Path([])
+
+    def is_eligible_for_static_resume(self, link=None) -> bool:
+        """True when a static EVC that stopped forwarding can resume on an UP
+        configured path, one recovered by link when given: the UNI ingress
+        is reinstalled, the path first installed when it never was, e.g.
+        pre-EP041."""
+        if any((
+            self.is_active(),
+            not self.current_path,
+            not self.keeps_static_paths(),
+            not self.are_unis_active(),
+        )):
+            return False
+        if (link is not None
+                and not self.is_static_path_affected_by_link(link)):
+            return False
+        return bool(self.get_reactivation_path())
+
+    def is_eligible_for_static_revert(self):
+        """True when this EVC can revert to an UP primary_path with an ingress
+        swap: a dual static EVC off primary, or a single static + dynamic
+        EVC on its dynamic (EP041)."""
+        if not self.is_active() or self.is_using_primary_path():
+            return False
+        return bool(
+            (self.has_dual_static_paths()
+             or self.has_single_static_dynamic_path())
+            and self.primary_path.status == EntityStatus.UP
+        )
+
+    def is_eligible_for_dyn_failover_recovery(self):
+        """True when a down static EVC with a dynamic backup, its configured
+        paths all down, can escape onto a dynamic path (EP041)."""
+        if any((
+            self.is_active(),
+            self.is_intra_switch(),
+            not self.primary_path,
+            not self.dynamic_backup_path,
+            not self.current_path,
+            not self.are_unis_active(),
+        )):
+            return False
+        return not self.get_reactivation_path()
+
+    def is_failover_reusable_after_revert(self) -> bool:
+        """True when the old dynamic kept in failover_path is still UP and
+        disjoint from primary_path (EP041)."""
+        if not (self.failover_path and self.primary_path):
+            return False
+        if self.failover_path.status != EntityStatus.UP:
+            return False
+        return DynamicPathManager.get_disjointness(
+            self, self.failover_path, self.primary_path
+        ) > 0
+
     def deploy_to_backup_path(self, old_path_dict: dict = None):
         """Deploy the backup path into the datapaths of this circuit.
 
@@ -626,7 +803,7 @@ class EVCDeploy(EVCBase):
         deploy a dynamic path.
         """
         # TODO: Remove flows from current (cookies)
-        if self.is_using_backup_path():
+        if self.is_using_backup_path() and self.is_active():
             # TODO: Log to say that cannot move backup to backup
             return True
 
@@ -649,7 +826,7 @@ class EVCDeploy(EVCBase):
         deploy this primary_path.
         """
         # TODO: Remove flows from current (cookies)
-        if self.is_using_primary_path():
+        if self.is_using_primary_path() and self.is_active():
             # TODO: Log to say that cannot move primary to primary
             return True
 
@@ -692,8 +869,41 @@ class EVCDeploy(EVCBase):
     #    def discover_new_path(self):
     #        # TODO: discover a new path to satisfy this circuit and deploy
 
+    def get_kept_standby_paths(self) -> list[Path]:
+        """Every installed configured path not carrying traffic, so not the
+        current_path object. A dual static + dynamic EVC on a dynamic escape
+        keeps both installed (EP041)."""
+        return [
+            path for path in (self.primary_path, self.backup_path)
+            if path and path.is_deployed()
+            and path is not self.current_path
+            and path is not self.failover_path
+        ]
+
+    def update(self, **kwargs):
+        """Sweep the kept standbys whose configured path was overwritten.
+
+        Captured before the new paths are set, swept only once the update is
+        stored, as storing it can still reject it (EP041).
+        """
+        sweep = []
+        if "primary_path" in kwargs or "backup_path" in kwargs:
+            sweep = self.get_kept_standby_paths()
+        enable, redeploy = super().update(**kwargs)
+        if sweep:
+            self.remove_static_standby_flows(sweep)
+        return enable, redeploy
+
+    def remove_static_standby_flows(self, paths: list[Path] = None):
+        """Sweep every kept static path not carrying traffic, or the given
+        ones captured earlier. Must run before remove_current_flows clears
+        current_path (EP041)."""
+        for path in self.get_kept_standby_paths() if paths is None else paths:
+            self.remove_path_flows(path)
+
     def remove(self):
         """Remove EVC path and disable it."""
+        self.remove_static_standby_flows()
         self.remove_current_flows(sync=False)
         self.remove_failover_flows(sync=False)
         self.disable()
@@ -813,7 +1023,6 @@ class EVCDeploy(EVCBase):
 
         try:
             nni_flows = self._prepare_nni_flows(path)
-        # pylint: disable=broad-except
         except Exception:
             err = traceback.format_exc()
             log.error(f"Fail to remove NNI failover flows for {self}: {err}")
@@ -832,7 +1041,6 @@ class EVCDeploy(EVCBase):
 
         try:
             uni_flows = self._prepare_uni_flows(path, skip_in=True)
-        # pylint: disable=broad-except
         except Exception:
             err = traceback.format_exc()
             log.error(f"Fail to remove UNI failover flows for {self}: {err}")
@@ -910,6 +1118,13 @@ class EVCDeploy(EVCBase):
             for interface in interfaces
         }
 
+    def are_unis_active(self) -> bool:
+        """Determine whether this EVC should be active"""
+        interface_a = self.uni_a.interface
+        interface_z = self.uni_z.interface
+        active, _ = self.is_uni_interface_active(interface_a, interface_z)
+        return active
+
     def try_to_activate(self) -> bool:
         """Try to activate the EVC."""
         if self.is_intra_switch():
@@ -943,7 +1158,7 @@ class EVCDeploy(EVCBase):
         self.activate()
         return True
 
-    # pylint: disable=too-many-branches, too-many-statements
+    # pylint: disable=too-many-statements
     def deploy_to_path(self, path=None, old_path_dict: dict = None):
         """Install the flows for this circuit.
 
@@ -959,7 +1174,9 @@ class EVCDeploy(EVCBase):
         7. Update links caches(primary, current, backup)
 
         """
+        self.remove_static_standby_flows()
         self.remove_current_flows(sync=False)
+        self.remove_failover_flows(sync=False)
         use_path = path or Path([])
         if not old_path_dict:
             old_path_dict = {}
@@ -1002,6 +1219,9 @@ class EVCDeploy(EVCBase):
                     log.error(msg)
                 else:
                     log.warning(msg)
+                # its paths were torn down above, kept standbys included,
+                # they must not reload as installed
+                self.sync()
                 return False
         except EVCPathNotInstalled as err:
             log.error(
@@ -1022,24 +1242,21 @@ class EVCDeploy(EVCBase):
         return True
 
     # pylint: disable=too-many-statements
-    def setup_failover_path(self, warn_if_not_path=True):
+    def setup_failover_path(self, warn_if_not_path=True, reference_path=None):
         """Install flows for the failover path of this EVC.
 
         Procedures to deploy:
 
         0. Remove flows currently installed for failover_path (if any)
-        1. Discover a disjoint path from current_path
+        1. Discover a disjoint path from current_path, or reference_path
+           (EP041)
         2. Choose vlans
         3. Install NNI flows
         4. Install UNI egress flows
         5. Update failover_path
         """
-        # Intra-switch EVCs have no failover_path
-        if self.is_intra_switch():
-            return False
-
-        # For not only setup failover path for totally dynamic EVCs
-        if not self.is_eligible_for_failover_path():
+        if (reference_path is None
+                and not self.is_eligible_for_failover_path()):
             return False
 
         out_new_flows: dict[str, list[dict]] = {}
@@ -1048,7 +1265,7 @@ class EVCDeploy(EVCBase):
         out_removed_flows = self.remove_path_flows(self.failover_path)
         self.failover_path = Path([])
 
-        for use_path in self.get_failover_path_candidates():
+        for use_path in self.get_failover_path_candidates(reference_path):
             if not use_path:
                 continue
             try:
@@ -1129,7 +1346,6 @@ class EVCDeploy(EVCBase):
             return {}
         return self._prepare_uni_flows(self.failover_path, skip_out=True)
 
-    # pylint: disable=too-many-branches
     def _prepare_direct_uni_flows(self):
         """Prepare flows connecting two UNIs for intra-switch EVC."""
         vlan_a = self._get_value_from_uni_tag(self.uni_a)
@@ -1279,7 +1495,6 @@ class EVCDeploy(EVCBase):
             return special.get(value, value)
         return None
 
-    # pylint: disable=too-many-locals
     def _prepare_uni_flows(self, path=None, skip_in=False, skip_out=False):
         """Prepare flows to install UNIs."""
         uni_flows = {}
@@ -1619,7 +1834,7 @@ class EVCDeploy(EVCBase):
             return {"result": []}
         return response.json()
 
-    # pylint: disable=too-many-return-statements, too-many-arguments
+    # pylint: disable=too-many-arguments
     @staticmethod
     def check_trace(
         evc_id: str,
@@ -1790,25 +2005,6 @@ class LinkProtection(EVCDeploy):
         """Verify if the current path is affected by link down event."""
         return self.current_path.is_affected_by_link(link)
 
-    def is_using_primary_path(self):
-        """Verify if the current deployed path is self.primary_path."""
-        return self.current_path == self.primary_path
-
-    def is_using_backup_path(self):
-        """Verify if the current deployed path is self.backup_path."""
-        return self.current_path == self.backup_path
-
-    def is_using_dynamic_path(self):
-        """Verify if the current deployed path is dynamic."""
-        if (
-            self.current_path
-            and not self.is_using_primary_path()
-            and not self.is_using_backup_path()
-            and self.current_path.status is EntityStatus.UP
-        ):
-            return True
-        return False
-
     def handle_link_up(self, link=None, interface=None):
         """Handle circuit when link up.
 
@@ -1826,7 +2022,8 @@ class LinkProtection(EVCDeploy):
                 lambda _: (True, 'nothing')
             ),
             (
-                lambda me: me.primary_path.is_affected_by_link(link),
+                lambda me: (me.primary_path.is_affected_by_link(link)
+                            and not me.current_path),
                 lambda me: (me.deploy_to_primary_path(), 'redeploy')
             ),
             # For this special case, it reached this point because interface
@@ -1854,7 +2051,8 @@ class LinkProtection(EVCDeploy):
             # In this case, probably the circuit is not being used and
             # we can move to backup
             (
-                lambda me: me.backup_path.is_affected_by_link(link),
+                lambda me: (me.backup_path.is_affected_by_link(link)
+                            and not me.current_path),
                 lambda me: (me.deploy_to_backup_path(), 'redeploy')
             ),
             # In this case, the circuit is not being used and we should
@@ -1878,41 +2076,17 @@ class LinkProtection(EVCDeploy):
                 return True
         return False
 
-    def handle_link_down(self):
-        """Handle circuit when link down.
-
-        Returns:
-            bool: True if the re-deploy was successly otherwise False.
-
-        """
-        success = False
-        if self.is_using_primary_path():
-            success = self.deploy_to_backup_path()
-        elif self.is_using_backup_path():
-            success = self.deploy_to_primary_path()
-
-        if not success and self.dynamic_backup_path:
-            success = self.deploy_to_path()
-
-        if success:
-            log.debug(f"{self} deployed after link down.")
-        else:
-            self.remove_current_flows(sync=False)
-            self.deactivate()
-            self.sync()
-            log.debug(f"Failed to re-deploy {self} after link down.")
-
-        return success
-
-    def are_unis_active(self) -> bool:
-        """Determine whether this EVC should be active"""
-        interface_a = self.uni_a.interface
-        interface_z = self.uni_z.interface
-        active, _ = self.is_uni_interface_active(interface_a, interface_z)
-        return active
+    def request_dyn_escape(self) -> None:
+        """Schedule the dynamic escape of this down static EVC, run by
+        Main.handle_evc_need_dyn_escape (EP041)."""
+        emit_event(self._controller, "need_dyn_escape",
+                   content={"evc_id": self.id})
+        log.info(f"{self} scheduled for a dynamic escape")
 
     def try_to_handle_uni_as_link_up(self, interface: Interface) -> bool:
-        """Try to handle UNI as link_up to trigger deployment."""
+        """Try to handle UNI as link_up to trigger deployment. EVCs keeping
+        their configured paths installed are resumed by
+        Main.handle_interface_link_up instead (EP041)."""
         if (
             self.current_path.status != EntityStatus.UP
             and not self.is_intra_switch()
