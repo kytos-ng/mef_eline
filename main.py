@@ -11,7 +11,7 @@ from contextlib import ExitStack
 from copy import deepcopy
 from enum import StrEnum
 from threading import Lock
-from typing import Optional
+from typing import Optional, Union
 
 from jsonschema.exceptions import ValidationError as OpenapiValidationError
 from openapi_schema_validator import validate
@@ -2095,13 +2095,21 @@ class Main(KytosNApp):
         return uni
 
     def _link_from_dict(
-        self, link_dict: dict, attribute: str, from_db=False
+        self, link_dict: Union[dict, str], attribute: str, from_db=False
     ) -> Link:
-        """Return a Link object from python dict.
+        """Return a Link object from a python dict or a link reference string.
 
+        ``link_dict`` may be either the canonical dict form
+        ``{"endpoint_a": {"id": ...}, "endpoint_b": {"id": ...}}`` or a string
+        referencing a topology link by its ``id`` or by its
+        ``metadata.link_name``. String references are resolved statelessly to
+        their endpoints (see ``_link_reference_to_dict``), so the resulting EVC
+        is stored exactly as if the endpoints had been given explicitly.
         Static paths keep their metadata (s_vlan) only when loaded from the
         DB, a request payload must never claim VLANs (EP041).
         """
+        if isinstance(link_dict, str):
+            link_dict = self._link_reference_to_dict(link_dict)
         id_a = link_dict.get("endpoint_a").get("id")
         id_b = link_dict.get("endpoint_b").get("id")
 
@@ -2129,6 +2137,45 @@ class Main(KytosNApp):
                 raise ValueError(error_msg)
             link.update_metadata("s_vlan", tag)
         return link
+
+    def _link_reference_to_dict(self, reference: str) -> dict:
+        """Resolve a link reference string to the canonical endpoint dict.
+
+        A reference is resolved statelessly, only at request time:
+
+        1. If ``reference`` exactly matches an existing link ``id``, use it.
+        2. Otherwise, match links whose ``metadata.link_name`` equals
+           ``reference``. Exactly one match is required: zero matches raises
+           ValueError, and more than one (ambiguous ``link_name``) also raises
+           ValueError.
+
+        Raises:
+            ValueError: if the reference matches no link, or matches more than
+                one link by ``link_name``.
+        """
+        link = self.controller.get_link(reference)
+        if link is None:
+            matches = [
+                cand
+                for cand in self.controller.links.copy().values()
+                if cand.get_metadata("link_name") == reference
+            ]
+            if not matches:
+                raise ValueError(
+                    f"Could not resolve link reference '{reference}': no link "
+                    "with this id or link_name was found"
+                )
+            if len(matches) > 1:
+                raise ValueError(
+                    f"Ambiguous link_name '{reference}': it matches "
+                    f"{len(matches)} links {[cand.id for cand in matches]}. "
+                    "Use the link id instead"
+                )
+            link = matches[0]
+        return {
+            "endpoint_a": {"id": link.endpoint_a.id},
+            "endpoint_b": {"id": link.endpoint_b.id},
+        }
 
     def _find_evc_by_schedule_id(self, schedule_id):
         """
