@@ -1931,7 +1931,7 @@ class TestMain:
         self.napp.controller.links = {"other": by_name}
         intfs = {i: MagicMock(id=i) for i in (ep_a, ep_b)}
         self.napp.controller.get_interface_by_id = MagicMock(
-            side_effect=lambda i: intfs.get(i)
+            side_effect=intfs.get
         )
 
         result = self.napp._link_from_dict("collision", "primary_path")
@@ -1954,7 +1954,7 @@ class TestMain:
         self.napp.controller.links = {"abc": link, "decoy": decoy}
         intfs = {i: MagicMock(id=i) for i in (ep_a, ep_b)}
         self.napp.controller.get_interface_by_id = MagicMock(
-            side_effect=lambda i: intfs.get(i)
+            side_effect=intfs.get
         )
 
         result = self.napp._link_from_dict("SAO-SCL-100G-01", "primary_path")
@@ -1975,7 +1975,7 @@ class TestMain:
         self.napp.controller.links = {"abc": topo_link}
         intfs = {i: MagicMock(id=i) for i in (ep_a, ep_b)}
         self.napp.controller.get_interface_by_id = MagicMock(
-            side_effect=lambda i: intfs.get(i)
+            side_effect=intfs.get
         )
 
         result = self.napp._link_from_dict("OLD-NAME", "primary_path")
@@ -2037,7 +2037,7 @@ class TestMain:
         all_ids = (dict_a, dict_b, id_a, id_b, name_a, name_b)
         intfs = {i: MagicMock(id=i) for i in all_ids}
         self.napp.controller.get_interface_by_id = MagicMock(
-            side_effect=lambda i: intfs.get(i)
+            side_effect=intfs.get
         )
 
         value = [
@@ -2083,7 +2083,7 @@ class TestMain:
         all_ids = p_dict + p_id + b_name
         intfs = {i: MagicMock(id=i) for i in all_ids}
         self.napp.controller.get_interface_by_id = MagicMock(
-            side_effect=lambda i: intfs.get(i)
+            side_effect=intfs.get
         )
 
         payload = {
