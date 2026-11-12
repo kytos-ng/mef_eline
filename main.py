@@ -2108,7 +2108,6 @@ class Main(KytosNApp):
         Static paths keep their metadata (s_vlan) only when loaded from the
         DB, a request payload must never claim VLANs (EP041).
         """
-    ) -> Link:
         if isinstance(link_dict, str):
             link_dict = self._link_reference_to_dict(link_dict)
         id_a = link_dict.get("endpoint_a").get("id")
