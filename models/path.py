@@ -123,6 +123,10 @@ class Path(list[Link], GenericEntity):
                 return status
         return EntityStatus.UP
 
+    def is_deployed(self) -> bool:
+        """Return True if this path has been deployed."""
+        return bool(self) and self[0].get_metadata("s_vlan") is not None
+
     def as_dict(self):
         """Return list comprehension of links as_dict."""
         return [link.as_dict() for link in self if link]
@@ -250,17 +254,9 @@ class DynamicPathManager:
         """
         if cutoff < 1:
             return None
-        unwanted_links = [
-            (link.endpoint_a.id, link.endpoint_b.id) for link in unwanted_path
-        ]
-        unwanted_switches = set()
-        for link in unwanted_path:
-            unwanted_switches.add(link.endpoint_a.switch.id)
-            unwanted_switches.add(link.endpoint_b.switch.id)
-        unwanted_switches.discard(circuit.uni_a.interface.switch.id)
-        unwanted_switches.discard(circuit.uni_z.interface.switch.id)
-
-        length_unwanted = (len(unwanted_links) + len(unwanted_switches))
+        unwanted_links, unwanted_switches, length_unwanted = (
+            cls._unwanted_components(circuit, unwanted_path)
+        )
         if not unwanted_links:
             return None
 
@@ -286,6 +282,57 @@ class DynamicPathManager:
                 continue
             yield cls.create_path(path["hops"])
         return None
+
+    @staticmethod
+    def _unwanted_components(
+        circuit, unwanted_path
+    ) -> tuple[list[tuple[str, str]], set[str], int]:
+        """Return the links, switches and ratio length of unwanted_path.
+
+        The UNI switches are discarded, every path of the circuit shares
+        them, so they carry no disjointness information.
+        """
+        unwanted_links = [
+            (link.endpoint_a.id, link.endpoint_b.id) for link in unwanted_path
+        ]
+        unwanted_switches = set()
+        for link in unwanted_path:
+            unwanted_switches.add(link.endpoint_a.switch.id)
+            unwanted_switches.add(link.endpoint_b.switch.id)
+        unwanted_switches.discard(circuit.uni_a.interface.switch.id)
+        unwanted_switches.discard(circuit.uni_z.interface.switch.id)
+        return (
+            unwanted_links,
+            unwanted_switches,
+            len(unwanted_links) + len(unwanted_switches),
+        )
+
+    @classmethod
+    def get_disjointness(cls, circuit, path, unwanted_path) -> float:
+        """Return the disjointness of path from unwanted_path, in [0.0, 1.0].
+
+        Same ratio as get_disjoint_paths, but computed between two paths
+        already materialized instead of Pathfinder replies, so it needs
+        neither a Pathfinder query nor any tag allocation.
+        """
+        if not path or not unwanted_path:
+            return 0.0
+        _, unwanted_switches, length_unwanted = cls._unwanted_components(
+            circuit, unwanted_path
+        )
+        if not length_unwanted:
+            return 0.0
+
+        unwanted_link_ids = {link.id for link in unwanted_path}
+        shared_links = len({link.id for link in path} & unwanted_link_ids)
+
+        path_switches = set()
+        for link in path:
+            path_switches.add(link.endpoint_a.switch.id)
+            path_switches.add(link.endpoint_b.switch.id)
+        shared_switches = len(path_switches & unwanted_switches)
+
+        return 1 - (shared_links + shared_switches) / length_unwanted
 
     @staticmethod
     def get_shared_components(
